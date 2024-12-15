@@ -1,0 +1,2 @@
+### Test Schedule
+GET http://localhost:8080/api/schedule
