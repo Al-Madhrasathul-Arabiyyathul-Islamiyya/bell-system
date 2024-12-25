@@ -1,0 +1,19 @@
+{
+    "sqltools.connections": [
+        {
+            "mssqlOptions": {
+                "appName": "SQLTools",
+                "useUTC": true,
+                "encrypt": true
+            },
+            "previewLimit": 50,
+            "server": "172.16.5.52",
+            "port": 1433,
+            "driver": "MSSQL",
+            "name": "BellScheduleDB",
+            "username": "bell_schedule_user",
+            "password": "Pass!1234",
+            "database": "BellScheduleDB"
+        }
+    ]
+}
