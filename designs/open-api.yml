@@ -1,0 +1,685 @@
+openapi: 3.0.0
+info:
+  title: Bell Schedule System API
+  version: 1.0.0
+  description: Backend API for managing school bell schedules and audio playback
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: Schedule
+    description: Schedule management endpoints
+  - name: Audio
+    description: System audio file management
+  - name: System
+    description: System status and control
+  - name: Media
+    description: Media file streaming from network share
+  - name: Users
+    description: User management (admin only)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        role:
+          type: string
+          enum: [admin, morning_user, afternoon_user]
+        createdAt:
+          type: string
+          format: date-time
+
+    UserCreate:
+      type: object
+      required:
+        - username
+        - password
+        - role
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, morning_user, afternoon_user]
+
+    UserUpdate:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          description: If provided, will update the password
+        role:
+          type: string
+          enum: [admin, morning_user, afternoon_user]
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        startTime:
+          type: string
+          format: time
+        endTime:
+          type: string
+          format: time
+
+    ScheduleItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+          nullable: true
+        name:
+          type: string
+        time:
+          type: string
+          format: time
+        soundId:
+          type: string
+          format: uuid
+        days:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 7
+
+    SystemAudioFile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        type:
+          type: string
+          enum: [bell, anthem, school_song, other]
+        checksum:
+          type: string
+          description: SHA-256 checksum of the file
+        createdAt:
+          type: string
+          format: date-time
+
+    SystemState:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [active, paused]
+        lastUpdated:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Authenticate user
+      description: Used by admin interface to authenticate users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Authentication failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /schedule/current:
+    get:
+      tags:
+        - Schedule
+      summary: Get current schedule
+      description: Returns the current session's schedule for the current day
+      responses:
+        '200':
+          description: Current schedule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session:
+                    $ref: '#/components/schemas/Session'
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                        time:
+                          type: string
+                          format: time
+                        sound:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                            checksum:
+                              type: string
+                        status:
+                          type: string
+                          enum: [pending, current, completed]
+
+  /schedule/items:
+    get:
+      tags:
+        - Schedule
+      summary: List schedule items
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: session_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: day
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 7
+      responses:
+        '200':
+          description: List of schedule items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ScheduleItem'
+    
+    post:
+      tags:
+        - Schedule
+      summary: Create schedule item
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - time
+                - soundId
+                - days
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                name:
+                  type: string
+                time:
+                  type: string
+                  format: time
+                soundId:
+                  type: string
+                  format: uuid
+                days:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 1
+                    maximum: 7
+      responses:
+        '201':
+          description: Schedule item created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleItem'
+
+  /schedule/items/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    
+    get:
+      tags:
+        - Schedule
+      summary: Get schedule item by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Schedule item details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleItem'
+    
+    put:
+      tags:
+        - Schedule
+      summary: Update schedule item
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                name:
+                  type: string
+                time:
+                  type: string
+                  format: time
+                soundId:
+                  type: string
+                  format: uuid
+                days:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 1
+                    maximum: 7
+      responses:
+        '200':
+          description: Schedule item updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScheduleItem'
+    
+    delete:
+      tags:
+        - Schedule
+      summary: Delete schedule item
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Schedule item deleted
+
+  /audio/files:
+    get:
+      tags:
+        - Audio
+      summary: List audio files
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [bell, anthem, school_song, other]
+      responses:
+        '200':
+          description: List of audio files
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SystemAudioFile'
+    
+    post:
+      tags:
+        - Audio
+      summary: Upload audio file
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - type
+                - name
+              properties:
+                file:
+                  type: string
+                  format: binary
+                type:
+                  type: string
+                  enum: [bell, anthem, school_song, other]
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Audio file uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemAudioFile'
+
+  /audio/files/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    
+    get:
+      tags:
+        - Audio
+      summary: Download audio file
+      description: Streams the audio file data
+      responses:
+        '200':
+          description: Audio file data
+          content:
+            audio/*:
+              schema:
+                type: string
+                format: binary
+    
+    delete:
+      tags:
+        - Audio
+      summary: Delete audio file
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Audio file deleted
+
+  /audio/checksums:
+    get:
+      tags:
+        - Audio
+      summary: Get checksums for all system audio files
+      description: Returns a list of file IDs and their checksums for client synchronization
+      responses:
+        '200':
+          description: Audio file checksums
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        type:
+                          type: string
+                        checksum:
+                          type: string
+
+  /system/state:
+    get:
+      tags:
+        - System
+      summary: Get current system state
+      description: Returns whether the bell system is active or paused
+      responses:
+        '200':
+          description: Current system state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemState'
+    
+    post:
+      tags:
+        - System
+      summary: Set system state
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - state
+              properties:
+                state:
+                  type: string
+                  enum: [active, paused]
+      responses:
+        '200':
+          description: System state updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemState'
+
+  /system/cancel-next-bell:
+    post:
+      tags:
+        - System
+      summary: Cancel next scheduled bell
+      description: Prevents the next scheduled bell from playing
+      responses:
+        '200':
+          description: Next bell cancelled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /system/sessions:
+    get:
+      tags:
+        - System
+      summary: Get all sessions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+  /users:
+    get:
+      tags:
+        - Users
+      summary: List all users
+      security:
+        - BearerAuth: []
+      description: Admin only - list all system users
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+    
+    post:
+      tags:
+        - Users
+      summary: Create new user
+      security:
+        - BearerAuth: []
+      description: Admin only - create new system user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+    
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      security:
+        - BearerAuth: []
+      description: Admin only - get user details
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    
+    put:
+      tags:
+        - Users
+      summary: Update user
+      security:
+        - BearerAuth: []
+      description: Admin only - update user details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    
+    delete:
+      tags:
+        - Users
+      summary: Delete user
+      security:
+        - BearerAuth: []
+      description: Admin only - delete user
+      responses:
+        '204':
+          description: User deleted
