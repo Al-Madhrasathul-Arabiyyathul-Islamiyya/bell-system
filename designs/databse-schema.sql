@@ -44,6 +44,7 @@ CREATE TABLE SystemAudioFiles (
     Name NVARCHAR(255) NOT NULL,
     FilePath NVARCHAR(500) NOT NULL,
     FileType NVARCHAR(20) CHECK (FileType IN ('bell', 'anthem', 'school_song', 'other')),
+    Checksum NVARCHAR(64) NOT NULL,
     CreatedAt DATETIME2 DEFAULT GETDATE(),
     UpdatedAt DATETIME2
 );
