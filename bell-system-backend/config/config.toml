@@ -1,2 +1,21 @@
+[server]
+port = 8080
+environment = "development"
+readTimeout = 15
+writeTimeout = 15
 
+[database]
+driver = "sqlserver"
+host = "localhost"
+port = 1433
+user = "bell_schedule_user"
+password = "YourStrongPassword123!"
+name = "BellScheduleDB"
+sslmode = "disable"
 
+[jwt]
+secret = "your-secret-key-change-in-production"
+expiresIn = 180 # minutes
+
+[storage]
+audioDir = "./data/audio"
