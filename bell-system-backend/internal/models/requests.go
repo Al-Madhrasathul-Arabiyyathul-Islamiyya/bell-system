@@ -28,7 +28,7 @@ type UserUpdateRequest struct {
 type ScheduleItemCreateRequest struct {
 	SessionID *uuid.UUID `json:"sessionId"`
 	Name      string     `json:"name" validate:"required"`
-	Time      string     `json:"time" validate:"required"` // Format: "15:04"
+	Time      string     `json:"time" validate:"required"`
 	SoundID   uuid.UUID  `json:"soundId" validate:"required"`
 	Days      []int      `json:"days" validate:"required,dive,min=1,max=7"`
 }
@@ -37,7 +37,7 @@ type ScheduleItemCreateRequest struct {
 type ScheduleItemUpdateRequest struct {
 	SessionID *uuid.UUID `json:"sessionId,omitempty"`
 	Name      string     `json:"name,omitempty"`
-	Time      string     `json:"time,omitempty"` // Format: "15:04"
+	Time      string     `json:"time,omitempty"`
 	SoundID   uuid.UUID  `json:"soundId,omitempty"`
 	Days      []int      `json:"days,omitempty" validate:"omitempty,dive,min=1,max=7"`
 }
