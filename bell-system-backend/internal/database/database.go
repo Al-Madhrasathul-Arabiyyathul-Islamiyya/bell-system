@@ -26,12 +26,10 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	// Set connection pool settings
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(time.Minute * 5)
 
-	// Test the connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -42,7 +40,6 @@ func New(cfg config.DatabaseConfig) (*DB, error) {
 	return &DB{db}, nil
 }
 
-// Close closes the database connection
 func (db *DB) Close() error {
 	return db.DB.Close()
 }
