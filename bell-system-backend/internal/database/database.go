@@ -8,7 +8,7 @@ import (
 
 	"arabiyya.edu.mv/bell-system-backend/config"
 
-	_ "github.com/denisenkom/go-mssqldb"
+	_ "github.com/microsoft/go-mssqldb"
 )
 
 // DB wraps the SQL database connection
