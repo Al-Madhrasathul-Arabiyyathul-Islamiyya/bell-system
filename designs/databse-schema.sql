@@ -21,6 +21,7 @@ GO
 -- Grant execute permissions for specific operations
 GRANT CREATE TABLE TO bell_schedule_user;
 GRANT ALTER ON SCHEMA::dbo TO bell_schedule_user;
+GRANT REFERENCES ON SCHEMA::dbo TO bell_schedule_user;
 GO
 
 -- Create Tables

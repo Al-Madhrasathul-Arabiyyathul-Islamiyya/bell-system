@@ -12,7 +12,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/config"
 	"arabiyya.edu.mv/bell-system-backend/internal/database"
 
-	_ "github.com/denisenkom/go-mssqldb"
+	_ "github.com/microsoft/go-mssqldb"
 )
 
 func main() {
