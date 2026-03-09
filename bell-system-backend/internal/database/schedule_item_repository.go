@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
+	"arabiyya.edu.mv/bell-system-backend/internal/helpers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 	"go.uber.org/zap"
@@ -134,7 +134,7 @@ func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*mo
 	}
 	scheduleItem.Days = daysMap[scheduleItem.ID]
 
-	scheduleItem.DayInfo = mapDaysToInfo(scheduleItem.Days)
+	scheduleItem.DayInfo = helpers.MapDaysToInfo(scheduleItem.Days)
 
 	if scheduleItem.SoundID != uuid.Nil {
 		soundIDs := []uuid.UUID{scheduleItem.SoundID}
@@ -250,7 +250,7 @@ func (r *ScheduleItemRepository) List(ctx context.Context) ([]*models.ScheduleIt
 	for _, item := range scheduleItems {
 		item.Days = daysMap[item.ID]
 
-		item.DayInfo = mapDaysToInfo(item.Days)
+		item.DayInfo = helpers.MapDaysToInfo(item.Days)
 
 		if item.SoundID != uuid.Nil {
 			if sound, ok := soundsMap[item.SoundID]; ok {
@@ -356,7 +356,7 @@ func (r *ScheduleItemRepository) GetCurrentSessionSchedules(ctx context.Context,
 	for _, item := range scheduleItems {
 		item.Days = daysMap[item.ID]
 
-		item.DayInfo = mapDaysToInfo(item.Days)
+		item.DayInfo = helpers.MapDaysToInfo(item.Days)
 
 		if item.SoundID != uuid.Nil {
 			if sound, ok := soundsMap[item.SoundID]; ok {
@@ -433,30 +433,3 @@ func (r *ScheduleItemRepository) Delete(ctx context.Context, id uuid.UUID) error
 	return nil
 }
 
-// mapDaysToInfo converts a slice of day numbers to a slice of ScheduleDayInfo
-func mapDaysToInfo(days []int) []models.ScheduleDayInfo {
-	if days == nil {
-		return nil
-	}
-
-	// Day names indexed by day number (where index 1 is Sunday)
-	dayNames := []string{"", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"}
-
-	dayInfo := make([]models.ScheduleDayInfo, 0, len(days))
-	for _, dayNum := range days {
-		// Check for valid day number (1-7)
-		if dayNum >= 1 && dayNum <= 7 {
-			dayInfo = append(dayInfo, models.ScheduleDayInfo{
-				DayNumber: dayNum,
-				DayName:   dayNames[dayNum],
-			})
-		}
-	}
-
-	// Sort by day number
-	sort.Slice(dayInfo, func(i, j int) bool {
-		return dayInfo[i].DayNumber < dayInfo[j].DayNumber
-	})
-
-	return dayInfo
-}
