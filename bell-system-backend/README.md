@@ -45,7 +45,7 @@ bell-system-backend/
 ├── pkg/
 │   ├── errors/          # Custom error types
 │   └── logger/          # Zap logger setup
-├── scripts/hooks/       # Git hooks (pre-commit, pre-push)
+├── scripts/             # Build, deploy, dev, test scripts
 ├── tests/
 │   ├── handlers/        # Handler integration tests
 │   ├── repositories/    # Repository tests (sqlmock)
@@ -112,18 +112,17 @@ See [docs/api/](../docs/api/) for OpenAPI specifications.
 
 ### Git Hooks
 
-Set up pre-commit and pre-push hooks:
+Git hooks live at the repo root (`scripts/hooks/`) and are shared across all components. They detect which files changed and only run relevant checks.
 
 ```bash
-make setup-hooks
+# From anywhere in the repo
+./scripts/hooks/setup.sh    # Bash
+./scripts/hooks/setup.ps1   # PowerShell
 
-# Or manually:
-# Bash
-./scripts/hooks/setup.sh
-# PowerShell
-./scripts/hooks/setup.ps1
+# Or from bell-system-backend/
+make setup-hooks
 ```
 
-**Pre-commit** checks: formatting (`gofmt`), static analysis (`go vet`), module tidiness (`go mod tidy`).
+**Pre-commit** (backend): formatting (`gofmt`), static analysis (`go vet`), module tidiness (`go mod tidy`).
 
-**Pre-push** checks: all tests pass, binary builds successfully.
+**Pre-push** (backend): all tests pass, binary builds successfully.

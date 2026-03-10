@@ -34,9 +34,9 @@ deps:
 	go mod tidy
 	go mod vendor
 
-# Setup git hooks
+# Setup git hooks (repo-wide, run from any directory)
 setup-hooks:
-	git config core.hooksPath bell-system-backend/scripts/hooks
+	git config core.hooksPath scripts/hooks
 
 # Lint: check formatting and run static analysis
 lint:
