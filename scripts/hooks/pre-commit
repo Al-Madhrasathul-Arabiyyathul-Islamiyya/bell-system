@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -e
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+
+# --- Backend (Go) ---
+if echo "$STAGED" | grep -q "^bell-system-backend/"; then
+    echo "==> [backend] Checking formatting..."
+    cd "$REPO_ROOT/bell-system-backend"
+
+    UNFORMATTED=$(gofmt -l .)
+    if [ -n "$UNFORMATTED" ]; then
+        echo "The following files need formatting:"
+        echo "$UNFORMATTED"
+        echo "Run 'gofmt -w .' to fix."
+        exit 1
+    fi
+
+    echo "==> [backend] Running go vet..."
+    go vet ./...
+
+    echo "==> [backend] Checking go.mod tidiness..."
+    cp go.mod go.mod.bak
+    cp go.sum go.sum.bak
+    go mod tidy
+    if ! diff -q go.mod go.mod.bak > /dev/null 2>&1 || ! diff -q go.sum go.sum.bak > /dev/null 2>&1; then
+        mv go.mod.bak go.mod
+        mv go.sum.bak go.sum
+        echo "go.mod or go.sum is not tidy. Run 'go mod tidy' and commit the changes."
+        exit 1
+    fi
+    rm -f go.mod.bak go.sum.bak
+
+    cd "$REPO_ROOT"
+fi
+
+# --- Admin Client (React/TypeScript) ---
+if echo "$STAGED" | grep -q "^admin-client/"; then
+    echo "==> [admin-client] Checks not yet configured."
+    # Future: eslint, tsc --noEmit, prettier
+fi
+
+# --- Desktop Client (.NET) ---
+if echo "$STAGED" | grep -q "^desktop-client/"; then
+    echo "==> [desktop-client] Checks not yet configured."
+    # Future: dotnet build, dotnet format --verify-no-changes
+fi
+
+echo "==> Pre-commit checks passed."

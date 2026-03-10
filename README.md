@@ -54,6 +54,7 @@ See [bell-system-backend/README.md](bell-system-backend/README.md) for full setu
 ```
 bell-system/
 ├── .github/workflows/    # CI/CD pipelines
+├── scripts/hooks/        # Git hooks (repo-wide)
 ├── bell-system-backend/  # Go REST API + scheduler
 ├── admin-client/         # React admin dashboard
 ├── desktop-client/       # .NET WPF desktop app
@@ -76,8 +77,9 @@ bell-system/
 ### Git Hooks Setup
 
 ```bash
-cd bell-system-backend
-make setup-hooks
+# From anywhere in the repo
+./scripts/hooks/setup.sh    # Bash
+./scripts/hooks/setup.ps1   # PowerShell
 ```
 
-This configures pre-commit (formatting, vet, tidy) and pre-push (tests, build) hooks.
+Hooks are repo-wide and detect which components changed. Only runs checks relevant to the modified files (e.g. Go checks for backend changes, future ESLint for admin-client).
