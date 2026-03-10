@@ -1,0 +1,12 @@
+﻿namespace ClientApp.ViewModels;
+
+partial class BaseViewModel : ObservableObject
+{
+    public BaseViewModel()
+    {
+
+    }
+
+    [ObservableProperty]
+    public partial string Title { get; set; } = string.Empty;
+}
