@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -e
+
+cd "$(git rev-parse --show-toplevel)/bell-system-backend"
+
+echo "==> Checking formatting..."
+UNFORMATTED=$(gofmt -l .)
+if [ -n "$UNFORMATTED" ]; then
+    echo "The following files need formatting:"
+    echo "$UNFORMATTED"
+    echo "Run 'gofmt -w .' to fix."
+    exit 1
+fi
+
+echo "==> Running go vet..."
+go vet ./...
+
+echo "==> Checking go.mod tidiness..."
+cp go.mod go.mod.bak
+cp go.sum go.sum.bak
+go mod tidy
+if ! diff -q go.mod go.mod.bak > /dev/null 2>&1 || ! diff -q go.sum go.sum.bak > /dev/null 2>&1; then
+    mv go.mod.bak go.mod
+    mv go.sum.bak go.sum
+    echo "go.mod or go.sum is not tidy. Run 'go mod tidy' and commit the changes."
+    exit 1
+fi
+rm -f go.mod.bak go.sum.bak
+
+echo "==> Pre-commit checks passed."
