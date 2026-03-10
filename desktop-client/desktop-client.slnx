@@ -6,6 +6,8 @@
     <Platform Solution="*|x64" Project="x64" />
     <Deploy />
   </Project>
+  <Project Path="ClientApp.Application/ClientApp.Application.csproj" />
+  <Project Path="ClientApp.Infrastructure/ClientApp.Infrastructure.csproj" />
 
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />

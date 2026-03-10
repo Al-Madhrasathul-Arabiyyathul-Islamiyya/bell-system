@@ -1,9 +1,15 @@
-﻿namespace ClientApp.ViewModels;
+namespace ClientApp.Application.ViewModels;
 
-sealed partial class MainViewModel : BaseViewModel
+/// <summary>
+/// Temporary shell view model for the desktop client landing page.
+/// </summary>
+public sealed partial class MainViewModel : BaseViewModel
 {
     int count;
 
+    /// <summary>
+    /// Initializes the main page view model.
+    /// </summary>
     public MainViewModel() => Title = "Home";
 
     [ObservableProperty]
