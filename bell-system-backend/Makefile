@@ -1,4 +1,4 @@
-.PHONY: dev build test clean
+.PHONY: dev build test clean lint check setup-hooks
 
 # Application settings
 APP_NAME=bell-schedule-system
@@ -33,3 +33,18 @@ migrate-down:
 deps:
 	go mod tidy
 	go mod vendor
+
+# Setup git hooks
+setup-hooks:
+	git config core.hooksPath bell-system-backend/scripts/hooks
+
+# Lint: check formatting and run static analysis
+lint:
+	gofmt -l .
+	go vet ./...
+
+# Full check: lint, tidy, test, and build
+check: lint
+	go mod tidy
+	go test ./... -count=1
+	go build ./cmd/server
