@@ -69,7 +69,7 @@ func TestScheduleHandler_List_Success(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 
 	var resp struct {
-		Total int                    `json:"total"`
+		Total int                   `json:"total"`
 		Items []models.ScheduleItem `json:"items"`
 	}
 	err := json.NewDecoder(rr.Body).Decode(&resp)
