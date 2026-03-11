@@ -42,12 +42,11 @@ func AuthRoutes(h *handlers.AuthHandler) chi.Router {
 // UserRoutes returns a chi.Router with user management routes.
 func UserRoutes(h *handlers.UserHandler) chi.Router {
 	r := chi.NewRouter()
-	// TODO: implement route handlers (admin only)
-	// GET / (list)
-	// POST / (create)
-	// GET /{id}
-	// PUT /{id}
-	// DELETE /{id}
+	r.Get("/", h.List)
+	r.Post("/", h.Create)
+	r.Get("/{id}", h.GetByID)
+	r.Put("/{id}", h.Update)
+	r.Delete("/{id}", h.Delete)
 	return r
 }
 
