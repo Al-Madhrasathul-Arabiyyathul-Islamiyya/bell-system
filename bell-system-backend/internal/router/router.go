@@ -77,6 +77,7 @@ func ScheduleRoutes(h *handlers.ScheduleHandler) chi.Router {
 func AudioRoutes(h *handlers.AudioHandler) chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.List)
+	r.Get("/checksums", h.ListChecksums)
 	r.Post("/", h.Upload)
 	r.Get("/{id}", h.GetByID)
 	r.Put("/{id}", h.Update)
