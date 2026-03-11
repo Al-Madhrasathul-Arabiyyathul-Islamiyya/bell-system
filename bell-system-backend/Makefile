@@ -14,7 +14,7 @@ build:
 
 # Run tests
 test:
-	go test ./... -v -coverpkg=./internal/...
+	go test ./... -v -coverpkg=arabiyya.edu.mv/bell-system-backend/internal/...
 
 # Clean built files
 clean:
@@ -46,5 +46,5 @@ lint:
 # Full check: lint, tidy, test, and build
 check: lint
 	go mod tidy
-	go test ./... -count=1 -coverpkg=./internal/...
+	go test ./... -count=1 -coverpkg=arabiyya.edu.mv/bell-system-backend/internal/...
 	go build ./cmd/server
