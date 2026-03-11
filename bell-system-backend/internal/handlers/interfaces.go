@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"io"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 
@@ -74,4 +75,11 @@ type TokenClaims struct {
 type PasswordHasher interface {
 	Hash(password string) (string, error)
 	Compare(hash, password string) error
+}
+
+// FileStorage defines the interface for audio file disk operations.
+type FileStorage interface {
+	Save(id string, ext string, data io.Reader) (path string, checksum string, err error)
+	Open(path string) (io.ReadCloser, error)
+	Delete(path string) error
 }

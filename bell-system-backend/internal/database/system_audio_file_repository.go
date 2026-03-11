@@ -50,7 +50,7 @@ func (r *SystemAudioFileRepository) GetByID(ctx context.Context, id uuid.UUID) (
     `
 	var audio models.SystemAudioFile
 	err := r.DB.QueryRowContext(ctx, query, id).Scan(
-		&audio.ID, &audio.Name, &audio.FilePath, &audio.FilePath, &audio.Checksum,
+		&audio.ID, &audio.Name, &audio.FilePath, &audio.FileType, &audio.Checksum,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -3,7 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
@@ -15,7 +19,8 @@ import (
 
 // AudioHandler handles audio file management HTTP requests.
 type AudioHandler struct {
-	AudioFiles SystemAudioFileRepository
+	AudioFiles  SystemAudioFileRepository
+	FileStorage FileStorage // nil = metadata-only mode (for tests)
 }
 
 // NewAudioHandler creates a new AudioHandler.
@@ -62,6 +67,25 @@ func (h *AudioHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.FileStorage != nil && file.FilePath != "" {
+		reader, err := h.FileStorage.Open(file.FilePath)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", "failed to read audio file")
+			return
+		}
+		defer reader.Close()
+
+		ext := filepath.Ext(file.FilePath)
+		contentType := mime.TypeByExtension(ext)
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s%s"`, file.Name, ext))
+		io.Copy(w, reader)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, file)
 }
 
@@ -87,12 +111,24 @@ func (h *AudioHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
+	id := uuid.New()
 	audioFile := &models.SystemAudioFile{
-		ID:        uuid.New(),
+		ID:        id,
 		Name:      name,
 		FilePath:  header.Filename,
 		FileType:  fileType,
 		CreatedAt: time.Now(),
+	}
+
+	if h.FileStorage != nil {
+		ext := filepath.Ext(header.Filename)
+		filePath, checksum, err := h.FileStorage.Save(id.String(), ext, file)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "internal_error", "failed to save audio file")
+			return
+		}
+		audioFile.FilePath = filePath
+		audioFile.Checksum = checksum
 	}
 
 	if err := h.AudioFiles.Create(r.Context(), audioFile); err != nil {
@@ -178,5 +214,31 @@ func (h *AudioHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if h.FileStorage != nil && existing.FilePath != "" {
+		h.FileStorage.Delete(existing.FilePath)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ListChecksums handles GET /checksums.
+func (h *AudioHandler) ListChecksums(w http.ResponseWriter, r *http.Request) {
+	files, err := h.AudioFiles.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list checksums")
+		return
+	}
+
+	type checksumEntry struct {
+		ID       uuid.UUID       `json:"id"`
+		Type     models.FileType `json:"type"`
+		Checksum string          `json:"checksum"`
+	}
+
+	entries := make([]checksumEntry, len(files))
+	for i, f := range files {
+		entries[i] = checksumEntry{ID: f.ID, Type: f.FileType, Checksum: f.Checksum}
+	}
+
+	writeJSON(w, http.StatusOK, entries)
 }
