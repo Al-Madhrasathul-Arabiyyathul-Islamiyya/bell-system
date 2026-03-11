@@ -19,3 +19,7 @@ expiresIn = 180 # minutes
 
 [storage]
 audioDir = "./data/audio"
+
+[cors]
+allowedOrigins = ["http://localhost:3000", "http://localhost:5173"]
+maxAge = 300

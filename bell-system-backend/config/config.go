@@ -13,6 +13,7 @@ type Config struct {
 	Database DatabaseConfig
 	JWT      JWTConfig
 	Storage  StorageConfig
+	CORS     CORSConfig
 }
 
 type ServerConfig struct {
@@ -35,6 +36,11 @@ type DatabaseConfig struct {
 type JWTConfig struct {
 	Secret    string
 	ExpiresIn int // in minutes
+}
+
+type CORSConfig struct {
+	AllowedOrigins []string
+	MaxAge         int // seconds
 }
 
 type StorageConfig struct {
