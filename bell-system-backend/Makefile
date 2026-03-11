@@ -14,7 +14,7 @@ build:
 
 # Run tests
 test:
-	go test ./... -v
+	go test ./... -v -coverpkg=./internal/...
 
 # Clean built files
 clean:
@@ -46,5 +46,5 @@ lint:
 # Full check: lint, tidy, test, and build
 check: lint
 	go mod tidy
-	go test ./... -count=1
+	go test ./... -count=1 -coverpkg=./internal/...
 	go build ./cmd/server
