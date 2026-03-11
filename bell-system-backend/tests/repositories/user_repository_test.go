@@ -251,6 +251,53 @@ func TestUserRepository_Delete_DBError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to delete user")
 }
 
+// --- Error path tests ---
+
+func TestUserRepository_GetByUsername_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockUserRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM Users WHERE Username").
+		WithArgs("admin").
+		WillReturnError(errors.New("connection lost"))
+
+	user, err := repo.GetByUsername(ctx, "admin")
+	require.Error(t, err)
+	assert.Nil(t, user)
+	assert.Contains(t, err.Error(), "failed to get user by username")
+}
+
+func TestUserRepository_List_ScanError(t *testing.T) {
+	repo, mock := mocks.NewMockUserRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Username"}).
+		AddRow(uuid.New(), "Bad Row")
+	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+		WillReturnRows(rows)
+
+	users, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, users)
+	assert.Contains(t, err.Error(), "failed to scan user")
+}
+
+func TestUserRepository_List_RowsError(t *testing.T) {
+	repo, mock := mocks.NewMockUserRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Username", "PasswordHash", "Role", "CreatedAt"}).
+		AddRow(uuid.New(), "admin", "hash", "admin", time.Now()).
+		RowError(0, errors.New("row error"))
+	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+		WillReturnRows(rows)
+
+	users, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, users)
+	assert.Contains(t, err.Error(), "error iterating user rows")
+}
+
 // --- Spec-driven: Three distinct roles ---
 
 func TestUserRepository_AllThreeRoles(t *testing.T) {

@@ -206,6 +206,158 @@ func TestSessionRepository_Delete_DBError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to delete session")
 }
 
+// --- Error path tests ---
+
+func TestSessionRepository_GetByID_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id").
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnError(errors.New("connection lost"))
+
+	session, err := repo.GetByID(ctx, uuid.New())
+	require.Error(t, err)
+	assert.Nil(t, session)
+	assert.Contains(t, err.Error(), "failed to get session")
+}
+
+func TestSessionRepository_GetCurrentSession_Success(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	id := uuid.New()
+	start := time.Date(0, 1, 1, 7, 0, 0, 0, time.UTC)
+	end := time.Date(0, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	rows := sqlmock.NewRows([]string{"Id", "Name", "StartTime", "EndTime"}).
+		AddRow(id, "Morning", start, end)
+
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE").
+		WillReturnRows(rows)
+
+	session, err := repo.GetCurrentSession(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, session)
+	assert.Equal(t, "Morning", session.Name)
+}
+
+func TestSessionRepository_GetCurrentSession_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE").
+		WillReturnError(errors.New("connection lost"))
+
+	session, err := repo.GetCurrentSession(ctx)
+	require.Error(t, err)
+	assert.Nil(t, session)
+	assert.Contains(t, err.Error(), "failed to get current session")
+}
+
+func TestSessionRepository_List_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
+		WillReturnError(errors.New("query failed"))
+
+	sessions, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, sessions)
+	assert.Contains(t, err.Error(), "failed to list sessions")
+}
+
+func TestSessionRepository_List_ScanError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name"}).
+		AddRow(uuid.New(), "Bad Row")
+	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
+		WillReturnRows(rows)
+
+	sessions, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, sessions)
+	assert.Contains(t, err.Error(), "failed to scan session")
+}
+
+func TestSessionRepository_List_RowsError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name", "StartTime", "EndTime"}).
+		AddRow(uuid.New(), "Session", time.Now(), time.Now()).
+		RowError(0, errors.New("row error"))
+	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
+		WillReturnRows(rows)
+
+	sessions, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, sessions)
+	assert.Contains(t, err.Error(), "error iterating session rows")
+}
+
+func TestSessionRepository_Update_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	session := &models.Session{ID: uuid.New(), Name: "Fail"}
+
+	mock.ExpectExec("UPDATE Sessions").
+		WithArgs(session.Name, session.StartTime, session.EndTime, session.ID).
+		WillReturnError(errors.New("update failed"))
+
+	err := repo.Update(ctx, session)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update session")
+}
+
+func TestSessionRepository_GetSessionsByIDs_QueryError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
+		WillReturnError(errors.New("query failed"))
+
+	result, err := repo.GetSessionsByIDs(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to get sessions")
+}
+
+func TestSessionRepository_GetSessionsByIDs_ScanError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name"}).
+		AddRow(uuid.New(), "Bad Row")
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
+		WillReturnRows(rows)
+
+	result, err := repo.GetSessionsByIDs(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to scan session")
+}
+
+func TestSessionRepository_GetSessionsByIDs_RowsError(t *testing.T) {
+	repo, mock := mocks.NewMockSessionRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name", "StartTime", "EndTime"}).
+		AddRow(uuid.New(), "Session", time.Now(), time.Now()).
+		RowError(0, errors.New("row error"))
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
+		WillReturnRows(rows)
+
+	result, err := repo.GetSessionsByIDs(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "error iterating session rows")
+}
+
 // --- Spec-driven: Two sessions (Morning 06:45-12:10, Afternoon 12:15-18:10) ---
 
 func TestSessionRepository_SpecSessions(t *testing.T) {

@@ -135,6 +135,55 @@ func TestScheduleDayRepository_Delete_DBError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to delete schedule day")
 }
 
+// --- Error path tests ---
+
+func TestScheduleDayRepository_Update_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleDayRepo(t)
+	ctx := context.Background()
+
+	sd := &models.ScheduleDay{ScheduleItemID: uuid.New(), DayOfWeek: 3}
+
+	mock.ExpectExec("UPDATE ScheduleDays").
+		WithArgs(sd.DayOfWeek, sd.ScheduleItemID).
+		WillReturnError(errors.New("update failed"))
+
+	err := repo.Update(ctx, sd)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update schedule day")
+}
+
+func TestScheduleDayRepository_GetDaysForScheduleItems_ScanError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleDayRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"ScheduleItemId"}).
+		AddRow(uuid.New())
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(rows)
+
+	result, err := repo.GetDaysForScheduleItems(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to scan schedule day")
+}
+
+func TestScheduleDayRepository_GetDaysForScheduleItems_RowsError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleDayRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	rows := sqlmock.NewRows([]string{"ScheduleItemId", "DayOfWeek"}).
+		AddRow(itemID, 2).
+		RowError(0, errors.New("row error"))
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(rows)
+
+	result, err := repo.GetDaysForScheduleItems(ctx, []uuid.UUID{itemID})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "error iterating schedule days rows")
+}
+
 // --- Spec-driven: Days 1-7 represent Sunday through Saturday ---
 
 func TestScheduleDayRepository_AllSevenDays(t *testing.T) {
