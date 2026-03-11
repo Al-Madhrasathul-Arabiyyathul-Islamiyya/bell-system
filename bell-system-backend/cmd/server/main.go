@@ -12,6 +12,9 @@ import (
 
 	"arabiyya.edu.mv/bell-system-backend/config"
 	"arabiyya.edu.mv/bell-system-backend/internal/database"
+	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
+	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	"arabiyya.edu.mv/bell-system-backend/internal/services"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
 	"github.com/go-chi/chi/v5"
@@ -38,6 +41,27 @@ func main() {
 	}
 	defer db.Close()
 
+	// Repositories
+	userRepo := database.NewUserRepository(db.DB, log)
+	sessionRepo := database.NewSessionRepository(db.DB, log)
+	scheduleDayRepo := database.NewScheduleDayRepository(db.DB, log)
+	audioFileRepo := database.NewSystemAudioFileRepository(db.DB, log)
+	scheduleItemRepo := database.NewScheduleItemRepository(db.DB, log, scheduleDayRepo, sessionRepo, audioFileRepo)
+
+	// Services
+	tokenSvc := services.NewTokenService(cfg.JWT.Secret, cfg.JWT.ExpiresIn)
+	hasher := services.NewPasswordHasher()
+
+	// Handlers
+	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
+	userHandler := handlers.NewUserHandler(userRepo, hasher)
+	sessionHandler := handlers.NewSessionHandler(sessionRepo)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo)
+	audioHandler := handlers.NewAudioHandler(audioFileRepo)
+
+	// Router
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
@@ -50,6 +74,8 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	r.Mount("/", apiRouter)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
