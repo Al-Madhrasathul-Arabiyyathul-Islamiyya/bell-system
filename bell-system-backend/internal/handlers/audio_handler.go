@@ -15,7 +15,8 @@ import (
 
 // AudioHandler handles audio file management HTTP requests.
 type AudioHandler struct {
-	AudioFiles SystemAudioFileRepository
+	AudioFiles  SystemAudioFileRepository
+	FileStorage FileStorage // nil = metadata-only mode (for tests)
 }
 
 // NewAudioHandler creates a new AudioHandler.
