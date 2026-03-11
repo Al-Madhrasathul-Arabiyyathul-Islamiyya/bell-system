@@ -30,10 +30,12 @@ func New(
 // AuthRoutes returns a chi.Router with authentication routes.
 func AuthRoutes(h *handlers.AuthHandler) chi.Router {
 	r := chi.NewRouter()
-	// TODO: implement route handlers
-	// POST /login
-	// POST /change-password (auth required)
-	// POST /logout (auth required)
+	r.Post("/login", h.Login)
+	r.Group(func(r chi.Router) {
+		r.Use(handlers.AuthMiddleware(h.Tokens))
+		r.Post("/change-password", h.ChangePassword)
+		r.Post("/logout", h.Logout)
+	})
 	return r
 }
 
