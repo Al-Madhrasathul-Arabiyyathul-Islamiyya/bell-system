@@ -52,6 +52,10 @@ func main() {
 	// Services
 	tokenSvc := services.NewTokenService(cfg.JWT.Secret, cfg.JWT.ExpiresIn)
 	hasher := services.NewPasswordHasher()
+	fileStore, err := services.NewLocalFileStorage(cfg.Storage.AudioDir)
+	if err != nil {
+		log.Fatal("Failed to initialize file storage", err)
+	}
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
@@ -59,6 +63,7 @@ func main() {
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo)
 	audioHandler := handlers.NewAudioHandler(audioFileRepo)
+	audioHandler.FileStorage = fileStore
 
 	// Router
 	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
