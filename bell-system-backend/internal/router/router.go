@@ -53,13 +53,12 @@ func UserRoutes(h *handlers.UserHandler) chi.Router {
 // SessionRoutes returns a chi.Router with session routes.
 func SessionRoutes(h *handlers.SessionHandler) chi.Router {
 	r := chi.NewRouter()
-	// TODO: implement route handlers
-	// GET / (list)
-	// POST / (create)
-	// GET /current
-	// GET /{id}
-	// PUT /{id}
-	// DELETE /{id}
+	r.Get("/", h.List)
+	r.Post("/", h.Create)
+	r.Get("/current", h.GetCurrent)
+	r.Get("/{id}", h.GetByID)
+	r.Put("/{id}", h.Update)
+	r.Delete("/{id}", h.Delete)
 	return r
 }
 
