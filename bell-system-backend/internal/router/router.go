@@ -65,12 +65,11 @@ func SessionRoutes(h *handlers.SessionHandler) chi.Router {
 // ScheduleRoutes returns a chi.Router with schedule item routes.
 func ScheduleRoutes(h *handlers.ScheduleHandler) chi.Router {
 	r := chi.NewRouter()
-	// TODO: implement route handlers
-	// GET / (list)
-	// POST / (create)
-	// GET /{id}
-	// PUT /{id}
-	// DELETE /{id}
+	r.Get("/", h.List)
+	r.Post("/", h.Create)
+	r.Get("/{id}", h.GetByID)
+	r.Put("/{id}", h.Update)
+	r.Delete("/{id}", h.Delete)
 	return r
 }
 
