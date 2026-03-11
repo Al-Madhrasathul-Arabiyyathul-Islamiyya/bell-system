@@ -76,11 +76,10 @@ func ScheduleRoutes(h *handlers.ScheduleHandler) chi.Router {
 // AudioRoutes returns a chi.Router with audio file routes.
 func AudioRoutes(h *handlers.AudioHandler) chi.Router {
 	r := chi.NewRouter()
-	// TODO: implement route handlers
-	// GET / (list)
-	// POST / (upload, multipart)
-	// GET /{id}
-	// PUT /{id}
-	// DELETE /{id}
+	r.Get("/", h.List)
+	r.Post("/", h.Upload)
+	r.Get("/{id}", h.GetByID)
+	r.Put("/{id}", h.Update)
+	r.Delete("/{id}", h.Delete)
 	return r
 }
