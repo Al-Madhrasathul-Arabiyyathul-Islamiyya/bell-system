@@ -125,6 +125,164 @@ func TestScheduleItemRepository_Create_TransactionRollbackOnDayInsertFailure(t *
 	assert.Contains(t, err.Error(), "failed to insert schedule day")
 }
 
+func TestScheduleItemRepository_GetByID_WithSoundAndSession(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	sessionID := uuid.New()
+	soundID := uuid.New()
+	now := time.Now()
+
+	// Main item query
+	itemRow := sqlmock.NewRows([]string{"Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt"}).
+		AddRow(itemID, sessionID, "Period Bell", now, soundID, now, now)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleItems WHERE").
+		WillReturnRows(itemRow)
+
+	// Days sub-query
+	dayRows := sqlmock.NewRows([]string{"ScheduleItemId", "DayOfWeek"}).
+		AddRow(itemID, 2).
+		AddRow(itemID, 4)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(dayRows)
+
+	// Sounds sub-query
+	soundRows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt"}).
+		AddRow(soundID, "bell.wav", "/audio/bell.wav", "bell", "hash1", now, now)
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnRows(soundRows)
+
+	// Sessions sub-query
+	sessionRows := sqlmock.NewRows([]string{"Id", "Name", "StartTime", "EndTime"}).
+		AddRow(sessionID, "Morning", now, now)
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
+		WillReturnRows(sessionRows)
+
+	item, err := repo.GetByID(ctx, itemID)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	assert.Equal(t, itemID, item.ID)
+	assert.Equal(t, []int{2, 4}, item.Days)
+	require.NotNil(t, item.Sound)
+	assert.Equal(t, "bell.wav", item.Sound.Name)
+	require.NotNil(t, item.Session)
+	assert.Equal(t, "Morning", item.Session.Name)
+	assert.NotNil(t, item.DayInfo)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestScheduleItemRepository_GetByID_NoSoundNoSession(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	now := time.Now()
+
+	// Main item with nil SessionID and zero SoundID
+	itemRow := sqlmock.NewRows([]string{"Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt"}).
+		AddRow(itemID, nil, "General Bell", now, uuid.Nil, now, now)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleItems WHERE").
+		WillReturnRows(itemRow)
+
+	// Days sub-query
+	dayRows := sqlmock.NewRows([]string{"ScheduleItemId", "DayOfWeek"}).
+		AddRow(itemID, 1)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(dayRows)
+
+	// No sound query expected (SoundID is Nil)
+	// No session query expected (SessionID is nil)
+
+	item, err := repo.GetByID(ctx, itemID)
+	require.NoError(t, err)
+	require.NotNil(t, item)
+	assert.Nil(t, item.Sound)
+	assert.Nil(t, item.Session)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
+func TestScheduleItemRepository_GetByID_DaysQueryError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	now := time.Now()
+
+	itemRow := sqlmock.NewRows([]string{"Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt"}).
+		AddRow(itemID, nil, "Bell", now, uuid.New(), now, now)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleItems WHERE").
+		WillReturnRows(itemRow)
+
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnError(errors.New("days query failed"))
+
+	item, err := repo.GetByID(ctx, itemID)
+	require.Error(t, err)
+	assert.Nil(t, item)
+	assert.Contains(t, err.Error(), "failed to get schedule days")
+}
+
+func TestScheduleItemRepository_GetByID_SoundsQueryError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	soundID := uuid.New()
+	now := time.Now()
+
+	itemRow := sqlmock.NewRows([]string{"Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt"}).
+		AddRow(itemID, nil, "Bell", now, soundID, now, now)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleItems WHERE").
+		WillReturnRows(itemRow)
+
+	dayRows := sqlmock.NewRows([]string{"ScheduleItemId", "DayOfWeek"}).
+		AddRow(itemID, 2)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(dayRows)
+
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnError(errors.New("sounds query failed"))
+
+	item, err := repo.GetByID(ctx, itemID)
+	require.Error(t, err)
+	assert.Nil(t, item)
+	assert.Contains(t, err.Error(), "failed to get sound file")
+}
+
+func TestScheduleItemRepository_GetByID_SessionsQueryError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	sessionID := uuid.New()
+	soundID := uuid.New()
+	now := time.Now()
+
+	itemRow := sqlmock.NewRows([]string{"Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt"}).
+		AddRow(itemID, sessionID, "Bell", now, soundID, now, now)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleItems WHERE").
+		WillReturnRows(itemRow)
+
+	dayRows := sqlmock.NewRows([]string{"ScheduleItemId", "DayOfWeek"}).
+		AddRow(itemID, 2)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(dayRows)
+
+	soundRows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt"}).
+		AddRow(soundID, "bell.wav", "/audio/bell.wav", "bell", "hash1", now, now)
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnRows(soundRows)
+
+	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
+		WillReturnError(errors.New("sessions query failed"))
+
+	item, err := repo.GetByID(ctx, itemID)
+	require.Error(t, err)
+	assert.Nil(t, item)
+	assert.Contains(t, err.Error(), "failed to get session")
+}
+
 func TestScheduleItemRepository_GetByID_NotFound(t *testing.T) {
 	repo, mock := mocks.NewMockScheduleItemRepo(t)
 	ctx := context.Background()
