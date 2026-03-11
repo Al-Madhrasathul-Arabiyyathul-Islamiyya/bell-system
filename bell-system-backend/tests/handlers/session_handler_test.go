@@ -13,6 +13,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 
 	"github.com/google/uuid"
@@ -316,4 +317,315 @@ func TestSessionHandler_Delete_NotFound(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+// --- Error path tests ---
+
+func TestSessionHandler_List_DBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_GetCurrent_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestSessionHandler_GetCurrent_DBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_GetByID_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestSessionHandler_GetByID_DBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_Update_InvalidUUID(t *testing.T) {
+	repo := &mocks.MockSessionRepo{}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Update_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestSessionHandler_Update_GetByIDDBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_Update_InvalidJSON(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: uuid.New()}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Update_InvalidStartTime(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: uuid.New()}, nil
+		},
+	}
+
+	body := `{"startTime":"not-a-time"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Update_InvalidEndTime(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: uuid.New()}, nil
+		},
+	}
+
+	body := `{"endTime":"not-a-time"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Update_DBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: uuid.New()}, nil
+		},
+		UpdateFunc: func(_ context.Context, _ *models.Session) error {
+			return errors.New("update failed")
+		},
+	}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_Delete_InvalidUUID(t *testing.T) {
+	repo := &mocks.MockSessionRepo{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Delete_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestSessionHandler_Delete_GetByIDDBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_Delete_DBError(t *testing.T) {
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: id}, nil
+		},
+		DeleteFunc: func(_ context.Context, _ uuid.UUID) error {
+			return errors.New("delete failed")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSessionHandler_Create_InvalidStartTime(t *testing.T) {
+	repo := &mocks.MockSessionRepo{}
+
+	body := `{"name":"Test","startTime":"not-time","endTime":"18:00"}`
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Create_InvalidEndTime(t *testing.T) {
+	repo := &mocks.MockSessionRepo{}
+
+	body := `{"name":"Test","startTime":"07:00","endTime":"not-time"}`
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Create_MissingFields(t *testing.T) {
+	repo := &mocks.MockSessionRepo{}
+
+	body := `{"name":"OnlyName"}`
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
