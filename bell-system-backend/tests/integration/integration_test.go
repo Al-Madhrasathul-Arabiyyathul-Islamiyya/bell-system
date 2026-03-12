@@ -276,3 +276,20 @@ func readJSON(t *testing.T, resp *http.Response, target any) {
 	err := json.NewDecoder(resp.Body).Decode(target)
 	require.NoError(t, err)
 }
+
+// createTestUser creates a user via the API and returns the user ID.
+// This avoids depending on seed bcrypt hashes matching.
+func createTestUser(t *testing.T, username, password, role string) string {
+	t.Helper()
+
+	body := fmt.Sprintf(`{"username":%q,"password":%q,"role":%q}`, username, password, role)
+	resp := doRequest(t, http.MethodPost, "/api/users", bytes.NewBufferString(body), "")
+	require.Equal(t, http.StatusCreated, resp.StatusCode, "failed to create test user %s", username)
+
+	var result map[string]any
+	readJSON(t, resp, &result)
+
+	id, ok := result["id"].(string)
+	require.True(t, ok)
+	return id
+}

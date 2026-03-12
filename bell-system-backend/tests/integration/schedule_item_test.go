@@ -67,7 +67,11 @@ func TestScheduleItemCRUD(t *testing.T) {
 		sessionID, soundID,
 	)
 	resp := doRequest(t, http.MethodPost, "/api/schedule-items", bytes.NewBufferString(createBody), "")
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	if resp.StatusCode != http.StatusCreated {
+		var errBody map[string]any
+		readJSON(t, resp, &errBody)
+		t.Fatalf("schedule item create failed with status %d: %v", resp.StatusCode, errBody)
+	}
 
 	var created map[string]any
 	readJSON(t, resp, &created)
