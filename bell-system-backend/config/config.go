@@ -9,11 +9,12 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Storage  StorageConfig
-	CORS     CORSConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	JWT       JWTConfig
+	Storage   StorageConfig
+	CORS      CORSConfig
+	WebSocket WebSocketConfig
 }
 
 type ServerConfig struct {
@@ -45,6 +46,12 @@ type CORSConfig struct {
 
 type StorageConfig struct {
 	AudioDir string
+}
+
+type WebSocketConfig struct {
+	PingInterval   int // seconds, default 30
+	PongTimeout    int // seconds, default 10
+	MaxMessageSize int // bytes, default 512
 }
 
 // LoadConfig loads the configuration from config.toml

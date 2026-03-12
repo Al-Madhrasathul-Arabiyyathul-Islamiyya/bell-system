@@ -23,7 +23,7 @@ import (
 
 // newScheduleRouter creates a schedule chi.Router with the given mocks.
 func newScheduleRouter(itemRepo handlers.ScheduleItemRepository, dayRepo handlers.ScheduleDayRepository) http.Handler {
-	h := handlers.NewScheduleHandler(itemRepo, dayRepo)
+	h := handlers.NewScheduleHandler(itemRepo, dayRepo, nil)
 	return router.ScheduleRoutes(h)
 }
 

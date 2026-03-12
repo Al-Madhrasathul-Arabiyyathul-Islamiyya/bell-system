@@ -15,10 +15,12 @@ import (
 	"testing"
 	"time"
 
+	"arabiyya.edu.mv/bell-system-backend/config"
 	"arabiyya.edu.mv/bell-system-backend/internal/database"
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	"arabiyya.edu.mv/bell-system-backend/internal/services"
+	ws "arabiyya.edu.mv/bell-system-backend/internal/websocket"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
 	"github.com/go-chi/chi/v5"
@@ -37,6 +39,8 @@ const (
 var (
 	testServer *httptest.Server
 	testDB     *sql.DB
+	testHub    *ws.Hub
+	hubDone    chan struct{}
 )
 
 func TestMain(m *testing.M) {
@@ -149,12 +153,25 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// WebSocket
+	testHub = ws.NewHub(log)
+	hubDone = make(chan struct{})
+	go testHub.Run(hubDone)
+
+	notifier := ws.NewNotifier(testHub)
+	wsCfg := config.WebSocketConfig{
+		PingInterval:   30,
+		PongTimeout:    10,
+		MaxMessageSize: 512,
+	}
+	wsHandler := ws.NewHandler(testHub, tokenSvc, log, wsCfg)
+
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo)
-	audioHandler := handlers.NewAudioHandler(audioFileRepo)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, notifier)
+	audioHandler := handlers.NewAudioHandler(audioFileRepo, notifier)
 	audioHandler.FileStorage = fileStore
 
 	// Router (mirrors cmd/server/main.go)
@@ -164,12 +181,15 @@ func TestMain(m *testing.M) {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(time.Second * 30))
 	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-	r.Mount("/", apiRouter)
+	r.Handle("/ws", wsHandler)
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Timeout(time.Second * 30))
+		r.Mount("/", apiRouter)
+	})
 
 	testServer = httptest.NewServer(r)
 
@@ -177,6 +197,8 @@ func TestMain(m *testing.M) {
 	code := m.Run()
 
 	// Cleanup
+	close(hubDone)
+	<-testHub.Done()
 	testServer.Close()
 
 	dropCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

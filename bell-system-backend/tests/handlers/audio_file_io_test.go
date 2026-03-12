@@ -22,7 +22,7 @@ import (
 )
 
 func newAudioRouterWithStorage(audioRepo handlers.SystemAudioFileRepository, fs handlers.FileStorage) http.Handler {
-	h := handlers.NewAudioHandler(audioRepo)
+	h := handlers.NewAudioHandler(audioRepo, nil)
 	h.FileStorage = fs
 	return router.AudioRoutes(h)
 }

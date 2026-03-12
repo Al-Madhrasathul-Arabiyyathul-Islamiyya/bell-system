@@ -23,7 +23,7 @@ import (
 
 // newAudioRouter creates an audio chi.Router with the given mock.
 func newAudioRouter(audioRepo handlers.SystemAudioFileRepository) http.Handler {
-	h := handlers.NewAudioHandler(audioRepo)
+	h := handlers.NewAudioHandler(audioRepo, nil)
 	return router.AudioRoutes(h)
 }
 

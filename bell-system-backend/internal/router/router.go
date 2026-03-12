@@ -6,7 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// New creates the main router with all routes registered.
+// New creates the main router with all API routes registered.
 func New(
 	auth *handlers.AuthHandler,
 	users *handlers.UserHandler,
