@@ -181,8 +181,13 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 	// Give hub time to register the client
 	time.Sleep(100 * time.Millisecond)
 
-	// Create an audio file first (needed for schedule item)
+	// Create an audio file first (needed for schedule item) — this triggers audio_files_updated
 	audioID := createTestAudioFileForWS(t)
+
+	// Drain the audio_files_updated notification
+	msg := readWSMessage(t, clientConn, 2*time.Second)
+	require.NotNil(t, msg, "should receive audio_files_updated from audio file creation")
+	assert.Equal(t, "audio_files_updated", msg.Type)
 
 	// Create a schedule item via REST — should trigger schedules_updated
 	sessionID := getSessionIDForWS(t)
@@ -192,7 +197,7 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 	resp.Body.Close()
 
 	// Client should receive schedules_updated
-	msg := readWSMessage(t, clientConn, 2*time.Second)
+	msg = readWSMessage(t, clientConn, 2*time.Second)
 	require.NotNil(t, msg, "client should receive schedules_updated notification")
 	assert.Equal(t, "schedules_updated", msg.Type)
 }
