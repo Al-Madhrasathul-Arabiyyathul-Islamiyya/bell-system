@@ -37,7 +37,7 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 		nil,
 	)
 
-	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, nil)
 	require.NotNil(t, r)
 
 	// Collect all registered routes

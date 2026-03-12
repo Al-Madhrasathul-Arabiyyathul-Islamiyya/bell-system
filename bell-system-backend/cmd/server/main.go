@@ -66,7 +66,7 @@ func main() {
 	audioHandler.FileStorage = fileStore
 
 	// Router
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, nil)
 
 	r := chi.NewRouter()
 

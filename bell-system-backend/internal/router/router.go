@@ -1,6 +1,8 @@
 package router
 
 import (
+	"net/http"
+
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 
 	"github.com/go-chi/chi/v5"
@@ -13,8 +15,13 @@ func New(
 	sessions *handlers.SessionHandler,
 	schedule *handlers.ScheduleHandler,
 	audio *handlers.AudioHandler,
+	ws http.Handler,
 ) chi.Router {
 	r := chi.NewRouter()
+
+	if ws != nil {
+		r.Handle("/ws", ws)
+	}
 
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/auth", AuthRoutes(auth))
