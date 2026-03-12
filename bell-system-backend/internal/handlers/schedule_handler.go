@@ -15,13 +15,14 @@ import (
 
 // ScheduleHandler handles schedule item management HTTP requests.
 type ScheduleHandler struct {
-	Items ScheduleItemRepository
-	Days  ScheduleDayRepository
+	Items    ScheduleItemRepository
+	Days     ScheduleDayRepository
+	Notifier EventNotifier
 }
 
 // NewScheduleHandler creates a new ScheduleHandler.
-func NewScheduleHandler(items ScheduleItemRepository, days ScheduleDayRepository) *ScheduleHandler {
-	return &ScheduleHandler{Items: items, Days: days}
+func NewScheduleHandler(items ScheduleItemRepository, days ScheduleDayRepository, notifier EventNotifier) *ScheduleHandler {
+	return &ScheduleHandler{Items: items, Days: days, Notifier: notifier}
 }
 
 func validateDays(days []int) bool {
@@ -110,10 +111,16 @@ func (h *ScheduleHandler) Create(w http.ResponseWriter, r *http.Request) {
 	created, err := h.Items.GetByID(r.Context(), item.ID)
 	if err != nil || created == nil {
 		writeJSON(w, http.StatusCreated, item)
+		if h.Notifier != nil {
+			h.Notifier.NotifySchedulesUpdated()
+		}
 		return
 	}
 
 	writeJSON(w, http.StatusCreated, created)
+	if h.Notifier != nil {
+		h.Notifier.NotifySchedulesUpdated()
+	}
 }
 
 // Update handles PUT /{id}.
@@ -176,6 +183,9 @@ func (h *ScheduleHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, existing)
+	if h.Notifier != nil {
+		h.Notifier.NotifySchedulesUpdated()
+	}
 }
 
 // Delete handles DELETE /{id}.
@@ -206,4 +216,7 @@ func (h *ScheduleHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	if h.Notifier != nil {
+		h.Notifier.NotifySchedulesUpdated()
+	}
 }

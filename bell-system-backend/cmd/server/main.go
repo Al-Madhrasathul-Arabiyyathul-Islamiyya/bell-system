@@ -61,8 +61,8 @@ func main() {
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo)
-	audioHandler := handlers.NewAudioHandler(audioFileRepo)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, nil)
+	audioHandler := handlers.NewAudioHandler(audioFileRepo, nil)
 	audioHandler.FileStorage = fileStore
 
 	// Router

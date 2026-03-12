@@ -30,9 +30,11 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 	scheduleHandler := handlers.NewScheduleHandler(
 		&mocks.MockScheduleItemRepo{},
 		&mocks.MockScheduleDayRepo{},
+		nil,
 	)
 	audioHandler := handlers.NewAudioHandler(
 		&mocks.MockSystemAudioFileRepo{},
+		nil,
 	)
 
 	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)

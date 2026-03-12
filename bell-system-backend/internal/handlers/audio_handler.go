@@ -21,11 +21,12 @@ import (
 type AudioHandler struct {
 	AudioFiles  SystemAudioFileRepository
 	FileStorage FileStorage // nil = metadata-only mode (for tests)
+	Notifier    EventNotifier
 }
 
 // NewAudioHandler creates a new AudioHandler.
-func NewAudioHandler(audioFiles SystemAudioFileRepository) *AudioHandler {
-	return &AudioHandler{AudioFiles: audioFiles}
+func NewAudioHandler(audioFiles SystemAudioFileRepository, notifier EventNotifier) *AudioHandler {
+	return &AudioHandler{AudioFiles: audioFiles, Notifier: notifier}
 }
 
 var validFileTypes = map[models.FileType]bool{
@@ -137,6 +138,9 @@ func (h *AudioHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, audioFile)
+	if h.Notifier != nil {
+		h.Notifier.NotifyAudioFilesUpdated()
+	}
 }
 
 type audioUpdateRequest struct {
@@ -185,6 +189,9 @@ func (h *AudioHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, existing)
+	if h.Notifier != nil {
+		h.Notifier.NotifyAudioFilesUpdated()
+	}
 }
 
 // Delete handles DELETE /{id}.
@@ -219,6 +226,9 @@ func (h *AudioHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	if h.Notifier != nil {
+		h.Notifier.NotifyAudioFilesUpdated()
+	}
 }
 
 // ListChecksums handles GET /checksums.
