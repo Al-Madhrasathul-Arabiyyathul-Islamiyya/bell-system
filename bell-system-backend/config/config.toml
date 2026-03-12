@@ -23,3 +23,8 @@ audioDir = "./data/audio"
 [cors]
 allowedOrigins = ["http://localhost:3000", "http://localhost:5173"]
 maxAge = 300
+
+[websocket]
+pingInterval = 30   # seconds
+pongTimeout = 10    # seconds
+maxMessageSize = 512 # bytes
