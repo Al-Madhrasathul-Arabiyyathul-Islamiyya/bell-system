@@ -313,9 +313,12 @@ func TestScheduleItemRepository_Delete_Success(t *testing.T) {
 	ctx := context.Background()
 
 	id := uuid.New()
+	mock.ExpectBegin()
+	mock.ExpectExec("DELETE FROM ScheduleDays WHERE").
+		WillReturnResult(sqlmock.NewResult(0, 3))
 	mock.ExpectExec("DELETE FROM ScheduleItems WHERE").
-		WithArgs(id).
 		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit()
 
 	err := repo.Delete(ctx, id)
 	require.NoError(t, err)
@@ -326,13 +329,30 @@ func TestScheduleItemRepository_Delete_DBError(t *testing.T) {
 	repo, mock := mocks.NewMockScheduleItemRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectBegin()
+	mock.ExpectExec("DELETE FROM ScheduleDays WHERE").
+		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectExec("DELETE FROM ScheduleItems WHERE").
-		WithArgs(sqlmock.AnyArg()).
 		WillReturnError(errors.New("constraint"))
+	mock.ExpectRollback()
 
 	err := repo.Delete(ctx, uuid.New())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete the schedule item")
+}
+
+func TestScheduleItemRepository_Delete_DaysDeleteError(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectBegin()
+	mock.ExpectExec("DELETE FROM ScheduleDays WHERE").
+		WillReturnError(errors.New("fk error"))
+	mock.ExpectRollback()
+
+	err := repo.Delete(ctx, uuid.New())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to delete schedule days")
 }
 
 func TestScheduleItemRepository_Update_Success(t *testing.T) {

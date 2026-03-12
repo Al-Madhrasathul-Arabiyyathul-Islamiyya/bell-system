@@ -1,4 +1,4 @@
-.PHONY: dev build test clean lint check setup-hooks
+.PHONY: dev build test test-integration clean lint check setup-hooks
 
 # Application settings
 APP_NAME=bell-schedule-system
@@ -15,6 +15,10 @@ build:
 # Run tests
 test:
 	go test ./... -v -coverpkg=arabiyya.edu.mv/bell-system-backend/internal/...
+
+# Run integration tests (requires Docker)
+test-integration:
+	go test -tags integration -v -count=1 -timeout 300s ./tests/integration/
 
 # Clean built files
 clean:

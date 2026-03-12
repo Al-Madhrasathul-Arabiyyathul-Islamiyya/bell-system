@@ -43,7 +43,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 // GetByID gets a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	query := `
-        SELECT Id, Username, PasswordHash, Role, CreatedAt
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Username, PasswordHash, Role, CreatedAt
         FROM Users
         WHERE Id = @p1
     `
@@ -63,7 +63,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 // GetByUsername gets a user by username
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
 	query := `
-        SELECT Id, Username, PasswordHash, Role, CreatedAt
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Username, PasswordHash, Role, CreatedAt
         FROM Users
         WHERE Username = @p1
     `
@@ -83,7 +83,7 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 // List gets all users
 func (r *UserRepository) List(ctx context.Context) ([]*models.User, error) {
 	query := `
-        SELECT Id, Username, PasswordHash, Role, CreatedAt
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Username, PasswordHash, Role, CreatedAt
         FROM Users
         ORDER BY Username
     `
