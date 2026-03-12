@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	"arabiyya.edu.mv/bell-system-backend/internal/services"
+	ws "arabiyya.edu.mv/bell-system-backend/internal/websocket"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
 	"github.com/go-chi/chi/v5"
@@ -57,16 +58,24 @@ func main() {
 		log.Fatal("Failed to initialize file storage", err)
 	}
 
+	// WebSocket
+	hub := ws.NewHub(log)
+	hubDone := make(chan struct{})
+	go hub.Run(hubDone)
+
+	notifier := ws.NewNotifier(hub)
+	wsHandler := ws.NewHandler(hub, tokenSvc, log, cfg.WebSocket)
+
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, nil)
-	audioHandler := handlers.NewAudioHandler(audioFileRepo, nil)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, notifier)
+	audioHandler := handlers.NewAudioHandler(audioFileRepo, notifier)
 	audioHandler.FileStorage = fileStore
 
 	// Router
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, nil)
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
 
 	r := chi.NewRouter()
 
@@ -74,7 +83,6 @@ func main() {
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(time.Second * 30))
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.CORS.AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
@@ -89,13 +97,19 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	r.Mount("/", apiRouter)
+	// WebSocket endpoint — mounted before timeout middleware so long-lived connections aren't killed
+	r.Handle("/ws", wsHandler)
+
+	// API routes with timeout middleware
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Timeout(time.Second * 30))
+		r.Mount("/", apiRouter)
+	})
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.Server.Port),
-		Handler:      r,
-		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
-		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
+		Addr:        fmt.Sprintf(":%d", cfg.Server.Port),
+		Handler:     r,
+		ReadTimeout: time.Duration(cfg.Server.ReadTimeout) * time.Second,
 	}
 
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
@@ -104,6 +118,10 @@ func main() {
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sig
+
+		// Shut down WebSocket hub first
+		close(hubDone)
+		<-hub.Done()
 
 		shutdownCtx, cancel := context.WithTimeout(serverCtx, 30*time.Second)
 		defer cancel()

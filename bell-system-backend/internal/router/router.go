@@ -1,27 +1,20 @@
 package router
 
 import (
-	"net/http"
-
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 
 	"github.com/go-chi/chi/v5"
 )
 
-// New creates the main router with all routes registered.
+// New creates the main router with all API routes registered.
 func New(
 	auth *handlers.AuthHandler,
 	users *handlers.UserHandler,
 	sessions *handlers.SessionHandler,
 	schedule *handlers.ScheduleHandler,
 	audio *handlers.AudioHandler,
-	ws http.Handler,
 ) chi.Router {
 	r := chi.NewRouter()
-
-	if ws != nil {
-		r.Handle("/ws", ws)
-	}
 
 	r.Route("/api", func(r chi.Router) {
 		r.Mount("/auth", AuthRoutes(auth))

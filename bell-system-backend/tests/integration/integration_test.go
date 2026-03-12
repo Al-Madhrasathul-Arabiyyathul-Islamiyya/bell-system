@@ -158,7 +158,7 @@ func TestMain(m *testing.M) {
 	audioHandler.FileStorage = fileStore
 
 	// Router (mirrors cmd/server/main.go)
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, nil)
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
