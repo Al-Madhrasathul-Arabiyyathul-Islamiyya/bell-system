@@ -1,0 +1,278 @@
+//go:build integration
+
+package integration_test
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+	"time"
+
+	"arabiyya.edu.mv/bell-system-backend/internal/database"
+	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
+	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	"arabiyya.edu.mv/bell-system-backend/internal/services"
+	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+)
+
+const (
+	testJWTSecret = "integration-test-jwt-secret"
+	testDBName    = "BellScheduleTestDB"
+	saPassword    = "hEsyPE5v32R&Mb"
+)
+
+var (
+	testServer *httptest.Server
+	testDB     *sql.DB
+)
+
+func TestMain(m *testing.M) {
+	ctx := context.Background()
+
+	req := testcontainers.ContainerRequest{
+		Image:        "mcr.microsoft.com/mssql/server:2025-CU2-GDR1-ubuntu-22.04",
+		ExposedPorts: []string{"1433/tcp"},
+		Env: map[string]string{
+			"ACCEPT_EULA":       "Y",
+			"MSSQL_SA_PASSWORD": saPassword,
+		},
+		WaitingFor: wait.ForAll(
+			wait.ForListeningPort("1433/tcp"),
+			wait.ForLog("Recovery is complete."),
+		).WithStartupTimeout(5 * time.Minute),
+	}
+
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to start mssql container: %v\n", err)
+		os.Exit(1)
+	}
+	defer container.Terminate(ctx)
+
+	// Get mapped port
+	mappedPort, err := container.MappedPort(ctx, "1433")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get mapped port: %v\n", err)
+		os.Exit(1)
+	}
+
+	host, err := container.Host(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get host: %v\n", err)
+		os.Exit(1)
+	}
+
+	connStr := fmt.Sprintf("sqlserver://sa:%s@%s:%s?encrypt=disable&TrustServerCertificate=true",
+		saPassword, host, mappedPort.Port())
+
+	masterDB, err := sql.Open("sqlserver", connStr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to open master db: %v\n", err)
+		os.Exit(1)
+	}
+
+	if _, err := masterDB.ExecContext(ctx, "CREATE DATABASE "+testDBName); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create test database: %v\n", err)
+		os.Exit(1)
+	}
+	masterDB.Close()
+
+	// Reconnect to test database
+	testConnStr := fmt.Sprintf("sqlserver://sa:%s@%s:%s?database=%s&encrypt=disable&TrustServerCertificate=true",
+		saPassword, host, mappedPort.Port(), testDBName)
+
+	testDB, err = sql.Open("sqlserver", testConnStr)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to open test db: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Wait for connection
+	for i := 0; i < 30; i++ {
+		if err := testDB.PingContext(ctx); err == nil {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	// Run migrations
+	if err := runMigrations(ctx); err != nil {
+		fmt.Fprintf(os.Stderr, "failed to run migrations: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Wire the full application stack
+	log, err := logger.New("test")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer log.Close()
+
+	// Repositories
+	userRepo := database.NewUserRepository(testDB, log)
+	sessionRepo := database.NewSessionRepository(testDB, log)
+	scheduleDayRepo := database.NewScheduleDayRepository(testDB, log)
+	audioFileRepo := database.NewSystemAudioFileRepository(testDB, log)
+	scheduleItemRepo := database.NewScheduleItemRepository(testDB, log, scheduleDayRepo, sessionRepo, audioFileRepo)
+
+	// Services
+	tokenSvc := services.NewTokenService(testJWTSecret, 180)
+	hasher := services.NewPasswordHasher()
+
+	tmpDir, err := os.MkdirTemp("", "bell-integration-*")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create temp dir: %v\n", err)
+		os.Exit(1)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	fileStore, err := services.NewLocalFileStorage(tmpDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to create file storage: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Handlers
+	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
+	userHandler := handlers.NewUserHandler(userRepo, hasher)
+	sessionHandler := handlers.NewSessionHandler(sessionRepo)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo)
+	audioHandler := handlers.NewAudioHandler(audioFileRepo)
+	audioHandler.FileStorage = fileStore
+
+	// Router (mirrors cmd/server/main.go)
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+
+	r := chi.NewRouter()
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(time.Second * 30))
+	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok"}`))
+	})
+	r.Mount("/", apiRouter)
+
+	testServer = httptest.NewServer(r)
+
+	// Run tests
+	code := m.Run()
+
+	// Cleanup
+	testServer.Close()
+
+	dropCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Reconnect to master to drop test DB
+	masterDB2, err := sql.Open("sqlserver", connStr)
+	if err == nil {
+		masterDB2.ExecContext(dropCtx, "ALTER DATABASE "+testDBName+" SET SINGLE_USER WITH ROLLBACK IMMEDIATE")
+		masterDB2.ExecContext(dropCtx, "DROP DATABASE "+testDBName)
+		masterDB2.Close()
+	}
+
+	testDB.Close()
+	container.Terminate(dropCtx)
+
+	os.Exit(code)
+}
+
+func runMigrations(ctx context.Context) error {
+	schemaSQL, err := os.ReadFile("../../migrations/001_create_tables_up.sql")
+	if err != nil {
+		return fmt.Errorf("read schema migration: %w", err)
+	}
+	if _, err := testDB.ExecContext(ctx, string(schemaSQL)); err != nil {
+		return fmt.Errorf("exec schema migration: %w", err)
+	}
+
+	seedSQL, err := os.ReadFile("../../migrations/002_seed_data_up.sql")
+	if err != nil {
+		return fmt.Errorf("read seed migration: %w", err)
+	}
+	if _, err := testDB.ExecContext(ctx, string(seedSQL)); err != nil {
+		return fmt.Errorf("exec seed migration: %w", err)
+	}
+
+	return nil
+}
+
+// cleanAndSeed truncates all tables in FK-safe order and re-inserts seed data.
+func cleanAndSeed(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+
+	tables := []string{"ScheduleDays", "ScheduleItems", "SystemAudioFiles", "Sessions", "Users"}
+	for _, table := range tables {
+		_, err := testDB.ExecContext(ctx, "DELETE FROM "+table)
+		require.NoError(t, err, "failed to clean table %s", table)
+	}
+
+	seedSQL, err := os.ReadFile("../../migrations/002_seed_data_up.sql")
+	require.NoError(t, err, "failed to read seed SQL")
+	_, err = testDB.ExecContext(ctx, string(seedSQL))
+	require.NoError(t, err, "failed to re-seed data")
+}
+
+// loginAs logs in with the given credentials and returns a JWT token.
+func loginAs(t *testing.T, username, password string) string {
+	t.Helper()
+
+	body := fmt.Sprintf(`{"username":%q,"password":%q}`, username, password)
+	resp := doRequest(t, http.MethodPost, "/api/auth/login", bytes.NewBufferString(body), "")
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode, "login failed for %s", username)
+
+	var result map[string]any
+	err := json.NewDecoder(resp.Body).Decode(&result)
+	require.NoError(t, err)
+
+	token, ok := result["token"].(string)
+	require.True(t, ok, "token not found in login response")
+	return token
+}
+
+// doRequest builds and executes an HTTP request against the test server.
+func doRequest(t *testing.T, method, path string, body io.Reader, token string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(method, testServer.URL+path, body)
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// readJSON decodes the response body into the given target.
+func readJSON(t *testing.T, resp *http.Response, target any) {
+	t.Helper()
+	defer resp.Body.Close()
+	err := json.NewDecoder(resp.Body).Decode(target)
+	require.NoError(t, err)
+}
