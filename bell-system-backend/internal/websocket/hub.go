@@ -20,7 +20,6 @@ type Hub struct {
 	done       chan struct{}
 	mu         sync.RWMutex
 	logger     *logger.Logger
-	config     Config
 }
 
 type broadcastMessage struct {
@@ -29,7 +28,7 @@ type broadcastMessage struct {
 }
 
 // NewHub creates a new Hub instance.
-func NewHub(log *logger.Logger, cfg Config) *Hub {
+func NewHub(log *logger.Logger) *Hub {
 	return &Hub{
 		clients:    make(map[string]*Client),
 		register:   make(chan *Client),
@@ -37,7 +36,6 @@ func NewHub(log *logger.Logger, cfg Config) *Hub {
 		broadcast:  make(chan broadcastMessage, 256),
 		done:       make(chan struct{}),
 		logger:     log,
-		config:     cfg,
 	}
 }
 

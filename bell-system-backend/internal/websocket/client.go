@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"time"
 
+	"arabiyya.edu.mv/bell-system-backend/config"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
-	"github.com/coder/websocket"
+	ws "github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -25,19 +26,19 @@ type Client struct {
 	ConnectedSince time.Time
 	UserID         uuid.UUID
 
-	conn   *websocket.Conn
+	conn   *ws.Conn
 	hub    *Hub
 	send   chan []byte
 	logger *logger.Logger
-	config Config
+	config config.WebSocketConfig
 }
 
 // NewClient creates a new Client from an accepted WebSocket connection.
 func NewClient(
-	conn *websocket.Conn,
+	conn *ws.Conn,
 	hub *Hub,
 	log *logger.Logger,
-	cfg Config,
+	cfg config.WebSocketConfig,
 	ip string,
 	clientType string,
 	clientName string,
@@ -85,17 +86,16 @@ func (c *Client) SendMessage(data []byte) {
 func (c *Client) ReadPump(ctx context.Context) {
 	defer func() {
 		c.hub.UnregisterClient(c)
-		c.conn.Close(websocket.StatusNormalClosure, "")
+		c.conn.Close(ws.StatusNormalClosure, "")
 	}()
 
-	conn := c.conn
-	conn.SetReadLimit(c.config.MaxMessageSize)
+	c.conn.SetReadLimit(int64(c.config.MaxMessageSize))
 
 	for {
-		_, data, err := conn.Read(ctx)
+		_, data, err := c.conn.Read(ctx)
 		if err != nil {
-			if websocket.CloseStatus(err) == websocket.StatusNormalClosure ||
-				websocket.CloseStatus(err) == websocket.StatusGoingAway {
+			if ws.CloseStatus(err) == ws.StatusNormalClosure ||
+				ws.CloseStatus(err) == ws.StatusGoingAway {
 				c.logger.Info("client disconnected normally", zap.String("client_id", c.ID))
 			} else {
 				c.logger.Info("client read error",
@@ -122,10 +122,13 @@ func (c *Client) ReadPump(ctx context.Context) {
 // WritePump writes messages to the WebSocket connection.
 // It runs until the send channel is closed.
 func (c *Client) WritePump(ctx context.Context) {
-	ticker := time.NewTicker(c.config.PingInterval)
+	pingInterval := time.Duration(c.config.PingInterval) * time.Second
+	pongTimeout := time.Duration(c.config.PongTimeout) * time.Second
+
+	ticker := time.NewTicker(pingInterval)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close(websocket.StatusNormalClosure, "")
+		c.conn.Close(ws.StatusNormalClosure, "")
 	}()
 
 	for {
@@ -134,7 +137,7 @@ func (c *Client) WritePump(ctx context.Context) {
 			if !ok {
 				return
 			}
-			err := c.conn.Write(ctx, websocket.MessageText, data)
+			err := c.conn.Write(ctx, ws.MessageText, data)
 			if err != nil {
 				c.logger.Info("client write error",
 					zap.String("client_id", c.ID),
@@ -144,7 +147,7 @@ func (c *Client) WritePump(ctx context.Context) {
 			}
 
 		case <-ticker.C:
-			pingCtx, cancel := context.WithTimeout(ctx, c.config.PongTimeout)
+			pingCtx, cancel := context.WithTimeout(ctx, pongTimeout)
 			err := c.conn.Ping(pingCtx)
 			cancel()
 			if err != nil {
