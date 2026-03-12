@@ -83,3 +83,13 @@ type FileStorage interface {
 	Open(path string) (io.ReadCloser, error)
 	Delete(path string) error
 }
+
+// EventNotifier allows REST handlers to notify WebSocket clients of data changes.
+type EventNotifier interface {
+	NotifySchedulesUpdated()
+	NotifyAudioFilesUpdated()
+	NotifyBellTriggered(payload models.BellTriggeredPayload)
+	NotifyBellCancelled(scheduleItemID string)
+	NotifySystemStateChanged(state string)
+	NotifySystemLog(level, message, source string)
+}
