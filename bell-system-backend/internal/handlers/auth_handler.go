@@ -97,6 +97,10 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to look up user")
 		return
 	}
+	if user == nil {
+		writeError(w, http.StatusNotFound, "not_found", "user not found")
+		return
+	}
 
 	if err := h.Passwords.Compare(user.PasswordHash, req.OldPassword); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "incorrect old password")
