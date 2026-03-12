@@ -13,6 +13,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 
 	"github.com/google/uuid"
@@ -312,6 +313,234 @@ func TestAudioHandler_Delete_DBError(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+// --- Error path tests ---
+
+func TestAudioHandler_GetByID_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_GetByID_DBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_Upload_InvalidMultipart(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{}
+
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("not multipart"))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAudioHandler_Upload_DBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		CreateFunc: func(_ context.Context, _ *models.SystemAudioFile) error {
+			return errors.New("create failed")
+		},
+	}
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("name", "test")
+	_ = writer.WriteField("type", "bell")
+	part, _ := writer.CreateFormFile("file", "test.wav")
+	_, _ = part.Write([]byte("fake"))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_Update_InvalidUUID(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{}
+
+	body := `{"name":"updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAudioHandler_Update_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	body := `{"name":"updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_Update_GetByIDDBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	body := `{"name":"updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_Update_InvalidJSON(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{ID: uuid.New()}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAudioHandler_Update_DBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{ID: uuid.New()}, nil
+		},
+		UpdateFunc: func(_ context.Context, _ *models.SystemAudioFile) error {
+			return errors.New("update failed")
+		},
+	}
+
+	body := `{"name":"updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_Update_FileTypeOnly(t *testing.T) {
+	fileID := uuid.New()
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{ID: fileID, Name: "old", FileType: models.FileTypeBell}, nil
+		},
+		UpdateFunc: func(_ context.Context, audio *models.SystemAudioFile) error {
+			assert.Equal(t, models.FileTypeAnthem, audio.FileType)
+			assert.Equal(t, "old", audio.Name) // name unchanged
+			return nil
+		},
+	}
+
+	body := `{"fileType":"anthem"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+fileID.String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestAudioHandler_Delete_InvalidUUID(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAudioHandler_Delete_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_Delete_GetByIDDBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)

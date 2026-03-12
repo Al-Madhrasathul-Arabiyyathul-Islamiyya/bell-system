@@ -175,6 +175,141 @@ func TestSystemAudioFileRepository_Delete_DBError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to delete system audio file")
 }
 
+// --- Error path tests ---
+
+func TestSystemAudioFileRepository_GetByID_Success(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	id := uuid.New()
+	rows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum"}).
+		AddRow(id, "bell.mp3", "/audio/bell.mp3", "bell", "hash1")
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id").
+		WithArgs(id).
+		WillReturnRows(rows)
+
+	audio, err := repo.GetByID(ctx, id)
+	require.NoError(t, err)
+	require.NotNil(t, audio)
+	assert.Equal(t, id, audio.ID)
+	assert.Equal(t, "bell.mp3", audio.Name)
+}
+
+func TestSystemAudioFileRepository_GetByID_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id").
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnError(errors.New("connection lost"))
+
+	audio, err := repo.GetByID(ctx, uuid.New())
+	require.Error(t, err)
+	assert.Nil(t, audio)
+	assert.Contains(t, err.Error(), "failed to get system audio file")
+}
+
+func TestSystemAudioFileRepository_List_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
+		WillReturnError(errors.New("query failed"))
+
+	audios, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, audios)
+}
+
+func TestSystemAudioFileRepository_List_ScanError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name"}).
+		AddRow(uuid.New(), "Bad Row")
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
+		WillReturnRows(rows)
+
+	audios, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, audios)
+}
+
+func TestSystemAudioFileRepository_List_RowsError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum"}).
+		AddRow(uuid.New(), "bell.mp3", "/audio/bell.mp3", "bell", "h1").
+		RowError(0, errors.New("row error"))
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
+		WillReturnRows(rows)
+
+	audios, err := repo.List(ctx)
+	require.Error(t, err)
+	assert.Nil(t, audios)
+}
+
+func TestSystemAudioFileRepository_Update_DBError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	audio := &models.SystemAudioFile{ID: uuid.New(), Name: "fail", FilePath: "/f", FileType: models.FileTypeBell, Checksum: "x"}
+
+	mock.ExpectExec("UPDATE SystemAudioFiles").
+		WithArgs(audio.Name, audio.FilePath, audio.FileType, audio.Checksum, audio.ID).
+		WillReturnError(errors.New("update failed"))
+
+	err := repo.Update(ctx, audio)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to update session")
+}
+
+func TestSystemAudioFileRepository_GetSoundsByIDs_QueryError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnError(errors.New("query failed"))
+
+	result, err := repo.GetSoundsByIDs(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to get sound files")
+}
+
+func TestSystemAudioFileRepository_GetSoundsByIDs_ScanError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	rows := sqlmock.NewRows([]string{"Id", "Name"}).
+		AddRow(uuid.New(), "Bad Row")
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnRows(rows)
+
+	result, err := repo.GetSoundsByIDs(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "failed to scan sound file")
+}
+
+func TestSystemAudioFileRepository_GetSoundsByIDs_RowsError(t *testing.T) {
+	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
+	ctx := context.Background()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt"}).
+		AddRow(uuid.New(), "bell.mp3", "/audio/bell.mp3", "bell", "h1", now, now).
+		RowError(0, errors.New("row error"))
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnRows(rows)
+
+	result, err := repo.GetSoundsByIDs(ctx, []uuid.UUID{uuid.New()})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.Contains(t, err.Error(), "error iterating sound files rows")
+}
+
 // --- Spec-driven: Four audio file types ---
 
 func TestSystemAudioFileRepository_AllFileTypes(t *testing.T) {

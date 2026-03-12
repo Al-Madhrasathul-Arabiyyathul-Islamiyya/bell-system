@@ -429,6 +429,116 @@ func TestAuthHandler_ChangePassword_HashError(t *testing.T) {
 
 // --- POST /logout ---
 
+func TestAuthHandler_ChangePassword_InvalidJSON(t *testing.T) {
+	userID := uuid.New()
+	userRepo := &mocks.MockUserRepo{}
+	hasher := &mocks.MockPasswordHasher{}
+	tokenSvc := &mocks.MockTokenService{
+		ValidateTokenFunc: func(_ string) (*handlers.TokenClaims, error) {
+			return &handlers.TokenClaims{UserID: userID, Username: "admin", Role: models.RoleAdmin}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/change-password", bytes.NewBufferString(`{bad`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rr := httptest.NewRecorder()
+
+	r := newAuthRouter(userRepo, tokenSvc, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAuthHandler_ChangePassword_MissingFields(t *testing.T) {
+	userID := uuid.New()
+	userRepo := &mocks.MockUserRepo{}
+	hasher := &mocks.MockPasswordHasher{}
+	tokenSvc := &mocks.MockTokenService{
+		ValidateTokenFunc: func(_ string) (*handlers.TokenClaims, error) {
+			return &handlers.TokenClaims{UserID: userID, Username: "admin", Role: models.RoleAdmin}, nil
+		},
+	}
+
+	body := `{"oldPassword":"","newPassword":""}`
+	req := httptest.NewRequest(http.MethodPost, "/change-password", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rr := httptest.NewRecorder()
+
+	r := newAuthRouter(userRepo, tokenSvc, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAuthHandler_ChangePassword_GetByIDError(t *testing.T) {
+	userID := uuid.New()
+	userRepo := &mocks.MockUserRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.User, error) {
+			return nil, errors.New("database error")
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{}
+	tokenSvc := &mocks.MockTokenService{
+		ValidateTokenFunc: func(_ string) (*handlers.TokenClaims, error) {
+			return &handlers.TokenClaims{UserID: userID, Username: "admin", Role: models.RoleAdmin}, nil
+		},
+	}
+
+	body := `{"oldPassword":"oldpass12","newPassword":"newpass123"}`
+	req := httptest.NewRequest(http.MethodPost, "/change-password", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rr := httptest.NewRecorder()
+
+	r := newAuthRouter(userRepo, tokenSvc, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAuthHandler_ChangePassword_UpdateError(t *testing.T) {
+	userID := uuid.New()
+	user := &models.User{
+		ID:           userID,
+		Username:     "admin",
+		PasswordHash: "old_hash",
+		Role:         models.RoleAdmin,
+	}
+
+	userRepo := &mocks.MockUserRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.User, error) {
+			return user, nil
+		},
+		UpdateFunc: func(_ context.Context, _ *models.User) error {
+			return errors.New("update failed")
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{
+		CompareFunc: func(_, _ string) error { return nil },
+		HashFunc: func(_ string) (string, error) {
+			return "new_hash", nil
+		},
+	}
+	tokenSvc := &mocks.MockTokenService{
+		ValidateTokenFunc: func(_ string) (*handlers.TokenClaims, error) {
+			return &handlers.TokenClaims{UserID: userID, Username: "admin", Role: models.RoleAdmin}, nil
+		},
+	}
+
+	body := `{"oldPassword":"oldpassword","newPassword":"newpassword1"}`
+	req := httptest.NewRequest(http.MethodPost, "/change-password", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rr := httptest.NewRecorder()
+
+	r := newAuthRouter(userRepo, tokenSvc, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
 func TestAuthHandler_Logout_Success(t *testing.T) {
 	userID := uuid.New()
 	userRepo := &mocks.MockUserRepo{}

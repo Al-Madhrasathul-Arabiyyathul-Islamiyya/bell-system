@@ -13,6 +13,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 
 	"github.com/google/uuid"
@@ -502,6 +503,296 @@ func TestScheduleHandler_DaysValidation_SundayIsOne(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusCreated, rr.Code)
+}
+
+// --- Error path tests ---
+
+func TestScheduleHandler_GetByID_ErrNotFound(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestScheduleHandler_GetByID_DBError(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, errors.New("database error")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestScheduleHandler_Create_InvalidTime(t *testing.T) {
+	soundID := uuid.New()
+	itemRepo := &mocks.MockScheduleItemRepo{}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name":    "Bad Time",
+		"time":    "not-a-time",
+		"soundId": soundID.String(),
+		"days":    []int{2},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Create_DBError(t *testing.T) {
+	soundID := uuid.New()
+	itemRepo := &mocks.MockScheduleItemRepo{
+		CreateFunc: func(_ context.Context, _ *models.ScheduleItem) error {
+			return errors.New("create failed")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name":    "Bell",
+		"time":    "08:00",
+		"soundId": soundID.String(),
+		"days":    []int{2},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
+	soundID := uuid.New()
+	itemRepo := &mocks.MockScheduleItemRepo{
+		CreateFunc: func(_ context.Context, _ *models.ScheduleItem) error {
+			return nil
+		},
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, errors.New("fetch failed")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name":    "Bell",
+		"time":    "08:00",
+		"soundId": soundID.String(),
+		"days":    []int{2},
+	})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	// Should still return 201 with the original item when GetByID fails
+	assert.Equal(t, http.StatusCreated, rr.Code)
+}
+
+func TestScheduleHandler_Update_InvalidUUID(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Update_ErrNotFound(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestScheduleHandler_Update_GetByIDDBError(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, errors.New("database error")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestScheduleHandler_Update_InvalidJSON(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: uuid.New()}, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Update_InvalidTime(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: uuid.New()}, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"time":"not-a-time"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Update_DBError(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: uuid.New()}, nil
+		},
+		UpdateFunc: func(_ context.Context, _ *models.ScheduleItem) error {
+			return errors.New("update failed")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"name":"Updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestScheduleHandler_Delete_InvalidUUID(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Delete_ErrNotFound(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestScheduleHandler_Delete_GetByIDDBError(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return nil, errors.New("database error")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestScheduleHandler_Delete_DBError(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: id}, nil
+		},
+		DeleteFunc: func(_ context.Context, _ uuid.UUID) error {
+			return errors.New("delete failed")
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
 func TestScheduleHandler_DaysValidation_EmptyDays(t *testing.T) {
