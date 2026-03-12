@@ -82,7 +82,11 @@ func TestScheduleItemCRUD(t *testing.T) {
 
 	// Get by ID — should include relations
 	resp = doRequest(t, http.MethodGet, "/api/schedule-items/"+itemID, nil, "")
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	if resp.StatusCode != http.StatusOK {
+		var errBody map[string]any
+		readJSON(t, resp, &errBody)
+		t.Fatalf("schedule item get by ID failed with status %d: %v", resp.StatusCode, errBody)
+	}
 
 	var fetched map[string]any
 	readJSON(t, resp, &fetched)
