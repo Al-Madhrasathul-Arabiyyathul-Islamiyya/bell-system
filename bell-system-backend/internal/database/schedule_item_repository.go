@@ -93,12 +93,12 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 // GetByID gets a schedule item by ID with related sound, session, and days
 func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
 	query := `
-        SELECT 
-            Id, 
-            SessionId, 
-            Name, 
-            Time, 
-            SoundId,
+        SELECT
+            CONVERT(NVARCHAR(36), Id) AS Id,
+            CONVERT(NVARCHAR(36), SessionId) AS SessionId,
+            Name,
+            Time,
+            CONVERT(NVARCHAR(36), SoundId) AS SoundId,
             CreatedAt,
             UpdatedAt
         FROM ScheduleItems
@@ -166,12 +166,12 @@ func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*mo
 // List gets all schedule items with their associations
 func (r *ScheduleItemRepository) List(ctx context.Context) ([]*models.ScheduleItem, error) {
 	query := `
-		SELECT 
-			Id, 
-			SessionId, 
-			Name, 
-			Time, 
-			SoundId,
+		SELECT
+			CONVERT(NVARCHAR(36), Id) AS Id,
+			CONVERT(NVARCHAR(36), SessionId) AS SessionId,
+			Name,
+			Time,
+			CONVERT(NVARCHAR(36), SoundId) AS SoundId,
 			CreatedAt,
 			UpdatedAt
 		FROM ScheduleItems
@@ -274,12 +274,12 @@ func (r *ScheduleItemRepository) GetCurrentSessionSchedules(ctx context.Context,
 	currentDayOfWeek := int(currentTime.Weekday()) + 1 // Adding 1 for Sunday = 1
 
 	query := `
-        SELECT 
-            si.Id, 
-            si.SessionId, 
-            si.Name, 
-            si.Time, 
-            si.SoundId,
+        SELECT
+            CONVERT(NVARCHAR(36), si.Id) AS Id,
+            CONVERT(NVARCHAR(36), si.SessionId) AS SessionId,
+            si.Name,
+            si.Time,
+            CONVERT(NVARCHAR(36), si.SoundId) AS SoundId,
             si.CreatedAt,
             si.UpdatedAt
         FROM ScheduleItems si
@@ -423,12 +423,16 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 	})
 }
 
-// Delete deletes a schedule item
+// Delete deletes a schedule item and its associated days
 func (r *ScheduleItemRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := "DELETE FROM ScheduleItems WHERE Id = @p1"
-	_, err := r.DB.ExecContext(ctx, query, id)
-	if err != nil {
-		return fmt.Errorf("failed to delete the schedule item: %w", err)
-	}
-	return nil
+	return r.WithTx(ctx, func(tx *sql.Tx) error {
+		// Delete associated days first (FK constraint)
+		if _, err := tx.ExecContext(ctx, "DELETE FROM ScheduleDays WHERE ScheduleItemId = @p1", id); err != nil {
+			return fmt.Errorf("failed to delete schedule days: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, "DELETE FROM ScheduleItems WHERE Id = @p1", id); err != nil {
+			return fmt.Errorf("failed to delete the schedule item: %w", err)
+		}
+		return nil
+	})
 }

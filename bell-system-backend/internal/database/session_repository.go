@@ -45,7 +45,7 @@ func (r *SessionRepository) Create(ctx context.Context, session *models.Session)
 // GetByID gets a session by ID
 func (r *SessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Session, error) {
 	query := `
-        SELECT Id, Name, StartTime, EndTime
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
         WHERE Id = @p1
     `
@@ -75,7 +75,7 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 	}
 
 	query := fmt.Sprintf(`
-		SELECT Id, Name, StartTime, EndTime
+		SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
 		FROM Sessions
 		WHERE Id IN (%s)
 	`, strings.Join(idStrings, ", "))
@@ -113,7 +113,7 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 // List gets all sessions
 func (r *SessionRepository) List(ctx context.Context) ([]*models.Session, error) {
 	query := `
-        SELECT Id, Name, StartTime, EndTime
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
         ORDER BY StartTime
     `
@@ -145,7 +145,7 @@ func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Sess
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 
 	query := `
-        SELECT Id, Name, StartTime, EndTime
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
         WHERE CAST(@p1 AS TIME) BETWEEN StartTime AND EndTime
     `
