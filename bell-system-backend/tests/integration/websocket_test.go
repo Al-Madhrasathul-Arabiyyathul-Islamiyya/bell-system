@@ -68,7 +68,8 @@ func readWSMessage(t *testing.T, conn *websocket.Conn, timeout time.Duration) *m
 
 func TestWebSocket_ConnectionAcknowledged(t *testing.T) {
 	cleanAndSeed(t)
-	token := loginAs(t, "admin", "admin123")
+	createTestUser(t, "wsadmin", "wspass123", "admin")
+	token := loginAs(t, "wsadmin", "wspass123")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -110,7 +111,8 @@ func TestWebSocket_InvalidToken(t *testing.T) {
 
 func TestWebSocket_InvalidClientType(t *testing.T) {
 	cleanAndSeed(t)
-	token := loginAs(t, "admin", "admin123")
+	createTestUser(t, "wsadmin2", "wspass123", "admin")
+	token := loginAs(t, "wsadmin2", "wspass123")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -122,7 +124,8 @@ func TestWebSocket_InvalidClientType(t *testing.T) {
 
 func TestWebSocket_AdminTypeRequiresAdminRole(t *testing.T) {
 	cleanAndSeed(t)
-	token := loginAs(t, "morning_user", "admin123")
+	createTestUser(t, "wsmorning", "wspass123", "morning_user")
+	token := loginAs(t, "wsmorning", "wspass123")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -134,7 +137,10 @@ func TestWebSocket_AdminTypeRequiresAdminRole(t *testing.T) {
 
 func TestWebSocket_AdminReceivesConnectedClients(t *testing.T) {
 	cleanAndSeed(t)
-	adminToken := loginAs(t, "admin", "admin123")
+	createTestUser(t, "wsadmin3", "wspass123", "admin")
+	createTestUser(t, "wsmorning2", "wspass123", "morning_user")
+
+	adminToken := loginAs(t, "wsadmin3", "wspass123")
 
 	adminConn := dialWS(t, adminToken, "admin", "Admin")
 	defer adminConn.Close(websocket.StatusNormalClosure, "")
@@ -145,7 +151,7 @@ func TestWebSocket_AdminReceivesConnectedClients(t *testing.T) {
 	assert.Equal(t, "connected_clients", msg.Type)
 
 	// Connect a second client
-	clientToken := loginAs(t, "morning_user", "admin123")
+	clientToken := loginAs(t, "wsmorning2", "wspass123")
 	clientConn := dialWS(t, clientToken, "client", "Display")
 	defer clientConn.Close(websocket.StatusNormalClosure, "")
 
@@ -162,10 +168,13 @@ func TestWebSocket_AdminReceivesConnectedClients(t *testing.T) {
 
 func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 	cleanAndSeed(t)
-	adminToken := loginAs(t, "admin", "admin123")
+	createTestUser(t, "wsadmin4", "wspass123", "admin")
+	createTestUser(t, "wsmorning3", "wspass123", "morning_user")
+
+	adminToken := loginAs(t, "wsadmin4", "wspass123")
 
 	// Connect a WebSocket client
-	clientToken := loginAs(t, "morning_user", "admin123")
+	clientToken := loginAs(t, "wsmorning3", "wspass123")
 	clientConn := dialWS(t, clientToken, "client", "Display")
 	defer clientConn.Close(websocket.StatusNormalClosure, "")
 
@@ -190,9 +199,10 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 
 func TestWebSocket_AudioUpdateNotifiesClients(t *testing.T) {
 	cleanAndSeed(t)
+	createTestUser(t, "wsmorning4", "wspass123", "morning_user")
 
 	// Connect a WebSocket client
-	clientToken := loginAs(t, "morning_user", "admin123")
+	clientToken := loginAs(t, "wsmorning4", "wspass123")
 	clientConn := dialWS(t, clientToken, "client", "Display")
 	defer clientConn.Close(websocket.StatusNormalClosure, "")
 
@@ -224,7 +234,8 @@ func TestWebSocket_AudioUpdateNotifiesClients(t *testing.T) {
 
 func TestWebSocket_Heartbeat(t *testing.T) {
 	cleanAndSeed(t)
-	token := loginAs(t, "morning_user", "admin123")
+	createTestUser(t, "wsmorning5", "wspass123", "morning_user")
+	token := loginAs(t, "wsmorning5", "wspass123")
 
 	conn := dialWS(t, token, "client", "Display")
 	defer conn.Close(websocket.StatusNormalClosure, "")
@@ -248,7 +259,8 @@ func TestWebSocket_Heartbeat(t *testing.T) {
 
 func TestWebSocket_ClientTypeClient(t *testing.T) {
 	cleanAndSeed(t)
-	token := loginAs(t, "morning_user", "admin123")
+	createTestUser(t, "wsmorning6", "wspass123", "morning_user")
+	token := loginAs(t, "wsmorning6", "wspass123")
 
 	conn := dialWS(t, token, "client", "MorningDisplay")
 	defer conn.Close(websocket.StatusNormalClosure, "")
