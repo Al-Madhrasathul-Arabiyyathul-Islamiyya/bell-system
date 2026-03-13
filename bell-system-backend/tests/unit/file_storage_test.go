@@ -131,24 +131,24 @@ func TestLocalFileStorage_Save_CopyFails(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to write file")
 	assert.Empty(t, path)
 	assert.Empty(t, checksum)
+
+	// Verify the partial file was cleaned up
+	_, statErr := os.Stat(filepath.Join(dir, "bad-reader.wav"))
+	assert.True(t, os.IsNotExist(statErr), "partial file should be removed after copy failure")
 }
 
-func TestLocalFileStorage_Delete_PermissionError(t *testing.T) {
+func TestLocalFileStorage_Delete_NonEmptyDirectory(t *testing.T) {
 	dir := t.TempDir()
 	fs, err := services.NewLocalFileStorage(dir)
 	require.NoError(t, err)
 
-	// Create a file, then open it exclusively to prevent deletion (Windows)
-	// On Unix, try to delete a file inside a read-only directory
-	path, _, err := fs.Save("locked", ".wav", strings.NewReader("data"))
-	require.NoError(t, err)
+	// Create a subdirectory with a file inside — os.Remove on a non-empty dir
+	// returns an error that is not os.ErrNotExist, hitting the error-wrapping path.
+	subdir := filepath.Join(dir, "nonempty")
+	require.NoError(t, os.Mkdir(subdir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(subdir, "child.txt"), []byte("x"), 0644))
 
-	// Open the file to lock it (Windows prevents deletion of open files)
-	f, err := os.Open(path)
-	require.NoError(t, err)
-	defer f.Close()
-
-	err = fs.Delete(path)
+	err = fs.Delete(subdir)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete file")
 }
