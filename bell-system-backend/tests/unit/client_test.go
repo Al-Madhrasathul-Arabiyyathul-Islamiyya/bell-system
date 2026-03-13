@@ -119,7 +119,7 @@ func TestClient_ReadPump_ProcessesRegister(t *testing.T) {
 
 	// Verify client name was updated
 	time.Sleep(50 * time.Millisecond)
-	assert.Equal(t, "UpdatedName", client.ClientName)
+	assert.Equal(t, "UpdatedName", client.ClientName())
 }
 
 func TestClient_ReadPump_ClosesOnReadError(t *testing.T) {

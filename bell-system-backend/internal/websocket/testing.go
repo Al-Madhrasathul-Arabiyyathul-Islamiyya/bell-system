@@ -18,7 +18,7 @@ func NewTestClient(hub *Hub, clientType string, clientName string) *Client {
 		ID:             uuid.New().String(),
 		IP:             "127.0.0.1",
 		ClientType:     clientType,
-		ClientName:     clientName,
+		clientName:     clientName,
 		ConnectedSince: time.Now().UTC(),
 		UserID:         uuid.New(),
 		hub:            hub,
