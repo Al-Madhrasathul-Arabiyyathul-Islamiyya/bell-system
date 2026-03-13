@@ -36,12 +36,17 @@ func (fs *LocalFileStorage) Save(id string, ext string, data io.Reader) (string,
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create file: %w", err)
 	}
-	defer f.Close()
 
 	h := sha256.New()
 	if _, err := io.Copy(f, io.TeeReader(data, h)); err != nil {
+		f.Close()
 		os.Remove(path)
 		return "", "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(path)
+		return "", "", fmt.Errorf("failed to close file: %w", err)
 	}
 
 	return path, hex.EncodeToString(h.Sum(nil)), nil

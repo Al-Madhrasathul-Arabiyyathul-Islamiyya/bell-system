@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/config"
@@ -22,9 +23,11 @@ type Client struct {
 	ID             string
 	IP             string
 	ClientType     string
-	ClientName     string
 	ConnectedSince time.Time
 	UserID         uuid.UUID
+
+	mu         sync.RWMutex
+	clientName string
 
 	conn   *ws.Conn
 	hub    *Hub
@@ -48,7 +51,7 @@ func NewClient(
 		ID:             uuid.New().String(),
 		IP:             ip,
 		ClientType:     clientType,
-		ClientName:     clientName,
+		clientName:     clientName,
 		ConnectedSince: time.Now().UTC(),
 		UserID:         userID,
 		conn:           conn,
@@ -59,13 +62,27 @@ func NewClient(
 	}
 }
 
+// ClientName returns the client's display name (thread-safe).
+func (c *Client) ClientName() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.clientName
+}
+
+// SetClientName updates the client's display name (thread-safe).
+func (c *Client) SetClientName(name string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.clientName = name
+}
+
 // Info returns the ClientInfo model for this client.
 func (c *Client) Info() models.ClientInfo {
 	return models.ClientInfo{
 		ID:             c.ID,
 		IP:             c.IP,
 		ClientType:     c.ClientType,
-		ClientName:     c.ClientName,
+		ClientName:     c.ClientName(),
 		ConnectedSince: c.ConnectedSince,
 	}
 }
@@ -190,11 +207,11 @@ func (c *Client) handleRegister(ctx context.Context, msg models.WebSocketMessage
 		return
 	}
 	if reg.ClientName != "" {
-		c.ClientName = reg.ClientName
+		c.SetClientName(reg.ClientName)
 	}
 	c.logger.Info("client registered via message",
 		zap.String("client_id", c.ID),
-		zap.String("client_name", c.ClientName),
+		zap.String("client_name", c.ClientName()),
 	)
 
 	ack := models.WebSocketMessage{
