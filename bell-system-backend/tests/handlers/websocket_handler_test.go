@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,4 +156,52 @@ func TestWSHandler_ClientConnection(t *testing.T) {
 	err = wsjson.Read(ctx, conn, &msg)
 	require.NoError(t, err)
 	assert.Equal(t, "connection_acknowledged", msg.Type)
+}
+
+func TestWSHandler_XRealIPHeader(t *testing.T) {
+	log, err := logger.New("test")
+	require.NoError(t, err)
+
+	cfg := config.WebSocketConfig{
+		PingInterval:   30,
+		PongTimeout:    10,
+		MaxMessageSize: 512,
+	}
+
+	hub := ws.NewHub(log)
+	done := make(chan struct{})
+	go hub.Run(done)
+	t.Cleanup(func() {
+		close(done)
+		<-hub.Done()
+	})
+
+	handler := ws.NewHandler(hub, validTokenService(), log, cfg)
+
+	// Create a test server that injects X-Real-IP header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Set("X-Real-IP", "10.0.0.1")
+		handler.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	wsURL := strings.Replace(srv.URL, "http://", "ws://", 1)
+	conn, _, err := websocket.Dial(ctx, wsURL+"?token=valid&client_type=admin&client_name=TestAdmin", nil)
+	require.NoError(t, err)
+	defer conn.Close(websocket.StatusNormalClosure, "")
+
+	// Read connection_acknowledged
+	var msg models.WebSocketMessage
+	err = wsjson.Read(ctx, conn, &msg)
+	require.NoError(t, err)
+	assert.Equal(t, "connection_acknowledged", msg.Type)
+
+	// Wait for the client to be registered, then check its IP
+	time.Sleep(100 * time.Millisecond)
+	clients := hub.ConnectedClients()
+	require.Len(t, clients, 1)
+	assert.Equal(t, "10.0.0.1", clients[0].IP)
 }
