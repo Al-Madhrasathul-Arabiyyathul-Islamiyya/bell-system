@@ -103,3 +103,98 @@ port = 8080
 	assert.Equal(t, 0, cfg.JWT.ExpiresIn)
 	assert.Equal(t, "", cfg.Storage.AudioDir)
 }
+
+func TestLoadConfig_CORSDefaults(t *testing.T) {
+	dir := t.TempDir()
+	content := `
+[server]
+port = 8080
+`
+	err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	origDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Empty(t, cfg.CORS.AllowedOrigins)
+	assert.Equal(t, 0, cfg.CORS.MaxAge)
+}
+
+func TestLoadConfig_CORSCustom(t *testing.T) {
+	dir := t.TempDir()
+	content := `
+[server]
+port = 8080
+
+[cors]
+allowedOrigins = ["http://example.com", "http://app.example.com"]
+maxAge = 600
+`
+	err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	origDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, []string{"http://example.com", "http://app.example.com"}, cfg.CORS.AllowedOrigins)
+	assert.Equal(t, 600, cfg.CORS.MaxAge)
+}
+
+func TestLoadConfig_WebSocketDefaults(t *testing.T) {
+	dir := t.TempDir()
+	content := `
+[server]
+port = 8080
+`
+	err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	origDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, 0, cfg.WebSocket.PingInterval)
+	assert.Equal(t, 0, cfg.WebSocket.PongTimeout)
+	assert.Equal(t, 0, cfg.WebSocket.MaxMessageSize)
+}
+
+func TestLoadConfig_WebSocketCustom(t *testing.T) {
+	dir := t.TempDir()
+	content := `
+[server]
+port = 8080
+
+[websocket]
+pingInterval = 45
+pongTimeout = 15
+maxMessageSize = 1024
+`
+	err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	origDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	cfg, err := config.LoadConfig()
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+
+	assert.Equal(t, 45, cfg.WebSocket.PingInterval)
+	assert.Equal(t, 15, cfg.WebSocket.PongTimeout)
+	assert.Equal(t, 1024, cfg.WebSocket.MaxMessageSize)
+}
