@@ -3,12 +3,17 @@ package websocket
 import (
 	"time"
 
+	"arabiyya.edu.mv/bell-system-backend/config"
+	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
+
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 // NewTestClient creates a Client without a real WebSocket connection, for testing.
 // The send channel is accessible via ReadSend and DrainSend methods.
 func NewTestClient(hub *Hub, clientType string, clientName string) *Client {
+	nopLogger := &logger.Logger{Logger: zap.NewNop()}
 	return &Client{
 		ID:             uuid.New().String(),
 		IP:             "127.0.0.1",
@@ -18,6 +23,7 @@ func NewTestClient(hub *Hub, clientType string, clientName string) *Client {
 		UserID:         uuid.New(),
 		hub:            hub,
 		send:           make(chan []byte, sendBufferSize),
+		logger:         nopLogger,
 	}
 }
 
@@ -39,5 +45,14 @@ func (c *Client) DrainSend() {
 		default:
 			return
 		}
+	}
+}
+
+// TestWSConfig returns a WebSocketConfig with short intervals suitable for tests.
+func TestWSConfig() config.WebSocketConfig {
+	return config.WebSocketConfig{
+		PingInterval:   1,
+		PongTimeout:    1,
+		MaxMessageSize: 512,
 	}
 }
