@@ -215,3 +215,34 @@ When you receive `audio_files_updated`:
 4. Cache the new checksum
 
 This ensures clients always have the latest audio files without downloading everything on every update.
+
+## Offline Resilience
+
+Desktop clients should remain functional when disconnected from the server.
+
+### Local Bell Triggering
+
+- On connect (or reconnect), fetch the full schedule: `GET /api/schedule-items` and current session: `GET /api/sessions/current`
+- Cache the schedule locally
+- When disconnected, the client should trigger bells locally based on the cached schedule and system clock
+- When reconnected, stop local triggers and resume server-driven mode
+
+### Local Pause/Resume
+
+- Track the system state (`active`/`paused`) locally
+- When disconnected, allow local pause/resume via the client UI
+- On reconnect, fetch the server state (`GET /api/system/state`) and adopt it as the source of truth
+
+### On-Demand Unscheduled Bells
+
+- The client may support triggering bells manually outside the schedule (e.g., emergency bell)
+- This is a client-only feature — the server does not need to be involved
+
+### Reconnection Flow
+
+1. Re-authenticate if the token has expired
+2. Connect to WebSocket with `register` message
+3. Fetch system state: `GET /api/system/state`
+4. Fetch current schedule: `GET /api/sessions/current` + `GET /api/schedule-items`
+5. Fetch audio checksums and sync any changed files
+6. Resume server-driven mode (stop local bell triggers)
