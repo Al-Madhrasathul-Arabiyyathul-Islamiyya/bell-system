@@ -174,8 +174,10 @@ func TestMain(m *testing.M) {
 	audioHandler := handlers.NewAudioHandler(audioFileRepo, notifier)
 	audioHandler.FileStorage = fileStore
 
+	stateRepo := database.NewSystemStateRepository(testDB, log)
+
 	// Router (mirrors cmd/server/main.go)
-	systemHandler := handlers.NewSystemHandler(nil, nil, nil) // no DB in integration tests for system state
+	systemHandler := handlers.NewSystemHandler(stateRepo, nil, notifier)
 	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 
 	r := chi.NewRouter()
@@ -236,6 +238,14 @@ func runMigrations(ctx context.Context) error {
 		return fmt.Errorf("exec seed migration: %w", err)
 	}
 
+	stateSQL, err := os.ReadFile("../../migrations/003_create_system_state_up.sql")
+	if err != nil {
+		return fmt.Errorf("read system state migration: %w", err)
+	}
+	if _, err := testDB.ExecContext(ctx, string(stateSQL)); err != nil {
+		return fmt.Errorf("exec system state migration: %w", err)
+	}
+
 	return nil
 }
 
@@ -249,6 +259,10 @@ func cleanAndSeed(t *testing.T) {
 		_, err := testDB.ExecContext(ctx, "DELETE FROM "+table)
 		require.NoError(t, err, "failed to clean table %s", table)
 	}
+
+	// Reset system state to active
+	_, err := testDB.ExecContext(ctx, "UPDATE SystemState SET Value = 'active', UpdatedAt = GETDATE() WHERE [Key] = 'system_state'")
+	require.NoError(t, err, "failed to reset system state")
 
 	seedSQL, err := os.ReadFile("../../migrations/002_seed_data_up.sql")
 	require.NoError(t, err, "failed to read seed SQL")
@@ -298,6 +312,11 @@ func readJSON(t *testing.T, resp *http.Response, target any) {
 	defer resp.Body.Close()
 	err := json.NewDecoder(resp.Body).Decode(target)
 	require.NoError(t, err)
+}
+
+// getDayOfWeek returns the current day of week as 1=Sunday..7=Saturday.
+func getDayOfWeek() int {
+	return int(time.Now().Weekday()) + 1
 }
 
 // createTestUser creates a user via the API and returns the user ID.
