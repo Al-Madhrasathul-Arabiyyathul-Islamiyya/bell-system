@@ -18,18 +18,13 @@ Upon connection, clients must identify their type and optionally provide a name 
 
 ### Initial Connection
 
-When a client connects, it should immediately send a registration message:
+Registration happens via query parameters on the WebSocket URL:
 
-```json
-{
-  "type": "register",
-  "timestamp": "2024-03-13T15:30:45Z",
-  "payload": {
-    "client_type": "admin" | "client",
-    "client_name": "Optional display name"
-  }
-}
 ```
+ws://{base_url}/ws?token={jwt_token}&client_type=admin|client&client_name=Optional+Display+Name
+```
+
+No separate registration message is needed — the server registers the client on upgrade.
 
 
 
@@ -76,7 +71,7 @@ All events follow a standard format:
 
 ### connection_acknowledged
 
-    - Sent to a client immediately after successful connection and registration
+    - Sent to a client immediately after successful WebSocket upgrade
     - Confirms connection and provides client's ID for reference
 
 ```json
@@ -196,6 +191,21 @@ Typically, most client actions are handled via REST API calls rather than WebSoc
 {
   "type": "heartbeat",
   "timestamp": "2024-03-13T15:30:45Z"
+}
+```
+
+2. register (optional)
+    - Can be sent after connecting to update the client name
+    - Not required for initial registration (handled via query parameters)
+
+```json
+{
+  "type": "register",
+  "timestamp": "2024-03-13T15:30:45Z",
+  "payload": {
+    "client_type": "admin" | "client",
+    "client_name": "Updated Display Name"
+  }
 }
 ```
 
