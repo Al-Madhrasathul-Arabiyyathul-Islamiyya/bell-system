@@ -15,6 +15,7 @@ type Config struct {
 	Storage   StorageConfig
 	CORS      CORSConfig
 	WebSocket WebSocketConfig
+	Scheduler SchedulerConfig
 }
 
 type ServerConfig struct {
@@ -46,6 +47,11 @@ type CORSConfig struct {
 
 type StorageConfig struct {
 	AudioDir string
+}
+
+type SchedulerConfig struct {
+	CheckInterval int  // seconds, default 30
+	Enabled       bool // default true
 }
 
 type WebSocketConfig struct {
