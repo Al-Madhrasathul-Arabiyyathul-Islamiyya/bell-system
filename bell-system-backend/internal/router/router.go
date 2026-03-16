@@ -17,7 +17,7 @@ func New(
 ) chi.Router {
 	r := chi.NewRouter()
 
-	r.Route("/api", func(r chi.Router) {
+	r.Route("/api/v1", func(r chi.Router) {
 		r.Mount("/auth", AuthRoutes(auth))
 		r.Mount("/users", UserRoutes(users))
 		r.Mount("/sessions", SessionRoutes(sessions))

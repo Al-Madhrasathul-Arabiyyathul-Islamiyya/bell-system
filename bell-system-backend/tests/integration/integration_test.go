@@ -260,7 +260,7 @@ func loginAs(t *testing.T, username, password string) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{"username":%q,"password":%q}`, username, password)
-	resp := doRequest(t, http.MethodPost, "/api/auth/login", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/login", bytes.NewBufferString(body), "")
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode, "login failed for %s", username)
@@ -305,7 +305,7 @@ func createTestUser(t *testing.T, username, password, role string) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{"username":%q,"password":%q,"role":%q}`, username, password, role)
-	resp := doRequest(t, http.MethodPost, "/api/users", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), "")
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "failed to create test user %s", username)
 
 	var result map[string]any

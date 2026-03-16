@@ -24,7 +24,7 @@ func uploadAudioFile(t *testing.T, name, fileType, filename, content string) (in
 	part.Write([]byte(content))
 	w.Close()
 
-	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/audio-files", &buf)
+	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio-files", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 
@@ -58,7 +58,7 @@ func TestAudioFileCRUD(t *testing.T) {
 	audioID := created["id"].(string)
 
 	// List
-	resp := doRequest(t, http.MethodGet, "/api/audio-files", nil, "")
+	resp := doRequest(t, http.MethodGet, "/api/v1/audio-files", nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var listResult map[string]any
@@ -66,13 +66,13 @@ func TestAudioFileCRUD(t *testing.T) {
 	assert.GreaterOrEqual(t, listResult["total"].(float64), float64(1))
 
 	// Get by ID
-	resp = doRequest(t, http.MethodGet, "/api/audio-files/"+audioID, nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/audio-files/"+audioID, nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
 	// Update metadata
 	updateBody := `{"name":"updated-anthem.mp3","fileType":"other"}`
-	resp = doRequest(t, http.MethodPut, "/api/audio-files/"+audioID, bytes.NewBufferString(updateBody), "")
+	resp = doRequest(t, http.MethodPut, "/api/v1/audio-files/"+audioID, bytes.NewBufferString(updateBody), "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var updated map[string]any
@@ -81,12 +81,12 @@ func TestAudioFileCRUD(t *testing.T) {
 	assert.Equal(t, "other", updated["fileType"])
 
 	// Delete
-	resp = doRequest(t, http.MethodDelete, "/api/audio-files/"+audioID, nil, "")
+	resp = doRequest(t, http.MethodDelete, "/api/v1/audio-files/"+audioID, nil, "")
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 	resp.Body.Close()
 
 	// Verify deleted
-	resp = doRequest(t, http.MethodGet, "/api/audio-files/"+audioID, nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/audio-files/"+audioID, nil, "")
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
 }
@@ -101,7 +101,7 @@ func TestAudioFileChecksums(t *testing.T) {
 	expectedChecksum := created["checksum"].(string)
 
 	// Get checksums
-	resp := doRequest(t, http.MethodGet, "/api/audio-files/checksums", nil, "")
+	resp := doRequest(t, http.MethodGet, "/api/v1/audio-files/checksums", nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var checksums []map[string]any

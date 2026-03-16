@@ -192,7 +192,7 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 	// Create a schedule item via REST — should trigger schedules_updated
 	sessionID := getSessionIDForWS(t)
 	body := fmt.Sprintf(`{"name":"WS Test Bell","time":"08:00","soundId":"%s","sessionId":"%s","days":[2,3,4,5,6]}`, audioID, sessionID)
-	resp := doRequest(t, http.MethodPost, "/api/schedule-items", bytes.NewBufferString(body), adminToken)
+	resp := doRequest(t, http.MethodPost, "/api/v1/schedule-items", bytes.NewBufferString(body), adminToken)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	resp.Body.Close()
 
@@ -223,7 +223,7 @@ func TestWebSocket_AudioUpdateNotifiesClients(t *testing.T) {
 	part.Write([]byte("fake audio data for ws test"))
 	w.Close()
 
-	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/audio-files", &buf)
+	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio-files", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	resp, err := http.DefaultClient.Do(req)
@@ -295,7 +295,7 @@ func createTestAudioFileForWS(t *testing.T) string {
 	part.Write([]byte("fake audio"))
 	w.Close()
 
-	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/audio-files", &buf)
+	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio-files", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 
@@ -312,7 +312,7 @@ func createTestAudioFileForWS(t *testing.T) string {
 func getSessionIDForWS(t *testing.T) string {
 	t.Helper()
 
-	resp := doRequest(t, http.MethodGet, "/api/sessions", nil, "")
+	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result map[string]any
