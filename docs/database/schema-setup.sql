@@ -68,8 +68,8 @@ CREATE TABLE ScheduleDays (
 
 -- Insert test data
 INSERT INTO Sessions (Name, StartTime, EndTime) VALUES
-    ('Morning Session', '07:00', '12:00'),
-    ('Afternoon Session', '12:00', '17:00');
+    ('Morning Session', '06:45', '12:10'),
+    ('Afternoon Session', '12:15', '18:10');
 
 -- Insert admin user with hashed password 'admin123' (you should change this in production)
 INSERT INTO Users (Username, PasswordHash, Role) VALUES
@@ -78,10 +78,21 @@ INSERT INTO Users (Username, PasswordHash, Role) VALUES
     ('afternoon_user', '$2a$10$xVR.FqM8kq8tKHXh9WWqIe3faG3F8bFY6VUxmk1cqWRqWGQM8ZmXi', 'afternoon_user');
 GO
 
+-- System State table
+CREATE TABLE SystemState (
+    [Key] NVARCHAR(50) PRIMARY KEY,
+    Value NVARCHAR(255) NOT NULL,
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+);
+
+INSERT INTO SystemState ([Key], Value, UpdatedAt) VALUES ('system_state', 'active', GETDATE());
+GO
+
 -- Grant permissions to specific tables
 GRANT SELECT, INSERT, UPDATE, DELETE ON Users TO bell_schedule_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON Sessions TO bell_schedule_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON SystemAudioFiles TO bell_schedule_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ScheduleItems TO bell_schedule_user;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ScheduleDays TO bell_schedule_user;
+GRANT SELECT, INSERT, UPDATE, DELETE ON SystemState TO bell_schedule_user;
 GO
