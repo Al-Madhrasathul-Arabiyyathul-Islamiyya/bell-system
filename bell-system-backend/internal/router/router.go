@@ -21,8 +21,8 @@ func New(
 		r.Mount("/auth", AuthRoutes(auth))
 		r.Mount("/users", UserRoutes(users))
 		r.Mount("/sessions", SessionRoutes(sessions))
-		r.Mount("/schedule-items", ScheduleRoutes(schedule))
-		r.Mount("/audio-files", AudioRoutes(audio))
+		r.Mount("/schedule", ScheduleRoutes(schedule))
+		r.Mount("/audio", AudioRoutes(audio))
 		r.Mount("/system", SystemRoutes(system))
 	})
 

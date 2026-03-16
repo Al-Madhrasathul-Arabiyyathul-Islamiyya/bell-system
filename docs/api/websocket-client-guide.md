@@ -74,7 +74,7 @@ All messages use the same JSON envelope:
 ### Schedule Events
 
 #### `schedules_updated`
-Sent when any schedule item is created, updated, or deleted. No payload — clients should re-fetch schedules via REST API (`GET /api/v1/schedule-items`).
+Sent when any schedule item is created, updated, or deleted. No payload — clients should re-fetch schedules via REST API (`GET /api/v1/schedule`).
 
 #### `bell_triggered`
 Sent when a bell is about to play. Client should play the referenced sound file.
@@ -114,7 +114,7 @@ Sent when the bell system is paused or resumed. When paused, clients should stop
 ```
 
 #### `audio_files_updated`
-Sent when audio files are added, updated, or deleted. Clients should re-check audio file checksums via `GET /api/v1/audio-files/checksums` and re-download any changed files.
+Sent when audio files are added, updated, or deleted. Clients should re-check audio file checksums via `GET /api/v1/audio/checksums` and re-download any changed files.
 
 ### Admin-Only Events
 
@@ -209,9 +209,9 @@ Pre-upgrade errors return standard HTTP responses:
 
 When you receive `audio_files_updated`:
 
-1. Fetch checksums: `GET /api/v1/audio-files/checksums`
+1. Fetch checksums: `GET /api/v1/audio/checksums`
 2. Compare with locally cached checksums
-3. Download changed files: `GET /api/v1/audio-files/{id}` (returns the file binary)
+3. Download changed files: `GET /api/v1/audio/{id}` (returns the file binary)
 4. Cache the new checksum
 
 This ensures clients always have the latest audio files without downloading everything on every update.
@@ -222,7 +222,7 @@ Desktop clients should remain functional when disconnected from the server.
 
 ### Local Bell Triggering
 
-- On connect (or reconnect), fetch the full schedule: `GET /api/v1/schedule-items` and current session: `GET /api/v1/sessions/current`
+- On connect (or reconnect), fetch the full schedule: `GET /api/v1/schedule` and current session: `GET /api/v1/sessions/current`
 - Cache the schedule locally
 - When disconnected, the client should trigger bells locally based on the cached schedule and system clock
 - When reconnected, stop local triggers and resume server-driven mode
@@ -243,6 +243,6 @@ Desktop clients should remain functional when disconnected from the server.
 1. Re-authenticate if the token has expired
 2. Connect to WebSocket with `register` message
 3. Fetch system state: `GET /api/v1/system/state`
-4. Fetch current schedule: `GET /api/v1/sessions/current` + `GET /api/v1/schedule-items`
+4. Fetch current schedule: `GET /api/v1/sessions/current` + `GET /api/v1/schedule`
 5. Fetch audio checksums and sync any changed files
 6. Resume server-driven mode (stop local bell triggers)
