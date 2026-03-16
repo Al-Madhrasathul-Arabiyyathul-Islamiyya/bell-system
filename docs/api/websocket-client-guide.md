@@ -4,7 +4,7 @@ Guide for native Windows client developers integrating with the Bell Schedule Sy
 
 ## Quick Start
 
-1. Authenticate via REST API: `POST /api/auth/login` to get a JWT token
+1. Authenticate via REST API: `POST /api/v1/auth/login` to get a JWT token
 2. Connect to WebSocket: `ws://{host}:{port}/ws?token={jwt}&client_type=client&client_name=Main+Hall`
 3. Listen for events, send heartbeats
 
@@ -18,7 +18,7 @@ ws://{host}:{port}/ws?token={jwt_token}&client_type={type}&client_name={name}
 
 | Parameter     | Required | Values              | Description                    |
 |---------------|----------|---------------------|--------------------------------|
-| `token`       | Yes      | JWT string          | From `/api/auth/login`         |
+| `token`       | Yes      | JWT string          | From `/api/v1/auth/login`         |
 | `client_type` | Yes      | `admin` or `client` | `admin` requires admin role    |
 | `client_name` | No       | Any string          | Human-readable display name    |
 
@@ -27,7 +27,7 @@ ws://{host}:{port}/ws?token={jwt_token}&client_type={type}&client_name={name}
 The JWT token must be valid and not expired. Obtain it via:
 
 ```
-POST /api/auth/login
+POST /api/v1/auth/login
 Content-Type: application/json
 
 {"username": "...", "password": "..."}
@@ -74,7 +74,7 @@ All messages use the same JSON envelope:
 ### Schedule Events
 
 #### `schedules_updated`
-Sent when any schedule item is created, updated, or deleted. No payload — clients should re-fetch schedules via REST API (`GET /api/schedule-items`).
+Sent when any schedule item is created, updated, or deleted. No payload — clients should re-fetch schedules via REST API (`GET /api/v1/schedule`).
 
 #### `bell_triggered`
 Sent when a bell is about to play. Client should play the referenced sound file.
@@ -114,7 +114,7 @@ Sent when the bell system is paused or resumed. When paused, clients should stop
 ```
 
 #### `audio_files_updated`
-Sent when audio files are added, updated, or deleted. Clients should re-check audio file checksums via `GET /api/audio-files/checksums` and re-download any changed files.
+Sent when audio files are added, updated, or deleted. Clients should re-check audio file checksums via `GET /api/v1/audio/checksums` and re-download any changed files.
 
 ### Admin-Only Events
 
@@ -209,9 +209,40 @@ Pre-upgrade errors return standard HTTP responses:
 
 When you receive `audio_files_updated`:
 
-1. Fetch checksums: `GET /api/audio-files/checksums`
+1. Fetch checksums: `GET /api/v1/audio/checksums`
 2. Compare with locally cached checksums
-3. Download changed files: `GET /api/audio-files/{id}` (returns the file binary)
+3. Download changed files: `GET /api/v1/audio/{id}` (returns the file binary)
 4. Cache the new checksum
 
 This ensures clients always have the latest audio files without downloading everything on every update.
+
+## Offline Resilience
+
+Desktop clients should remain functional when disconnected from the server.
+
+### Local Bell Triggering
+
+- On connect (or reconnect), fetch the full schedule: `GET /api/v1/schedule` and current session: `GET /api/v1/sessions/current`
+- Cache the schedule locally
+- When disconnected, the client should trigger bells locally based on the cached schedule and system clock
+- When reconnected, stop local triggers and resume server-driven mode
+
+### Local Pause/Resume
+
+- Track the system state (`active`/`paused`) locally
+- When disconnected, allow local pause/resume via the client UI
+- On reconnect, fetch the server state (`GET /api/v1/system/state`) and adopt it as the source of truth
+
+### On-Demand Unscheduled Bells
+
+- The client may support triggering bells manually outside the schedule (e.g., emergency bell)
+- This is a client-only feature — the server does not need to be involved
+
+### Reconnection Flow
+
+1. Re-authenticate if the token has expired
+2. Connect to WebSocket with `register` message
+3. Fetch system state: `GET /api/v1/system/state`
+4. Fetch current schedule: `GET /api/v1/sessions/current` + `GET /api/v1/schedule`
+5. Fetch audio checksums and sync any changed files
+6. Resume server-driven mode (stop local bell triggers)

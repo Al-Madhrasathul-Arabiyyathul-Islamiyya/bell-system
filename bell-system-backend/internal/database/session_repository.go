@@ -34,7 +34,9 @@ func (r *SessionRepository) Create(ctx context.Context, session *models.Session)
     `
 	_, err := r.DB.ExecContext(
 		ctx, query,
-		session.ID, session.Name, session.StartTime, session.EndTime,
+		session.ID, session.Name,
+		session.StartTime.Format("15:04"),
+		session.EndTime.Format("15:04"),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -171,7 +173,10 @@ func (r *SessionRepository) Update(ctx context.Context, session *models.Session)
     `
 	_, err := r.DB.ExecContext(
 		ctx, query,
-		session.Name, session.StartTime, session.EndTime, session.ID,
+		session.Name,
+		session.StartTime.Format("15:04"),
+		session.EndTime.Format("15:04"),
+		session.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)

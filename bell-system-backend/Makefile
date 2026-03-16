@@ -46,6 +46,7 @@ setup-hooks:
 lint:
 	gofmt -l .
 	go vet ./...
+	staticcheck ./...
 
 # Full check: lint, tidy, test, and build
 check: lint

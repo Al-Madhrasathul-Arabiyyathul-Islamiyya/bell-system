@@ -26,7 +26,7 @@ func createTestAudioFile(t *testing.T) string {
 	part.Write([]byte("fake audio data"))
 	w.Close()
 
-	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/audio-files", &buf)
+	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 
@@ -45,7 +45,7 @@ func createTestAudioFile(t *testing.T) string {
 func getSessionID(t *testing.T) string {
 	t.Helper()
 
-	resp := doRequest(t, http.MethodGet, "/api/sessions", nil, "")
+	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result map[string]any
@@ -66,7 +66,7 @@ func TestScheduleItemCRUD(t *testing.T) {
 		`{"sessionId":"%s","name":"First Bell","time":"07:00","soundId":"%s","days":[1,2,3,4,5]}`,
 		sessionID, soundID,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/schedule-items", bytes.NewBufferString(createBody), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(createBody), "")
 	if resp.StatusCode != http.StatusCreated {
 		var errBody map[string]any
 		readJSON(t, resp, &errBody)
@@ -81,7 +81,7 @@ func TestScheduleItemCRUD(t *testing.T) {
 	assert.Equal(t, "First Bell", created["name"])
 
 	// Get by ID — should include relations
-	resp = doRequest(t, http.MethodGet, "/api/schedule-items/"+itemID, nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, "")
 	if resp.StatusCode != http.StatusOK {
 		var errBody map[string]any
 		readJSON(t, resp, &errBody)
@@ -98,7 +98,7 @@ func TestScheduleItemCRUD(t *testing.T) {
 	assert.Len(t, days, 5)
 
 	// List
-	resp = doRequest(t, http.MethodGet, "/api/schedule-items", nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule", nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var listResult map[string]any
@@ -107,7 +107,7 @@ func TestScheduleItemCRUD(t *testing.T) {
 
 	// Update
 	updateBody := `{"name":"Updated Bell"}`
-	resp = doRequest(t, http.MethodPut, "/api/schedule-items/"+itemID, bytes.NewBufferString(updateBody), "")
+	resp = doRequest(t, http.MethodPut, "/api/v1/schedule/"+itemID, bytes.NewBufferString(updateBody), "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var updated map[string]any
@@ -115,12 +115,12 @@ func TestScheduleItemCRUD(t *testing.T) {
 	assert.Equal(t, "Updated Bell", updated["name"])
 
 	// Delete
-	resp = doRequest(t, http.MethodDelete, "/api/schedule-items/"+itemID, nil, "")
+	resp = doRequest(t, http.MethodDelete, "/api/v1/schedule/"+itemID, nil, "")
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 	resp.Body.Close()
 
 	// Verify deleted
-	resp = doRequest(t, http.MethodGet, "/api/schedule-items/"+itemID, nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, "")
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
 }
@@ -133,7 +133,7 @@ func TestScheduleItem_InvalidDays(t *testing.T) {
 	body := fmt.Sprintf(
 		`{"name":"Bad Days","time":"08:00","soundId":"%s","days":[0,8]}`, soundID,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/schedule-items", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), "")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -147,7 +147,7 @@ func TestScheduleItem_InvalidTime(t *testing.T) {
 	body := fmt.Sprintf(
 		`{"name":"Bad Time","time":"not-a-time","soundId":"%s","days":[1]}`, soundID,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/schedule-items", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), "")
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

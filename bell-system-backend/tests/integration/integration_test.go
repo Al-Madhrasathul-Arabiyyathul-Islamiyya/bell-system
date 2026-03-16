@@ -170,12 +170,15 @@ func TestMain(m *testing.M) {
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, notifier)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, sessionRepo, notifier)
 	audioHandler := handlers.NewAudioHandler(audioFileRepo, notifier)
 	audioHandler.FileStorage = fileStore
 
+	stateRepo := database.NewSystemStateRepository(testDB, log)
+
 	// Router (mirrors cmd/server/main.go)
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	systemHandler := handlers.NewSystemHandler(stateRepo, nil, notifier)
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
@@ -235,6 +238,14 @@ func runMigrations(ctx context.Context) error {
 		return fmt.Errorf("exec seed migration: %w", err)
 	}
 
+	stateSQL, err := os.ReadFile("../../migrations/003_create_system_state_up.sql")
+	if err != nil {
+		return fmt.Errorf("read system state migration: %w", err)
+	}
+	if _, err := testDB.ExecContext(ctx, string(stateSQL)); err != nil {
+		return fmt.Errorf("exec system state migration: %w", err)
+	}
+
 	return nil
 }
 
@@ -249,6 +260,10 @@ func cleanAndSeed(t *testing.T) {
 		require.NoError(t, err, "failed to clean table %s", table)
 	}
 
+	// Reset system state to active
+	_, err := testDB.ExecContext(ctx, "UPDATE SystemState SET Value = 'active', UpdatedAt = GETDATE() WHERE [Key] = 'system_state'")
+	require.NoError(t, err, "failed to reset system state")
+
 	seedSQL, err := os.ReadFile("../../migrations/002_seed_data_up.sql")
 	require.NoError(t, err, "failed to read seed SQL")
 	_, err = testDB.ExecContext(ctx, string(seedSQL))
@@ -260,7 +275,7 @@ func loginAs(t *testing.T, username, password string) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{"username":%q,"password":%q}`, username, password)
-	resp := doRequest(t, http.MethodPost, "/api/auth/login", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/login", bytes.NewBufferString(body), "")
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode, "login failed for %s", username)
@@ -299,13 +314,18 @@ func readJSON(t *testing.T, resp *http.Response, target any) {
 	require.NoError(t, err)
 }
 
+// getDayOfWeek returns the current day of week as 1=Sunday..7=Saturday.
+func getDayOfWeek() int {
+	return int(time.Now().Weekday()) + 1
+}
+
 // createTestUser creates a user via the API and returns the user ID.
 // This avoids depending on seed bcrypt hashes matching.
 func createTestUser(t *testing.T, username, password, role string) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{"username":%q,"password":%q,"role":%q}`, username, password, role)
-	resp := doRequest(t, http.MethodPost, "/api/users", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), "")
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "failed to create test user %s", username)
 
 	var result map[string]any

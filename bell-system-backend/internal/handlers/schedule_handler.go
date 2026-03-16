@@ -17,12 +17,62 @@ import (
 type ScheduleHandler struct {
 	Items    ScheduleItemRepository
 	Days     ScheduleDayRepository
+	Sessions SessionRepository
 	Notifier EventNotifier
 }
 
 // NewScheduleHandler creates a new ScheduleHandler.
-func NewScheduleHandler(items ScheduleItemRepository, days ScheduleDayRepository, notifier EventNotifier) *ScheduleHandler {
-	return &ScheduleHandler{Items: items, Days: days, Notifier: notifier}
+func NewScheduleHandler(items ScheduleItemRepository, days ScheduleDayRepository, sessions SessionRepository, notifier EventNotifier) *ScheduleHandler {
+	return &ScheduleHandler{Items: items, Days: days, Sessions: sessions, Notifier: notifier}
+}
+
+// GetCurrent handles GET /current — returns today's schedule for the active session.
+func (h *ScheduleHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
+	session, err := h.Sessions.GetCurrentSession(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to get current session")
+		return
+	}
+	if session == nil {
+		writeJSON(w, http.StatusOK, models.CurrentScheduleResponse{
+			Session: nil,
+			Items:   []models.CurrentScheduleItem{},
+		})
+		return
+	}
+
+	items, err := h.Items.GetCurrentSessionSchedules(r.Context(), session.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to get schedule items")
+		return
+	}
+
+	now := time.Now()
+	currentTime := now.Hour()*60 + now.Minute()
+
+	result := make([]models.CurrentScheduleItem, 0, len(items))
+	for _, item := range items {
+		itemTime := item.Time.Hour()*60 + item.Time.Minute()
+		status := "pending"
+		if itemTime < currentTime {
+			status = "completed"
+		} else if itemTime == currentTime {
+			status = "current"
+		}
+
+		result = append(result, models.CurrentScheduleItem{
+			ID:     item.ID,
+			Name:   item.Name,
+			Time:   item.Time.Format("15:04"),
+			Sound:  item.Sound,
+			Status: status,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, models.CurrentScheduleResponse{
+		Session: session,
+		Items:   result,
+	})
 }
 
 func validateDays(days []int) bool {

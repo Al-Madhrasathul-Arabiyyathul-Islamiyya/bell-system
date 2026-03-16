@@ -15,7 +15,7 @@ func TestLogin_Success(t *testing.T) {
 	cleanAndSeed(t)
 	createTestUser(t, "testadmin", "securepass123", "admin")
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/login",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/login",
 		bytes.NewBufferString(`{"username":"testadmin","password":"securepass123"}`), "")
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
@@ -36,7 +36,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 	cleanAndSeed(t)
 	createTestUser(t, "testadmin", "securepass123", "admin")
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/login",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/login",
 		bytes.NewBufferString(`{"username":"testadmin","password":"wrongpassword"}`), "")
 	defer resp.Body.Close()
 
@@ -46,7 +46,7 @@ func TestLogin_WrongPassword(t *testing.T) {
 func TestLogin_NonexistentUser(t *testing.T) {
 	cleanAndSeed(t)
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/login",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/login",
 		bytes.NewBufferString(`{"username":"nonexistent","password":"password"}`), "")
 	defer resp.Body.Close()
 
@@ -56,7 +56,7 @@ func TestLogin_NonexistentUser(t *testing.T) {
 func TestLogin_MissingFields(t *testing.T) {
 	cleanAndSeed(t)
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/login",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/login",
 		bytes.NewBufferString(`{}`), "")
 	defer resp.Body.Close()
 
@@ -70,21 +70,21 @@ func TestChangePassword_Success(t *testing.T) {
 	token := loginAs(t, "testadmin", "securepass123")
 
 	// Change password
-	resp := doRequest(t, http.MethodPost, "/api/auth/change-password",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/change-password",
 		bytes.NewBufferString(`{"oldPassword":"securepass123","newPassword":"newpass12345"}`), token)
 	defer resp.Body.Close()
 
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Login with new password should succeed
-	resp2 := doRequest(t, http.MethodPost, "/api/auth/login",
+	resp2 := doRequest(t, http.MethodPost, "/api/v1/auth/login",
 		bytes.NewBufferString(`{"username":"testadmin","password":"newpass12345"}`), "")
 	defer resp2.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
 	// Login with old password should fail
-	resp3 := doRequest(t, http.MethodPost, "/api/auth/login",
+	resp3 := doRequest(t, http.MethodPost, "/api/v1/auth/login",
 		bytes.NewBufferString(`{"username":"testadmin","password":"securepass123"}`), "")
 	defer resp3.Body.Close()
 
@@ -97,7 +97,7 @@ func TestLogout(t *testing.T) {
 
 	token := loginAs(t, "testadmin", "securepass123")
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/logout", nil, token)
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/logout", nil, token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
@@ -106,7 +106,7 @@ func TestLogout(t *testing.T) {
 func TestProtectedEndpoint_NoToken(t *testing.T) {
 	cleanAndSeed(t)
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/change-password",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/change-password",
 		bytes.NewBufferString(`{"oldPassword":"x","newPassword":"y"}`), "")
 	defer resp.Body.Close()
 
@@ -116,7 +116,7 @@ func TestProtectedEndpoint_NoToken(t *testing.T) {
 func TestProtectedEndpoint_InvalidToken(t *testing.T) {
 	cleanAndSeed(t)
 
-	resp := doRequest(t, http.MethodPost, "/api/auth/change-password",
+	resp := doRequest(t, http.MethodPost, "/api/v1/auth/change-password",
 		bytes.NewBufferString(`{"oldPassword":"x","newPassword":"y"}`), "garbage-token")
 	defer resp.Body.Close()
 

@@ -30,14 +30,20 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 	scheduleHandler := handlers.NewScheduleHandler(
 		&mocks.MockScheduleItemRepo{},
 		&mocks.MockScheduleDayRepo{},
+		&mocks.MockSessionRepo{},
 		nil,
 	)
 	audioHandler := handlers.NewAudioHandler(
 		&mocks.MockSystemAudioFileRepo{},
 		nil,
 	)
+	systemHandler := handlers.NewSystemHandler(
+		&mocks.MockSystemStateRepo{},
+		&mocks.MockSchedulerService{},
+		nil,
+	)
 
-	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 	require.NotNil(t, r)
 
 	// Collect all registered routes
@@ -49,31 +55,35 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 	require.NoError(t, err)
 
 	expectedRoutes := []string{
-		"POST /api/auth/login",
-		"POST /api/auth/change-password",
-		"POST /api/auth/logout",
-		"GET /api/users/",
-		"POST /api/users/",
-		"GET /api/users/{id}",
-		"PUT /api/users/{id}",
-		"DELETE /api/users/{id}",
-		"GET /api/sessions/",
-		"POST /api/sessions/",
-		"GET /api/sessions/current",
-		"GET /api/sessions/{id}",
-		"PUT /api/sessions/{id}",
-		"DELETE /api/sessions/{id}",
-		"GET /api/schedule-items/",
-		"POST /api/schedule-items/",
-		"GET /api/schedule-items/{id}",
-		"PUT /api/schedule-items/{id}",
-		"DELETE /api/schedule-items/{id}",
-		"GET /api/audio-files/",
-		"GET /api/audio-files/checksums",
-		"POST /api/audio-files/",
-		"GET /api/audio-files/{id}",
-		"PUT /api/audio-files/{id}",
-		"DELETE /api/audio-files/{id}",
+		"POST /api/v1/auth/login",
+		"POST /api/v1/auth/change-password",
+		"POST /api/v1/auth/logout",
+		"GET /api/v1/users/",
+		"POST /api/v1/users/",
+		"GET /api/v1/users/{id}",
+		"PUT /api/v1/users/{id}",
+		"DELETE /api/v1/users/{id}",
+		"GET /api/v1/sessions/",
+		"POST /api/v1/sessions/",
+		"GET /api/v1/sessions/current",
+		"GET /api/v1/sessions/{id}",
+		"PUT /api/v1/sessions/{id}",
+		"DELETE /api/v1/sessions/{id}",
+		"GET /api/v1/schedule/",
+		"GET /api/v1/schedule/current",
+		"POST /api/v1/schedule/",
+		"GET /api/v1/schedule/{id}",
+		"PUT /api/v1/schedule/{id}",
+		"DELETE /api/v1/schedule/{id}",
+		"GET /api/v1/audio/",
+		"GET /api/v1/audio/checksums",
+		"POST /api/v1/audio/",
+		"GET /api/v1/audio/{id}",
+		"PUT /api/v1/audio/{id}",
+		"DELETE /api/v1/audio/{id}",
+		"GET /api/v1/system/state",
+		"POST /api/v1/system/state",
+		"POST /api/v1/system/cancel-next-bell",
 	}
 
 	for _, expected := range expectedRoutes {

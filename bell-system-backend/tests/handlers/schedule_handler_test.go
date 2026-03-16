@@ -23,7 +23,13 @@ import (
 
 // newScheduleRouter creates a schedule chi.Router with the given mocks.
 func newScheduleRouter(itemRepo handlers.ScheduleItemRepository, dayRepo handlers.ScheduleDayRepository) http.Handler {
-	h := handlers.NewScheduleHandler(itemRepo, dayRepo, nil)
+	h := handlers.NewScheduleHandler(itemRepo, dayRepo, nil, nil)
+	return router.ScheduleRoutes(h)
+}
+
+// newScheduleRouterWithSessions creates a schedule chi.Router with session support.
+func newScheduleRouterWithSessions(itemRepo handlers.ScheduleItemRepository, sessionRepo handlers.SessionRepository) http.Handler {
+	h := handlers.NewScheduleHandler(itemRepo, nil, sessionRepo, nil)
 	return router.ScheduleRoutes(h)
 }
 
@@ -814,4 +820,105 @@ func TestScheduleHandler_DaysValidation_EmptyDays(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+// --- GET /current (current schedule) ---
+
+func TestScheduleHandler_GetCurrent_Success(t *testing.T) {
+	sessionID := uuid.New()
+	soundID := uuid.New()
+	session := &models.Session{
+		ID:   sessionID,
+		Name: "Morning",
+	}
+
+	now := time.Now()
+	pastTime := time.Date(0, 1, 1, now.Hour()-1, 0, 0, 0, time.UTC)
+	futureTime := time.Date(0, 1, 1, now.Hour()+1, 0, 0, 0, time.UTC)
+
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Past Bell", Time: pastTime, SoundID: soundID},
+		{ID: uuid.New(), Name: "Future Bell", Time: futureTime, SoundID: soundID},
+	}
+
+	sessionRepo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {
+			return session, nil
+		},
+	}
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetCurrentSessionSchedulesFunc: func(_ context.Context, id uuid.UUID) ([]*models.ScheduleItem, error) {
+			assert.Equal(t, sessionID, id)
+			return items, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+	newScheduleRouterWithSessions(itemRepo, sessionRepo).ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp models.CurrentScheduleResponse
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "Morning", resp.Session.Name)
+	assert.Len(t, resp.Items, 2)
+	assert.Equal(t, "completed", resp.Items[0].Status)
+	assert.Equal(t, "pending", resp.Items[1].Status)
+}
+
+func TestScheduleHandler_GetCurrent_NoSession(t *testing.T) {
+	sessionRepo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+	newScheduleRouterWithSessions(&mocks.MockScheduleItemRepo{}, sessionRepo).ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp models.CurrentScheduleResponse
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Nil(t, resp.Session)
+	assert.Empty(t, resp.Items)
+}
+
+func TestScheduleHandler_GetCurrent_SessionError(t *testing.T) {
+	sessionRepo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {
+			return nil, errors.New("db error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+	newScheduleRouterWithSessions(&mocks.MockScheduleItemRepo{}, sessionRepo).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestScheduleHandler_GetCurrent_ItemsError(t *testing.T) {
+	session := &models.Session{ID: uuid.New(), Name: "Morning"}
+
+	sessionRepo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {
+			return session, nil
+		},
+	}
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetCurrentSessionSchedulesFunc: func(_ context.Context, _ uuid.UUID) ([]*models.ScheduleItem, error) {
+			return nil, errors.New("db error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+	newScheduleRouterWithSessions(itemRepo, sessionRepo).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }

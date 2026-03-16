@@ -6,8 +6,11 @@ CHANGED=$(git diff --name-only HEAD @{push} 2>/dev/null || git diff --name-only 
 
 # --- Backend (Go) ---
 if echo "$CHANGED" | grep -q "^bell-system-backend/"; then
-    echo "==> [backend] Running tests..."
+    echo "==> [backend] Running staticcheck..."
     cd "$REPO_ROOT/bell-system-backend"
+    staticcheck ./...
+
+    echo "==> [backend] Running tests..."
     go test -race ./... -count=1
 
     echo "==> [backend] Verifying build..."
