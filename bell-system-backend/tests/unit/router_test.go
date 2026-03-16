@@ -30,6 +30,7 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 	scheduleHandler := handlers.NewScheduleHandler(
 		&mocks.MockScheduleItemRepo{},
 		&mocks.MockScheduleDayRepo{},
+		&mocks.MockSessionRepo{},
 		nil,
 	)
 	audioHandler := handlers.NewAudioHandler(
@@ -69,6 +70,7 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 		"PUT /api/v1/sessions/{id}",
 		"DELETE /api/v1/sessions/{id}",
 		"GET /api/v1/schedule-items/",
+		"GET /api/v1/schedule-items/current",
 		"POST /api/v1/schedule-items/",
 		"GET /api/v1/schedule-items/{id}",
 		"PUT /api/v1/schedule-items/{id}",

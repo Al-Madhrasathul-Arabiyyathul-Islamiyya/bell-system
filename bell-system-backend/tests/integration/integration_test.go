@@ -170,12 +170,13 @@ func TestMain(m *testing.M) {
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, notifier)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, sessionRepo, notifier)
 	audioHandler := handlers.NewAudioHandler(audioFileRepo, notifier)
 	audioHandler.FileStorage = fileStore
 
 	// Router (mirrors cmd/server/main.go)
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	systemHandler := handlers.NewSystemHandler(nil, nil, nil) // no DB in integration tests for system state
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)

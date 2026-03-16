@@ -68,6 +68,7 @@ func SessionRoutes(h *handlers.SessionHandler) chi.Router {
 func ScheduleRoutes(h *handlers.ScheduleHandler) chi.Router {
 	r := chi.NewRouter()
 	r.Get("/", h.List)
+	r.Get("/current", h.GetCurrent)
 	r.Post("/", h.Create)
 	r.Get("/{id}", h.GetByID)
 	r.Put("/{id}", h.Update)

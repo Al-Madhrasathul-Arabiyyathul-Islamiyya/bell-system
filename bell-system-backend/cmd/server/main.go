@@ -81,7 +81,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, reloadNotifier)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, sessionRepo, reloadNotifier)
 	audioHandler := handlers.NewAudioHandler(audioFileRepo, reloadNotifier)
 	audioHandler.FileStorage = fileStore
 	systemHandler := handlers.NewSystemHandler(stateRepo, sched, reloadNotifier)
