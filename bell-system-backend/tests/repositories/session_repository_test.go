@@ -28,7 +28,7 @@ func TestSessionRepository_Create_Success(t *testing.T) {
 	}
 
 	mock.ExpectExec("INSERT INTO Sessions").
-		WithArgs(session.ID, session.Name, session.StartTime, session.EndTime).
+		WithArgs(session.ID, session.Name, "07:00", "12:00").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := repo.Create(ctx, session)
@@ -43,7 +43,7 @@ func TestSessionRepository_Create_DBError(t *testing.T) {
 	session := &models.Session{ID: uuid.New(), Name: "Duplicate"}
 
 	mock.ExpectExec("INSERT INTO Sessions").
-		WithArgs(session.ID, session.Name, session.StartTime, session.EndTime).
+		WithArgs(session.ID, session.Name, "00:00", "00:00").
 		WillReturnError(errors.New("duplicate name"))
 
 	err := repo.Create(ctx, session)
@@ -171,7 +171,7 @@ func TestSessionRepository_Update_Success(t *testing.T) {
 	}
 
 	mock.ExpectExec("UPDATE Sessions").
-		WithArgs(session.Name, session.StartTime, session.EndTime, session.ID).
+		WithArgs(session.Name, "06:45", "12:10", session.ID).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := repo.Update(ctx, session)
@@ -306,7 +306,7 @@ func TestSessionRepository_Update_DBError(t *testing.T) {
 	session := &models.Session{ID: uuid.New(), Name: "Fail"}
 
 	mock.ExpectExec("UPDATE Sessions").
-		WithArgs(session.Name, session.StartTime, session.EndTime, session.ID).
+		WithArgs(session.Name, "00:00", "00:00", session.ID).
 		WillReturnError(errors.New("update failed"))
 
 	err := repo.Update(ctx, session)
@@ -378,10 +378,10 @@ func TestSessionRepository_SpecSessions(t *testing.T) {
 	}
 
 	mock.ExpectExec("INSERT INTO Sessions").
-		WithArgs(morning.ID, morning.Name, morning.StartTime, morning.EndTime).
+		WithArgs(morning.ID, morning.Name, "06:45", "12:10").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO Sessions").
-		WithArgs(afternoon.ID, afternoon.Name, afternoon.StartTime, afternoon.EndTime).
+		WithArgs(afternoon.ID, afternoon.Name, "12:15", "18:10").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	require.NoError(t, repo.Create(ctx, morning))

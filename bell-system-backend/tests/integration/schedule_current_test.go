@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 
@@ -49,18 +50,33 @@ func TestScheduleCurrent_NoSession(t *testing.T) {
 func TestScheduleCurrent_WithItems(t *testing.T) {
 	cleanAndSeed(t)
 
-	soundID := createTestAudioFile(t)
-	sessionID := getSessionID(t)
+	// Create a session that covers the current time (so GetCurrentSession finds it)
+	now := time.Now()
+	startTime := fmt.Sprintf("%02d:%02d", now.Hour(), 0)
+	endHour := now.Hour() + 1
+	if endHour > 23 {
+		endHour = 23
+	}
+	endTime := fmt.Sprintf("%02d:%02d", endHour, 59)
 
-	// Create a schedule item for today
-	now := "12:00" // use a time that works — items returned regardless of past/future
+	sessionBody := fmt.Sprintf(`{"name":"Test Now Session","startTime":"%s","endTime":"%s"}`, startTime, endTime)
+	resp := doRequest(t, http.MethodPost, "/api/v1/sessions", bytes.NewBufferString(sessionBody), "")
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var sessionResult map[string]any
+	readJSON(t, resp, &sessionResult)
+	sessionID := sessionResult["id"].(string)
+
+	soundID := createTestAudioFile(t)
 	dayOfWeek := getDayOfWeek()
 
+	// Create a schedule item for today within the session
+	bellTime := fmt.Sprintf("%02d:30", now.Hour())
 	createBody := fmt.Sprintf(
 		`{"sessionId":"%s","name":"Test Current Bell","time":"%s","soundId":"%s","days":[%d]}`,
-		sessionID, now, soundID, dayOfWeek,
+		sessionID, bellTime, soundID, dayOfWeek,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(createBody), "")
+	resp = doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(createBody), "")
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	resp.Body.Close()
 
@@ -73,6 +89,7 @@ func TestScheduleCurrent_WithItems(t *testing.T) {
 	err := json.NewDecoder(resp.Body).Decode(&result)
 	require.NoError(t, err)
 	require.NotNil(t, result.Session)
+	assert.Equal(t, "Test Now Session", result.Session.Name)
 	require.NotEmpty(t, result.Items)
 
 	// Find our item
