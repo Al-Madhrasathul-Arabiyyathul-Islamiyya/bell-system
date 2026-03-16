@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"context"
+	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
@@ -271,4 +272,26 @@ func (m *MockSystemAudioFileRepo) Delete(ctx context.Context, id uuid.UUID) erro
 		panic("MockSystemAudioFileRepo.DeleteFunc not set")
 	}
 	return m.DeleteFunc(ctx, id)
+}
+
+// MockSystemStateRepo is a function-field mock for handlers.SystemStateRepository.
+type MockSystemStateRepo struct {
+	GetStateFunc func(ctx context.Context) (string, time.Time, error)
+	SetStateFunc func(ctx context.Context, state string) error
+}
+
+var _ handlers.SystemStateRepository = (*MockSystemStateRepo)(nil)
+
+func (m *MockSystemStateRepo) GetState(ctx context.Context) (string, time.Time, error) {
+	if m.GetStateFunc == nil {
+		return "active", time.Now(), nil
+	}
+	return m.GetStateFunc(ctx)
+}
+
+func (m *MockSystemStateRepo) SetState(ctx context.Context, state string) error {
+	if m.SetStateFunc == nil {
+		return nil
+	}
+	return m.SetStateFunc(ctx, state)
 }

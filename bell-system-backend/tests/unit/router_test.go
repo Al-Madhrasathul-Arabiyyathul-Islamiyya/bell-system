@@ -36,8 +36,13 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 		&mocks.MockSystemAudioFileRepo{},
 		nil,
 	)
+	systemHandler := handlers.NewSystemHandler(
+		&mocks.MockSystemStateRepo{},
+		&mocks.MockSchedulerService{},
+		nil,
+	)
 
-	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 	require.NotNil(t, r)
 
 	// Collect all registered routes
@@ -74,6 +79,9 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 		"GET /api/audio-files/{id}",
 		"PUT /api/audio-files/{id}",
 		"DELETE /api/audio-files/{id}",
+		"GET /api/system/state",
+		"POST /api/system/state",
+		"POST /api/system/cancel-next-bell",
 	}
 
 	for _, expected := range expectedRoutes {

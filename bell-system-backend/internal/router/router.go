@@ -13,6 +13,7 @@ func New(
 	sessions *handlers.SessionHandler,
 	schedule *handlers.ScheduleHandler,
 	audio *handlers.AudioHandler,
+	system *handlers.SystemHandler,
 ) chi.Router {
 	r := chi.NewRouter()
 
@@ -22,6 +23,7 @@ func New(
 		r.Mount("/sessions", SessionRoutes(sessions))
 		r.Mount("/schedule-items", ScheduleRoutes(schedule))
 		r.Mount("/audio-files", AudioRoutes(audio))
+		r.Mount("/system", SystemRoutes(system))
 	})
 
 	return r
@@ -70,6 +72,15 @@ func ScheduleRoutes(h *handlers.ScheduleHandler) chi.Router {
 	r.Get("/{id}", h.GetByID)
 	r.Put("/{id}", h.Update)
 	r.Delete("/{id}", h.Delete)
+	return r
+}
+
+// SystemRoutes returns a chi.Router with system management routes.
+func SystemRoutes(h *handlers.SystemHandler) chi.Router {
+	r := chi.NewRouter()
+	r.Get("/state", h.GetState)
+	r.Post("/state", h.SetState)
+	r.Post("/cancel-next-bell", h.CancelNextBell)
 	return r
 }
 

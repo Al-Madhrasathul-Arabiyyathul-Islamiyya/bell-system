@@ -14,6 +14,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/database"
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	"arabiyya.edu.mv/bell-system-backend/internal/scheduler"
 	"arabiyya.edu.mv/bell-system-backend/internal/services"
 	ws "arabiyya.edu.mv/bell-system-backend/internal/websocket"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
@@ -49,6 +50,7 @@ func main() {
 	scheduleDayRepo := database.NewScheduleDayRepository(db.DB, log)
 	audioFileRepo := database.NewSystemAudioFileRepository(db.DB, log)
 	scheduleItemRepo := database.NewScheduleItemRepository(db.DB, log, scheduleDayRepo, sessionRepo, audioFileRepo)
+	stateRepo := database.NewSystemStateRepository(db.DB, log)
 
 	// Services
 	tokenSvc := services.NewTokenService(cfg.JWT.Secret, cfg.JWT.ExpiresIn)
@@ -66,16 +68,26 @@ func main() {
 	notifier := ws.NewNotifier(hub)
 	wsHandler := ws.NewHandler(hub, tokenSvc, log, cfg.WebSocket)
 
+	// Scheduler
+	sched := scheduler.New(sessionRepo, scheduleItemRepo, stateRepo, notifier, log, cfg.Scheduler.CheckInterval)
+	schedDone := make(chan struct{})
+	if cfg.Scheduler.Enabled {
+		go sched.Run(schedDone)
+	}
+
+	reloadNotifier := &scheduler.ReloadNotifier{Inner: notifier, Scheduler: sched}
+
 	// Handlers
 	authHandler := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
-	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, notifier)
-	audioHandler := handlers.NewAudioHandler(audioFileRepo, notifier)
+	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, reloadNotifier)
+	audioHandler := handlers.NewAudioHandler(audioFileRepo, reloadNotifier)
 	audioHandler.FileStorage = fileStore
+	systemHandler := handlers.NewSystemHandler(stateRepo, sched, reloadNotifier)
 
 	// Router
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler)
+	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 
 	r := chi.NewRouter()
 
@@ -119,7 +131,11 @@ func main() {
 	go func() {
 		<-sig
 
-		// Shut down WebSocket hub first
+		// Shut down scheduler first, then WebSocket hub
+		if cfg.Scheduler.Enabled {
+			close(schedDone)
+			<-sched.Done()
+		}
 		close(hubDone)
 		<-hub.Done()
 
