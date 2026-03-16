@@ -2,89 +2,65 @@ Create migration files for database tables
 Implement basic API handlers for the core functionality
 Add authentication middleware and JWT handling
 
-Configuration (internal/config)
+## Package Structure
 
-Load environment-specific configurations
-Define configuration structures for:
+### `cmd/server/`
+Entry point — starts the HTTP server, wires dependencies.
 
-Server settings (port, environment, etc.)
-Database connection
-Audio file storage paths
-Session times
-JWT settings
-WebSocket settings
+### `cmd/migrate/`
+Migration runner — applies SQL migrations up/down.
 
+### `config/`
+TOML configuration via Viper — server, database, JWT, audio paths, WebSocket settings.
 
+### `internal/database/`
+Repositories for data access:
+- Users
+- Sessions
+- ScheduleItems
+- ScheduleDays
+- SystemAudioFiles
+- SystemState
 
-2. Database Layer (internal/database)
+### `internal/models/`
+Data structures matching the database schema — JSON tags, validation logic.
 
-Connection setup and management
-Migration utilities
-Transaction handling
-Repository implementations for:
+### `internal/handlers/`
+HTTP handlers for all API endpoints, plus auth middleware:
+- Authentication (login, logout, change-password)
+- Schedule management (CRUD + current)
+- Audio file management (CRUD + checksums + upload/download)
+- Session management (CRUD + current)
+- System state management (get/set state, cancel next bell)
+- User management (CRUD)
 
-Users
-Sessions
-SystemAudioFiles
-ScheduleItems
-ScheduleDays
+### `internal/router/`
+Chi route registration — mounts all handler groups under `/api/v1`.
 
+### `internal/websocket/`
+Real-time communication:
+- Hub — connection registry, broadcast
+- Client — per-connection read/write pumps
+- Handler — upgrade HTTP to WebSocket, authenticate via query params
+- Notifier — bridges handler events to WebSocket broadcasts
 
+### `internal/scheduler/`
+Bell timer engine:
+- Schedules timers for upcoming bells
+- Reloads on schedule/state changes via reload notifier
+- Respects system state (active/paused)
 
-3. Models (internal/models)
+### `internal/services/`
+Business logic services:
+- Token service (JWT generation/validation)
+- Password hasher (bcrypt)
+- File storage (audio file I/O, checksum calculation)
 
-Data structures matching the database schema
-JSON serialization tags
-Validation logic
-User model with password hashing
+### `internal/helpers/`
+Shared utilities (e.g., schedule day helpers).
 
-4. HTTP API Handlers (internal/handlers)
+### `pkg/logger/`
+Zap wrapper — structured logging.
 
-REST API routes implementation based on OpenAPI spec
-Request/response structures
-Input validation
-Error responses
-
-Specific handler groups:
-
-Authentication handlers
-Schedule management
-Audio file management
-System state management
-User management
-
-5. Middleware (internal/middleware)
-
-Authentication middleware (JWT validation)
-Role-based authorization
-Request logging
-Error handling
-CORS support
-
-6. WebSocket (internal/websocket)
-
-Connection management
-Client registration and tracking
-Event broadcasting
-Message handling based on websocket.md spec
-
-7. Scheduler (internal/scheduler)
-
-Bell schedule management
-Timer implementation for bell triggering
-Schedule recalculation on changes
-Bell cancellation functionality
-
-8. Storage (internal/storage)
-
-Audio file management
-File upload handling
-Checksum calculation
-File system operations
-
-9. Application Service (internal/app)
-
-Central coordination
-Server initialization and routing
-Dependency wiring
-Graceful shutdown
+### `pkg/errors/`
+Application error types.
