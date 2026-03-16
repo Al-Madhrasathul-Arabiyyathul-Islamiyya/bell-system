@@ -69,6 +69,10 @@ func (h *SystemHandler) SetState(w http.ResponseWriter, r *http.Request) {
 
 // CancelNextBell handles POST /api/system/cancel-next-bell.
 func (h *SystemHandler) CancelNextBell(w http.ResponseWriter, r *http.Request) {
+	if h.Scheduler == nil {
+		writeError(w, http.StatusNotFound, "not_found", "no pending bells to cancel")
+		return
+	}
 	cancelledID, err := h.Scheduler.CancelNextBell()
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not_found", "no pending bells to cancel")
