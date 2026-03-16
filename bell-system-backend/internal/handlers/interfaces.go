@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"io"
+	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 
@@ -56,6 +57,17 @@ type SystemAudioFileRepository interface {
 	List(ctx context.Context) ([]*models.SystemAudioFile, error)
 	Update(ctx context.Context, audio *models.SystemAudioFile) error
 	Delete(ctx context.Context, id uuid.UUID) error
+}
+
+// SystemStateRepository defines the interface for system state data access.
+type SystemStateRepository interface {
+	GetState(ctx context.Context) (string, time.Time, error)
+	SetState(ctx context.Context, state string) error
+}
+
+// SchedulerService defines the interface for scheduler operations.
+type SchedulerService interface {
+	CancelNextBell() (cancelledItemID string, err error)
 }
 
 // TokenService defines the interface for JWT token operations.
