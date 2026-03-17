@@ -445,6 +445,116 @@ func TestDefaultInterval(t *testing.T) {
 	assert.Equal(t, 30*time.Second, s.interval)
 }
 
+func TestLoadAndSchedule_GetCurrentSessionError(t *testing.T) {
+	s := New(
+		&mockSessionRepo{err: fmt.Errorf("connection lost")},
+		&mockItemRepo{},
+		&mockStateRepo{state: "active"},
+		&mockNotifier{},
+		testLogger(),
+		30,
+	)
+
+	s.loadAndSchedule()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assert.Empty(t, s.timers)
+}
+
+func TestLoadAndSchedule_GetScheduleItemsError(t *testing.T) {
+	session := &models.Session{ID: uuid.New(), Name: "Morning"}
+	s := New(
+		&mockSessionRepo{session: session},
+		&mockItemRepo{err: fmt.Errorf("query failed")},
+		&mockStateRepo{state: "active"},
+		&mockNotifier{},
+		testLogger(),
+		30,
+	)
+
+	s.loadAndSchedule()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assert.Empty(t, s.timers)
+}
+
+func TestLoadAndSchedule_GetStateError(t *testing.T) {
+	s := New(
+		&mockSessionRepo{},
+		&mockItemRepo{},
+		&mockStateRepo{err: fmt.Errorf("db error")},
+		&mockNotifier{},
+		testLogger(),
+		30,
+	)
+
+	s.loadAndSchedule()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assert.Empty(t, s.timers)
+}
+
+func TestFireBell_GetStateError(t *testing.T) {
+	notifier := &mockNotifier{}
+	stateRepo := &mockStateRepo{err: fmt.Errorf("db error")}
+	s := New(
+		&mockSessionRepo{},
+		&mockItemRepo{},
+		stateRepo,
+		notifier,
+		testLogger(),
+		30,
+	)
+
+	st := &scheduledTimer{
+		itemID:  "item-1",
+		soundID: "sound-1",
+		name:    "Test Bell",
+	}
+
+	s.fireBell(st)
+
+	notifier.mu.Lock()
+	defer notifier.mu.Unlock()
+	assert.Empty(t, notifier.bellTriggeredArgs, "bell should not fire when state check fails")
+}
+
+func TestLoadAndSchedule_LogsScheduledBells(t *testing.T) {
+	now := time.Date(2026, 3, 17, 10, 0, 0, 0, time.Local)
+	session := &models.Session{ID: uuid.New(), Name: "Morning"}
+
+	items := []*models.ScheduleItem{
+		{
+			ID:      uuid.New(),
+			Name:    "Bell",
+			Time:    time.Date(0, 1, 1, 11, 0, 0, 0, time.UTC),
+			SoundID: uuid.New(),
+		},
+	}
+
+	s := New(
+		&mockSessionRepo{session: session},
+		&mockItemRepo{items: items},
+		&mockStateRepo{state: "active"},
+		&mockNotifier{},
+		testLogger(),
+		30,
+	)
+	s.nowFunc = func() time.Time { return now }
+
+	s.loadAndSchedule()
+
+	s.mu.Lock()
+	assert.Len(t, s.timers, 1)
+	for _, timer := range s.timers {
+		timer.timer.Stop()
+	}
+	s.mu.Unlock()
+}
+
 func TestSetNowFunc_OverridesDefault(t *testing.T) {
 	s := New(
 		&mockSessionRepo{},
