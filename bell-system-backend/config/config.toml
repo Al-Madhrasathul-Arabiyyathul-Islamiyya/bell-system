@@ -32,3 +32,4 @@ maxMessageSize = 512 # bytes
 [scheduler]
 checkInterval = 30  # seconds
 enabled = true
+timezone = "Indian/Maldives"  # IANA timezone for schedule comparisons

@@ -17,6 +17,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/scheduler"
 	"arabiyya.edu.mv/bell-system-backend/internal/services"
 	ws "arabiyya.edu.mv/bell-system-backend/internal/websocket"
+	"arabiyya.edu.mv/bell-system-backend/pkg/clock"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
 	"github.com/go-chi/chi/v5"
@@ -37,6 +38,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer log.Close()
+
+	clk, err := clock.New(cfg.Scheduler.Timezone)
+	if err != nil {
+		log.Fatal("Failed to load timezone", err)
+	}
 
 	db, err := database.New(cfg.Database)
 	if err != nil {
@@ -69,7 +75,9 @@ func main() {
 	wsHandler := ws.NewHandler(hub, tokenSvc, log, cfg.WebSocket)
 
 	// Scheduler
+	sessionRepo.NowFunc = clk.Now
 	sched := scheduler.New(sessionRepo, scheduleItemRepo, stateRepo, notifier, log, cfg.Scheduler.CheckInterval)
+	sched.SetNowFunc(clk.Now)
 	schedDone := make(chan struct{})
 	if cfg.Scheduler.Enabled {
 		go sched.Run(schedDone)
@@ -82,6 +90,7 @@ func main() {
 	userHandler := handlers.NewUserHandler(userRepo, hasher)
 	sessionHandler := handlers.NewSessionHandler(sessionRepo)
 	scheduleHandler := handlers.NewScheduleHandler(scheduleItemRepo, scheduleDayRepo, sessionRepo, reloadNotifier)
+	scheduleHandler.NowFunc = clk.Now
 	audioHandler := handlers.NewAudioHandler(audioFileRepo, reloadNotifier)
 	audioHandler.FileStorage = fileStore
 	systemHandler := handlers.NewSystemHandler(stateRepo, sched, reloadNotifier)

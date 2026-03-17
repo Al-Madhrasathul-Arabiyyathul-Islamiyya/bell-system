@@ -61,6 +61,11 @@ func New(
 	}
 }
 
+// SetNowFunc overrides the function used to get the current time.
+func (s *Scheduler) SetNowFunc(fn func() time.Time) {
+	s.nowFunc = fn
+}
+
 // Run starts the scheduler loop. It blocks until done is closed.
 func (s *Scheduler) Run(done <-chan struct{}) {
 	defer close(s.doneClosed)

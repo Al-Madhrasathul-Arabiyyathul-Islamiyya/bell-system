@@ -19,6 +19,7 @@ type ScheduleHandler struct {
 	Days     ScheduleDayRepository
 	Sessions SessionRepository
 	Notifier EventNotifier
+	NowFunc  func() time.Time
 }
 
 // NewScheduleHandler creates a new ScheduleHandler.
@@ -47,7 +48,11 @@ func (h *ScheduleHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	now := time.Now()
+	nowFn := h.NowFunc
+	if nowFn == nil {
+		nowFn = time.Now
+	}
+	now := nowFn()
 	currentTime := now.Hour()*60 + now.Minute()
 
 	result := make([]models.CurrentScheduleItem, 0, len(items))
