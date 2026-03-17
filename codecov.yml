@@ -1,0 +1,31 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: 95%
+        threshold: 2%
+    patch:
+      default:
+        target: 95%
+
+ignore:
+  - "bell-system-backend/tests/mocks/**"
+  - "bell-system-backend/cmd/migrate/**"
+
+flags:
+  unittests:
+    paths:
+      - "bell-system-backend/"
+    carryforward: true
+  integration:
+    paths:
+      - "bell-system-backend/"
+    carryforward: true
+
+comment:
+  layout: "reach,diff,flags,components"
+  behavior: default
+  require_changes: false
