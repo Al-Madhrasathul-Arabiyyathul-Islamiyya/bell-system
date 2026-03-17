@@ -832,9 +832,10 @@ func TestScheduleHandler_GetCurrent_Success(t *testing.T) {
 		Name: "Morning",
 	}
 
-	now := time.Now()
-	pastTime := time.Date(0, 1, 1, now.Hour()-1, 0, 0, 0, time.UTC)
-	futureTime := time.Date(0, 1, 1, now.Hour()+1, 0, 0, 0, time.UTC)
+	// Use a fixed time at noon to avoid midnight wrapping in any timezone.
+	fixedNow := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
+	pastTime := time.Date(0, 1, 1, 11, 0, 0, 0, time.UTC)
+	futureTime := time.Date(0, 1, 1, 13, 0, 0, 0, time.UTC)
 
 	items := []*models.ScheduleItem{
 		{ID: uuid.New(), Name: "Past Bell", Time: pastTime, SoundID: soundID},
@@ -853,9 +854,12 @@ func TestScheduleHandler_GetCurrent_Success(t *testing.T) {
 		},
 	}
 
+	h := handlers.NewScheduleHandler(itemRepo, nil, sessionRepo, nil)
+	h.NowFunc = func() time.Time { return fixedNow }
+
 	req := httptest.NewRequest(http.MethodGet, "/current", nil)
 	rr := httptest.NewRecorder()
-	newScheduleRouterWithSessions(itemRepo, sessionRepo).ServeHTTP(rr, req)
+	router.ScheduleRoutes(h).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
