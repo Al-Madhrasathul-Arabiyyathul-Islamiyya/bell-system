@@ -2,8 +2,9 @@
 
 REST API server for the Arabiyya Bell Schedule System. Handles schedule management, audio file storage, user authentication, and real-time communication with desktop clients via WebSocket.
 
-[![CI](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml/badge.svg)](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml)
+[![CI](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml)
 [![Release](https://github.com/arabiyya-edu/bell-system/actions/workflows/release.yml/badge.svg)](https://github.com/arabiyya-edu/bell-system/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/arabiyya-edu/bell-system/branch/develop/graph/badge.svg)](https://codecov.io/gh/arabiyya-edu/bell-system)
 
 ## Prerequisites
 

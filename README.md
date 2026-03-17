@@ -2,8 +2,9 @@
 
 An automated school bell schedule and media playback system for Arabiyya School. Manages bell schedules, plays audio files on cue, and provides administrative control through a web interface and desktop client.
 
-[![CI](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml/badge.svg)](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml)
+[![CI](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/arabiyya-edu/bell-system/actions/workflows/ci.yml)
 [![Release](https://github.com/arabiyya-edu/bell-system/actions/workflows/release.yml/badge.svg)](https://github.com/arabiyya-edu/bell-system/actions/workflows/release.yml)
+[![codecov](https://codecov.io/gh/arabiyya-edu/bell-system/branch/develop/graph/badge.svg)](https://codecov.io/gh/arabiyya-edu/bell-system)
 
 ## Architecture
 
