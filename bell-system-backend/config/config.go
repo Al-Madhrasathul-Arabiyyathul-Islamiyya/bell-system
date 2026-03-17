@@ -50,8 +50,9 @@ type StorageConfig struct {
 }
 
 type SchedulerConfig struct {
-	CheckInterval int  // seconds, default 30
-	Enabled       bool // default true
+	CheckInterval int    // seconds, default 30
+	Enabled       bool   // default true
+	Timezone      string // IANA timezone for schedule comparisons, default "Indian/Maldives"
 }
 
 type WebSocketConfig struct {
