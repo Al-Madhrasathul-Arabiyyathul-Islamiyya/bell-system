@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ import (
 func newAudioRouterWithStorage(audioRepo handlers.SystemAudioFileRepository, fs handlers.FileStorage) http.Handler {
 	h := handlers.NewAudioHandler(audioRepo, nil)
 	h.FileStorage = fs
-	return router.AudioRoutes(h)
+	return router.AudioRoutes(h, testutil.PermissiveTokenService)
 }
 
 // --- Upload with FileStorage ---
@@ -63,7 +64,7 @@ func TestAudioHandler_Upload_WithFileStorage(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouterWithStorage(repo, fs)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	require.Equal(t, http.StatusCreated, rr.Code)
 	assert.Equal(t, ".wav", savedExt)
@@ -98,7 +99,7 @@ func TestAudioHandler_Upload_FileStorageSaveError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouterWithStorage(repo, fs)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
@@ -163,7 +164,7 @@ func TestAudioHandler_Delete_RemovesFile(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouterWithStorage(repo, fs)

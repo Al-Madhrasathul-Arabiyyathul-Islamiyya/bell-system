@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,12 @@ import (
 // newSessionRouter creates a session chi.Router with the given mock.
 func newSessionRouter(sessionRepo handlers.SessionRepository) http.Handler {
 	h := handlers.NewSessionHandler(sessionRepo)
-	return router.SessionRoutes(h)
+	return router.SessionRoutes(h, testutil.PermissiveTokenService)
+}
+
+func authSessionReq(req *http.Request) *http.Request {
+	testutil.SetAuthHeader(req)
+	return req
 }
 
 // --- GET / (list sessions) ---
@@ -42,7 +48,7 @@ func TestSessionHandler_List_Success(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -67,7 +73,7 @@ func TestSessionHandler_List_Empty(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -94,7 +100,7 @@ func TestSessionHandler_GetByID_Success(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+sessionID.String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/"+sessionID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -116,7 +122,7 @@ func TestSessionHandler_GetByID_NotFound(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -128,7 +134,7 @@ func TestSessionHandler_GetByID_NotFound(t *testing.T) {
 func TestSessionHandler_GetByID_InvalidUUID(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/not-a-uuid", nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/not-a-uuid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -194,7 +200,7 @@ func TestSessionHandler_Create_Success(t *testing.T) {
 	}
 
 	body := `{"name":"Evening","startTime":"17:00","endTime":"20:00"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -207,7 +213,7 @@ func TestSessionHandler_Create_Success(t *testing.T) {
 func TestSessionHandler_Create_InvalidJSON(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{bad`))
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{bad`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -225,7 +231,7 @@ func TestSessionHandler_Create_OverlappingTimes(t *testing.T) {
 	}
 
 	body := `{"name":"Overlap","startTime":"07:00","endTime":"13:00"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -251,7 +257,7 @@ func TestSessionHandler_Update_Success(t *testing.T) {
 	}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -269,7 +275,7 @@ func TestSessionHandler_Update_NotFound(t *testing.T) {
 	}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -294,7 +300,7 @@ func TestSessionHandler_Delete_Success(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+sessionID.String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodDelete, "/"+sessionID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -310,7 +316,7 @@ func TestSessionHandler_Delete_NotFound(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -328,7 +334,7 @@ func TestSessionHandler_List_DBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -376,7 +382,7 @@ func TestSessionHandler_GetByID_ErrNotFound(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -392,7 +398,7 @@ func TestSessionHandler_GetByID_DBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -405,7 +411,7 @@ func TestSessionHandler_Update_InvalidUUID(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -423,7 +429,7 @@ func TestSessionHandler_Update_ErrNotFound(t *testing.T) {
 	}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -441,7 +447,7 @@ func TestSessionHandler_Update_GetByIDDBError(t *testing.T) {
 	}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -458,7 +464,7 @@ func TestSessionHandler_Update_InvalidJSON(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -476,7 +482,7 @@ func TestSessionHandler_Update_InvalidStartTime(t *testing.T) {
 	}
 
 	body := `{"startTime":"not-a-time"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -494,7 +500,7 @@ func TestSessionHandler_Update_InvalidEndTime(t *testing.T) {
 	}
 
 	body := `{"endTime":"not-a-time"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -515,7 +521,7 @@ func TestSessionHandler_Update_DBError(t *testing.T) {
 	}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -528,7 +534,7 @@ func TestSessionHandler_Update_DBError(t *testing.T) {
 func TestSessionHandler_Delete_InvalidUUID(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -544,7 +550,7 @@ func TestSessionHandler_Delete_ErrNotFound(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -560,7 +566,7 @@ func TestSessionHandler_Delete_GetByIDDBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -579,7 +585,7 @@ func TestSessionHandler_Delete_DBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authSessionReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -592,7 +598,7 @@ func TestSessionHandler_Create_InvalidStartTime(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
 	body := `{"name":"Test","startTime":"not-time","endTime":"18:00"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -606,7 +612,7 @@ func TestSessionHandler_Create_InvalidEndTime(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
 	body := `{"name":"Test","startTime":"07:00","endTime":"not-time"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -620,7 +626,7 @@ func TestSessionHandler_Create_MissingFields(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
 	body := `{"name":"OnlyName"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 

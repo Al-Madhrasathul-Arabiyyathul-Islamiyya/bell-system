@@ -7,6 +7,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 		nil,
 	)
 
-	r := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
+	r := router.New(testutil.PermissiveTokenService, authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 	require.NotNil(t, r)
 
 	// Collect all registered routes

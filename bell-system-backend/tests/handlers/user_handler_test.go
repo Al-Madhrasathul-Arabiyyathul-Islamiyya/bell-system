@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,13 @@ import (
 // newUserRouter creates a user chi.Router with the given mocks.
 func newUserRouter(userRepo handlers.UserRepository, hasher handlers.PasswordHasher) http.Handler {
 	h := handlers.NewUserHandler(userRepo, hasher)
-	return router.UserRoutes(h)
+	return router.UserRoutes(h, testutil.PermissiveTokenService)
+}
+
+// authReq adds a valid auth header to the request.
+func authReq(req *http.Request) *http.Request {
+	testutil.SetAuthHeader(req)
+	return req
 }
 
 // --- GET / (list users) ---
@@ -43,7 +50,7 @@ func TestUserHandler_List_Success(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -69,7 +76,7 @@ func TestUserHandler_List_Empty(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -95,7 +102,7 @@ func TestUserHandler_List_DBError(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -122,7 +129,7 @@ func TestUserHandler_GetByID_Success(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+userID.String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/"+userID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -145,7 +152,7 @@ func TestUserHandler_GetByID_NotFound(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -163,7 +170,7 @@ func TestUserHandler_GetByID_InvalidUUID(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/not-a-uuid", nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/not-a-uuid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -193,7 +200,7 @@ func TestUserHandler_Create_Success(t *testing.T) {
 	}
 
 	body := `{"username":"newuser","password":"password123","role":"admin"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -214,7 +221,7 @@ func TestUserHandler_Create_InvalidJSON(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{broken`))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{broken`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -239,7 +246,7 @@ func TestUserHandler_Create_DuplicateUsername(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"existing","password":"password123","role":"admin"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -259,7 +266,7 @@ func TestUserHandler_Create_MissingFields(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"onlyuser"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -274,7 +281,7 @@ func TestUserHandler_Create_InvalidRole(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"user","password":"password123","role":"superadmin"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -307,7 +314,7 @@ func TestUserHandler_Update_Success(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"newname"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -326,7 +333,7 @@ func TestUserHandler_Update_NotFound(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"newname"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -345,7 +352,7 @@ func TestUserHandler_Update_InvalidJSON(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(`{bad`))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(`{bad`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -371,7 +378,7 @@ func TestUserHandler_Delete_Success(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+userID.String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodDelete, "/"+userID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -388,7 +395,7 @@ func TestUserHandler_Delete_NotFound(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -410,7 +417,7 @@ func TestUserHandler_Delete_DBError(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+userID.String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodDelete, "/"+userID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -429,7 +436,7 @@ func TestUserHandler_GetByID_ErrNotFound(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -446,7 +453,7 @@ func TestUserHandler_GetByID_DBError(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -460,7 +467,7 @@ func TestUserHandler_Create_PasswordTooShort(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"user","password":"short","role":"admin"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -483,7 +490,7 @@ func TestUserHandler_Create_HashError(t *testing.T) {
 	}
 
 	body := `{"username":"user","password":"password123","role":"admin"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -509,7 +516,7 @@ func TestUserHandler_Create_DBError(t *testing.T) {
 	}
 
 	body := `{"username":"user","password":"password123","role":"admin"}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -524,7 +531,7 @@ func TestUserHandler_Update_InvalidUUID(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"newname"}`
-	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -543,7 +550,7 @@ func TestUserHandler_Update_ErrNotFound(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"newname"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -562,7 +569,7 @@ func TestUserHandler_Update_GetByIDDBError(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"newname"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -590,7 +597,7 @@ func TestUserHandler_Update_WithPassword(t *testing.T) {
 	}
 
 	body := `{"password":"newpassword1"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -614,7 +621,7 @@ func TestUserHandler_Update_PasswordHashError(t *testing.T) {
 	}
 
 	body := `{"password":"newpassword1"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -638,7 +645,7 @@ func TestUserHandler_Update_WithRole(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"role":"morning_user"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -661,7 +668,7 @@ func TestUserHandler_Update_DBError(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	body := `{"username":"newname"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body))
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -675,7 +682,7 @@ func TestUserHandler_Delete_InvalidUUID(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	req := authReq(httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -692,7 +699,7 @@ func TestUserHandler_Delete_ErrNotFound(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -709,7 +716,7 @@ func TestUserHandler_Delete_GetByIDDBError(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
