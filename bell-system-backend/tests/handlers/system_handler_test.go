@@ -153,6 +153,65 @@ func TestSystemHandler_SetState_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestSystemHandler_SetState_NilNotifier(t *testing.T) {
+	now := time.Date(2026, 3, 17, 10, 0, 0, 0, time.UTC)
+	repo := &mocks.MockSystemStateRepo{
+		SetStateFunc: func(_ context.Context, state string) error {
+			return nil
+		},
+		GetStateFunc: func(_ context.Context) (string, time.Time, error) {
+			return "active", now, nil
+		},
+	}
+
+	h := handlers.NewSystemHandler(repo, &mocks.MockSchedulerService{}, nil)
+	r := router.SystemRoutes(h)
+
+	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
+	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp models.SystemStateResponse
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "active", resp.State)
+}
+
+func TestSystemHandler_SetState_GetStateErrorAfterSet(t *testing.T) {
+	callCount := 0
+	repo := &mocks.MockSystemStateRepo{
+		SetStateFunc: func(_ context.Context, state string) error {
+			return nil
+		},
+		GetStateFunc: func(_ context.Context) (string, time.Time, error) {
+			callCount++
+			// First GetState call is from SetState's follow-up read
+			return "", time.Time{}, errors.New("db error on re-read")
+		},
+	}
+
+	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
+	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestSystemHandler_CancelNextBell_NilScheduler(t *testing.T) {
+	h := handlers.NewSystemHandler(&mocks.MockSystemStateRepo{}, nil, nil)
+	r := router.SystemRoutes(h)
+
+	req := httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil)
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
 // --- POST /cancel-next-bell ---
 
 func TestSystemHandler_CancelNextBell_Success(t *testing.T) {

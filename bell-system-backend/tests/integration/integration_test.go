@@ -41,6 +41,10 @@ var (
 	testDB     *sql.DB
 	testHub    *ws.Hub
 	hubDone    chan struct{}
+
+	// Exposed for binary coverage tests
+	testDBHost string
+	testDBPort string
 )
 
 func TestMain(m *testing.M) {
@@ -81,6 +85,9 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "failed to get host: %v\n", err)
 		os.Exit(1)
 	}
+
+	testDBHost = host
+	testDBPort = mappedPort.Port()
 
 	connStr := fmt.Sprintf("sqlserver://sa:%s@%s:%s?encrypt=disable&TrustServerCertificate=true",
 		saPassword, host, mappedPort.Port())

@@ -2,10 +2,12 @@ package unit_test
 
 import (
 	"testing"
+	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/services"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -92,6 +94,44 @@ func TestTokenService_ValidateToken_Malformed(t *testing.T) {
 	claims, err := svc.ValidateToken("not.a.valid.token")
 	require.Error(t, err)
 	assert.Nil(t, claims)
+}
+
+func TestTokenService_ValidateToken_InvalidSigningMethod(t *testing.T) {
+	svc := services.NewTokenService("test-secret", 60)
+
+	// Create an RS256-signed token (not HMAC) — should be rejected
+	token := jwt.NewWithClaims(jwt.SigningMethodNone, jwt.MapClaims{
+		"sub":      uuid.New().String(),
+		"username": "admin",
+		"role":     "admin",
+		"exp":      time.Now().Add(time.Hour).Unix(),
+	})
+	tokenStr, err := token.SignedString(jwt.UnsafeAllowNoneSignatureType)
+	require.NoError(t, err)
+
+	claims, err := svc.ValidateToken(tokenStr)
+	require.Error(t, err)
+	assert.Nil(t, claims)
+}
+
+func TestTokenService_ValidateToken_NonUUIDSubject(t *testing.T) {
+	secret := "test-secret"
+
+	// Manually craft a token with a non-UUID subject
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":      "not-a-uuid",
+		"username": "admin",
+		"role":     "admin",
+		"exp":      time.Now().Add(time.Hour).Unix(),
+	})
+	tokenStr, err := token.SignedString([]byte(secret))
+	require.NoError(t, err)
+
+	svc := services.NewTokenService(secret, 60)
+	claims, err := svc.ValidateToken(tokenStr)
+	require.Error(t, err)
+	assert.Nil(t, claims)
+	assert.Contains(t, err.Error(), "invalid user ID")
 }
 
 func TestTokenService_RoundTrip_AllRoles(t *testing.T) {
