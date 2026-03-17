@@ -872,6 +872,66 @@ func TestScheduleHandler_GetCurrent_Success(t *testing.T) {
 	assert.Equal(t, "pending", resp.Items[1].Status)
 }
 
+func TestScheduleHandler_GetCurrent_NowFunc_AllStatuses(t *testing.T) {
+	sessionID := uuid.New()
+	soundID := uuid.New()
+	session := &models.Session{ID: sessionID, Name: "Afternoon"}
+
+	// Fix "now" at exactly 14:00 — test all three statuses.
+	fixedNow := time.Date(2025, 1, 15, 14, 0, 0, 0, time.UTC)
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Past", Time: time.Date(0, 1, 1, 13, 0, 0, 0, time.UTC), SoundID: soundID},
+		{ID: uuid.New(), Name: "Current", Time: time.Date(0, 1, 1, 14, 0, 0, 0, time.UTC), SoundID: soundID},
+		{ID: uuid.New(), Name: "Future", Time: time.Date(0, 1, 1, 15, 0, 0, 0, time.UTC), SoundID: soundID},
+	}
+
+	sessionRepo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) { return session, nil },
+	}
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetCurrentSessionSchedulesFunc: func(_ context.Context, _ uuid.UUID) ([]*models.ScheduleItem, error) { return items, nil },
+	}
+
+	h := handlers.NewScheduleHandler(itemRepo, nil, sessionRepo, nil)
+	h.NowFunc = func() time.Time { return fixedNow }
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+	router.ScheduleRoutes(h).ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp models.CurrentScheduleResponse
+	require.NoError(t, json.NewDecoder(rr.Body).Decode(&resp))
+	require.Len(t, resp.Items, 3)
+	assert.Equal(t, "completed", resp.Items[0].Status)
+	assert.Equal(t, "current", resp.Items[1].Status)
+	assert.Equal(t, "pending", resp.Items[2].Status)
+}
+
+func TestScheduleHandler_GetCurrent_NowFunc_NilFallback(t *testing.T) {
+	// When NowFunc is nil, handler should use time.Now without panicking.
+	session := &models.Session{ID: uuid.New(), Name: "Morning"}
+
+	sessionRepo := &mocks.MockSessionRepo{
+		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) { return session, nil },
+	}
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetCurrentSessionSchedulesFunc: func(_ context.Context, _ uuid.UUID) ([]*models.ScheduleItem, error) {
+			return []*models.ScheduleItem{}, nil
+		},
+	}
+
+	h := handlers.NewScheduleHandler(itemRepo, nil, sessionRepo, nil)
+	// NowFunc intentionally left nil
+
+	req := httptest.NewRequest(http.MethodGet, "/current", nil)
+	rr := httptest.NewRecorder()
+	router.ScheduleRoutes(h).ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+}
+
 func TestScheduleHandler_GetCurrent_NoSession(t *testing.T) {
 	sessionRepo := &mocks.MockSessionRepo{
 		GetCurrentSessionFunc: func(_ context.Context) (*models.Session, error) {

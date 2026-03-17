@@ -444,3 +444,25 @@ func TestDefaultInterval(t *testing.T) {
 
 	assert.Equal(t, 30*time.Second, s.interval)
 }
+
+func TestSetNowFunc_OverridesDefault(t *testing.T) {
+	s := New(
+		&mockSessionRepo{},
+		&mockItemRepo{},
+		&mockStateRepo{state: "active"},
+		&mockNotifier{},
+		testLogger(),
+		30,
+	)
+
+	// Default should be time.Now (non-nil)
+	assert.NotNil(t, s.nowFunc)
+	before := s.nowFunc()
+
+	fixed := time.Date(2025, 6, 15, 10, 0, 0, 0, time.UTC)
+	s.SetNowFunc(func() time.Time { return fixed })
+
+	got := s.nowFunc()
+	assert.True(t, got.Equal(fixed), "expected %v, got %v", fixed, got)
+	assert.False(t, got.Equal(before), "should differ from wall clock")
+}
