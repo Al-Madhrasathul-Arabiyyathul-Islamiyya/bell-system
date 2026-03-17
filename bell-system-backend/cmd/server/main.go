@@ -96,7 +96,7 @@ func main() {
 	systemHandler := handlers.NewSystemHandler(stateRepo, sched, reloadNotifier)
 
 	// Router
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
+	apiRouter := router.New(tokenSvc, authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 
 	r := chi.NewRouter()
 

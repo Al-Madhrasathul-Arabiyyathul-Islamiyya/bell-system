@@ -185,7 +185,7 @@ func TestMain(m *testing.M) {
 
 	// Router (mirrors cmd/server/main.go)
 	systemHandler := handlers.NewSystemHandler(stateRepo, nil, notifier)
-	apiRouter := router.New(authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
+	apiRouter := router.New(tokenSvc, authHandler, userHandler, sessionHandler, scheduleHandler, audioHandler, systemHandler)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
