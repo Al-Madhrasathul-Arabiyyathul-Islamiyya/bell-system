@@ -241,7 +241,7 @@ Desktop clients should remain functional when disconnected from the server.
 ### Reconnection Flow
 
 1. Re-authenticate if the token has expired
-2. Connect to WebSocket with `register` message
+2. Connect to WebSocket via query parameters (`token`, `client_type`, `client_name`)
 3. Fetch system state: `GET /api/v1/system/state`
 4. Fetch current schedule: `GET /api/v1/sessions/current` + `GET /api/v1/schedule`
 5. Fetch audio checksums and sync any changed files

@@ -113,6 +113,13 @@ CREATE TABLE ScheduleDays (
     DayOfWeek TINYINT CHECK (DayOfWeek BETWEEN 1 AND 7),
     PRIMARY KEY (ScheduleItemId, DayOfWeek)
 )
+
+-- System state (active/paused)
+CREATE TABLE SystemState (
+    [Key] NVARCHAR(50) PRIMARY KEY,
+    Value NVARCHAR(255) NOT NULL,
+    UpdatedAt DATETIME2 NOT NULL DEFAULT GETDATE()
+)
 ```
 
 ### Schedule Management Details
@@ -149,7 +156,7 @@ CREATE TABLE ScheduleDays (
 - WebSocket for real-time updates
 - SQL Server connection
 - File system operations for system audio files
-- API endpoints as specified in open-api.yml
+- API endpoints as specified in openapi.yml
 
 ### Client (Native Windows):
 
