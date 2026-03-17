@@ -101,6 +101,24 @@ func NewMockSystemAudioFileRepo(t *testing.T) (*database.SystemAudioFileReposito
 	return database.NewSystemAudioFileRepository(db, log), mock
 }
 
+// NewMockSystemStateRepo creates a sqlmock-backed SystemStateRepository for testing.
+func NewMockSystemStateRepo(t *testing.T) (*database.SystemStateRepository, sqlmock.Sqlmock) {
+	t.Helper()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("failed to create sqlmock: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	log, err := logger.New("test")
+	if err != nil {
+		t.Fatalf("failed to create logger: %v", err)
+	}
+	t.Cleanup(func() { log.Close() })
+
+	return database.NewSystemStateRepository(db, log), mock
+}
+
 // NewMockScheduleItemRepo creates a sqlmock-backed ScheduleItemRepository for testing.
 // It shares a single mock DB across all sub-repositories.
 func NewMockScheduleItemRepo(t *testing.T) (*database.ScheduleItemRepository, sqlmock.Sqlmock) {
