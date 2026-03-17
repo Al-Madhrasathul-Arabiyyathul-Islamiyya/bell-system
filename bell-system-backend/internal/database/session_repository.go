@@ -17,6 +17,7 @@ import (
 // SessionRepository handles database operations for sessions
 type SessionRepository struct {
 	*Repository
+	NowFunc func() time.Time
 }
 
 // NewSessionRepository creates a new session repository
@@ -143,7 +144,11 @@ func (r *SessionRepository) List(ctx context.Context) ([]*models.Session, error)
 
 // GetCurrentSession gets the session that includes the current time
 func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Session, error) {
-	now := time.Now()
+	nowFn := r.NowFunc
+	if nowFn == nil {
+		nowFn = time.Now
+	}
+	now := nowFn()
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 
 	query := `
