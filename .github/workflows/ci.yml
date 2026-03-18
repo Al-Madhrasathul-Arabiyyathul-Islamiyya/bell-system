@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [develop]
+    branches: [develop, master]
   pull_request:
-    branches: [develop]
+    branches: [develop, master]
 
 defaults:
   run:
@@ -71,6 +71,8 @@ jobs:
           files: bell-system-backend/unit.out
           flags: unittests
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
 
   build:
     name: Build
@@ -110,3 +112,5 @@ jobs:
           files: bell-system-backend/integration.out
           flags: integration
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          verbose: true
