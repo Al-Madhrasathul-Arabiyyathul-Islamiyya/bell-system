@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -24,13 +25,18 @@ import (
 // newScheduleRouter creates a schedule chi.Router with the given mocks.
 func newScheduleRouter(itemRepo handlers.ScheduleItemRepository, dayRepo handlers.ScheduleDayRepository) http.Handler {
 	h := handlers.NewScheduleHandler(itemRepo, dayRepo, nil, nil)
-	return router.ScheduleRoutes(h)
+	return router.ScheduleRoutes(h, testutil.PermissiveTokenService)
 }
 
 // newScheduleRouterWithSessions creates a schedule chi.Router with session support.
 func newScheduleRouterWithSessions(itemRepo handlers.ScheduleItemRepository, sessionRepo handlers.SessionRepository) http.Handler {
 	h := handlers.NewScheduleHandler(itemRepo, nil, sessionRepo, nil)
-	return router.ScheduleRoutes(h)
+	return router.ScheduleRoutes(h, testutil.PermissiveTokenService)
+}
+
+func authScheduleReq(req *http.Request) *http.Request {
+	testutil.SetAuthHeader(req)
+	return req
 }
 
 // --- GET / (list schedule items) ---
@@ -67,7 +73,7 @@ func TestScheduleHandler_List_Success(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -96,7 +102,7 @@ func TestScheduleHandler_List_Empty(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -113,7 +119,7 @@ func TestScheduleHandler_List_DBError(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -141,7 +147,7 @@ func TestScheduleHandler_GetByID_Success(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+itemID.String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/"+itemID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -164,7 +170,7 @@ func TestScheduleHandler_GetByID_NotFound(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -177,7 +183,7 @@ func TestScheduleHandler_GetByID_InvalidUUID(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/not-valid", nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/not-valid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -219,7 +225,7 @@ func TestScheduleHandler_Create_WithSession(t *testing.T) {
 		"soundId":   soundID.String(),
 		"days":      []int{2, 3, 4, 5, 6},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -254,7 +260,7 @@ func TestScheduleHandler_Create_WithoutSession(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{2, 3, 4, 5, 6},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -268,7 +274,7 @@ func TestScheduleHandler_Create_InvalidJSON(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{bad`))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{bad`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -289,7 +295,7 @@ func TestScheduleHandler_Create_InvalidDays_Zero(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{0, 2, 3},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -310,7 +316,7 @@ func TestScheduleHandler_Create_InvalidDays_Eight(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{1, 8},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -325,7 +331,7 @@ func TestScheduleHandler_Create_MissingRequiredFields(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{}`
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -358,7 +364,7 @@ func TestScheduleHandler_Update_Success(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"name":"New Name","days":[2,3,4,5,6]}`
-	req := httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -377,7 +383,7 @@ func TestScheduleHandler_Update_NotFound(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"name":"New Name"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -397,7 +403,7 @@ func TestScheduleHandler_Update_InvalidDays(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"days":[0,8]}`
-	req := httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -423,7 +429,7 @@ func TestScheduleHandler_Delete_Success(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+itemID.String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/"+itemID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -440,7 +446,7 @@ func TestScheduleHandler_Delete_NotFound(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -471,7 +477,7 @@ func TestScheduleHandler_DaysValidation_ValidRange(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{1, 2, 3, 4, 5, 6, 7},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -501,7 +507,7 @@ func TestScheduleHandler_DaysValidation_SundayIsOne(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{1},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -521,7 +527,7 @@ func TestScheduleHandler_GetByID_ErrNotFound(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -538,7 +544,7 @@ func TestScheduleHandler_GetByID_DBError(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -558,7 +564,7 @@ func TestScheduleHandler_Create_InvalidTime(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{2},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -583,7 +589,7 @@ func TestScheduleHandler_Create_DBError(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{2},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -611,7 +617,7 @@ func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{2},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -627,7 +633,7 @@ func TestScheduleHandler_Update_InvalidUUID(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -646,7 +652,7 @@ func TestScheduleHandler_Update_ErrNotFound(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -665,7 +671,7 @@ func TestScheduleHandler_Update_GetByIDDBError(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -683,7 +689,7 @@ func TestScheduleHandler_Update_InvalidJSON(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -702,7 +708,7 @@ func TestScheduleHandler_Update_InvalidTime(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"time":"not-a-time"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -724,7 +730,7 @@ func TestScheduleHandler_Update_DBError(t *testing.T) {
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
 	body := `{"name":"Updated"}`
-	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -738,7 +744,7 @@ func TestScheduleHandler_Delete_InvalidUUID(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -755,7 +761,7 @@ func TestScheduleHandler_Delete_ErrNotFound(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -772,7 +778,7 @@ func TestScheduleHandler_Delete_GetByIDDBError(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -792,7 +798,7 @@ func TestScheduleHandler_Delete_DBError(t *testing.T) {
 	}
 	dayRepo := &mocks.MockScheduleDayRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newScheduleRouter(itemRepo, dayRepo)
@@ -812,7 +818,7 @@ func TestScheduleHandler_DaysValidation_EmptyDays(t *testing.T) {
 		"soundId": soundID.String(),
 		"days":    []int{},
 	})
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body))
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
@@ -859,7 +865,7 @@ func TestScheduleHandler_GetCurrent_Success(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/current", nil)
 	rr := httptest.NewRecorder()
-	router.ScheduleRoutes(h).ServeHTTP(rr, req)
+	router.ScheduleRoutes(h, testutil.PermissiveTokenService).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
@@ -897,7 +903,7 @@ func TestScheduleHandler_GetCurrent_NowFunc_AllStatuses(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/current", nil)
 	rr := httptest.NewRecorder()
-	router.ScheduleRoutes(h).ServeHTTP(rr, req)
+	router.ScheduleRoutes(h, testutil.PermissiveTokenService).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
@@ -927,7 +933,7 @@ func TestScheduleHandler_GetCurrent_NowFunc_NilFallback(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/current", nil)
 	rr := httptest.NewRecorder()
-	router.ScheduleRoutes(h).ServeHTTP(rr, req)
+	router.ScheduleRoutes(h, testutil.PermissiveTokenService).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 }

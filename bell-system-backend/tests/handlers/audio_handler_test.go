@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,12 @@ import (
 // newAudioRouter creates an audio chi.Router with the given mock.
 func newAudioRouter(audioRepo handlers.SystemAudioFileRepository) http.Handler {
 	h := handlers.NewAudioHandler(audioRepo, nil)
-	return router.AudioRoutes(h)
+	return router.AudioRoutes(h, testutil.PermissiveTokenService)
+}
+
+func authAudioReq(req *http.Request) *http.Request {
+	testutil.SetAuthHeader(req)
+	return req
 }
 
 // --- GET / (list audio files) ---
@@ -41,7 +47,7 @@ func TestAudioHandler_List_Success(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -66,7 +72,7 @@ func TestAudioHandler_List_Empty(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -82,7 +88,7 @@ func TestAudioHandler_List_DBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodGet, "/", nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -171,7 +177,7 @@ func TestAudioHandler_Upload_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	require.Equal(t, http.StatusCreated, rr.Code)
 }
@@ -190,7 +196,7 @@ func TestAudioHandler_Upload_MissingFile(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
@@ -211,7 +217,7 @@ func TestAudioHandler_Upload_InvalidType(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
@@ -237,7 +243,7 @@ func TestAudioHandler_Update_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	require.Equal(t, http.StatusOK, rr.Code)
 }
@@ -255,7 +261,7 @@ func TestAudioHandler_Update_NotFound(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 }
@@ -275,7 +281,7 @@ func TestAudioHandler_Delete_Success(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -291,7 +297,7 @@ func TestAudioHandler_Delete_NotFound(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -312,7 +318,7 @@ func TestAudioHandler_Delete_DBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -363,7 +369,7 @@ func TestAudioHandler_Upload_InvalidMultipart(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
@@ -388,7 +394,7 @@ func TestAudioHandler_Upload_DBError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
@@ -402,7 +408,7 @@ func TestAudioHandler_Update_InvalidUUID(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
@@ -420,7 +426,7 @@ func TestAudioHandler_Update_ErrNotFound(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 }
@@ -438,7 +444,7 @@ func TestAudioHandler_Update_GetByIDDBError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
@@ -455,7 +461,7 @@ func TestAudioHandler_Update_InvalidJSON(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
@@ -476,7 +482,7 @@ func TestAudioHandler_Update_DBError(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
@@ -500,7 +506,7 @@ func TestAudioHandler_Update_FileTypeOnly(t *testing.T) {
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
-	r.ServeHTTP(rr, req)
+	r.ServeHTTP(rr, authAudioReq(req))
 
 	assert.Equal(t, http.StatusOK, rr.Code)
 }
@@ -508,7 +514,7 @@ func TestAudioHandler_Update_FileTypeOnly(t *testing.T) {
 func TestAudioHandler_Delete_InvalidUUID(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{}
 
-	req := httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/not-a-uuid", nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -524,7 +530,7 @@ func TestAudioHandler_Delete_ErrNotFound(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -540,7 +546,7 @@ func TestAudioHandler_Delete_GetByIDDBError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil)
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+uuid.New().String(), nil))
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -581,7 +587,7 @@ func TestAudioHandler_FileTypes_AllValid(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			r := newAudioRouter(repo)
-			r.ServeHTTP(rr, req)
+			r.ServeHTTP(rr, authAudioReq(req))
 
 			require.Equal(t, http.StatusCreated, rr.Code)
 		})

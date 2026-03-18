@@ -182,7 +182,7 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Create an audio file first (needed for schedule item) — this triggers audio_files_updated
-	audioID := createTestAudioFileForWS(t)
+	audioID := createTestAudioFileForWS(t, adminToken)
 
 	// Drain the audio_files_updated notification
 	msg := readWSMessage(t, clientConn, 2*time.Second)
@@ -190,7 +190,7 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 	assert.Equal(t, "audio_files_updated", msg.Type)
 
 	// Create a schedule item via REST — should trigger schedules_updated
-	sessionID := getSessionIDForWS(t)
+	sessionID := getSessionIDForWS(t, adminToken)
 	body := fmt.Sprintf(`{"name":"WS Test Bell","time":"08:00","soundId":"%s","sessionId":"%s","days":[2,3,4,5,6]}`, audioID, sessionID)
 	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), adminToken)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -205,6 +205,7 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 func TestWebSocket_AudioUpdateNotifiesClients(t *testing.T) {
 	cleanAndSeed(t)
 	createTestUser(t, "wsmorning4", "wspass123", "morning_user")
+	token := adminToken(t)
 
 	// Connect a WebSocket client
 	clientToken := loginAs(t, "wsmorning4", "wspass123")
@@ -226,6 +227,7 @@ func TestWebSocket_AudioUpdateNotifiesClients(t *testing.T) {
 	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
@@ -283,7 +285,7 @@ func TestWebSocket_ClientTypeClient(t *testing.T) {
 }
 
 // createTestAudioFileForWS is a helper that creates an audio file via REST API.
-func createTestAudioFileForWS(t *testing.T) string {
+func createTestAudioFileForWS(t *testing.T, token string) string {
 	t.Helper()
 
 	var buf bytes.Buffer
@@ -298,6 +300,7 @@ func createTestAudioFileForWS(t *testing.T) string {
 	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -309,10 +312,10 @@ func createTestAudioFileForWS(t *testing.T) string {
 }
 
 // getSessionIDForWS returns the first session ID.
-func getSessionIDForWS(t *testing.T) string {
+func getSessionIDForWS(t *testing.T, token string) string {
 	t.Helper()
 
-	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, "")
+	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var result map[string]any

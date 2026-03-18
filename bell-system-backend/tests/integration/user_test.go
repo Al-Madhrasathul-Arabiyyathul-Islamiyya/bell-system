@@ -14,10 +14,11 @@ import (
 
 func TestUserCRUD(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// Create
 	createBody := `{"username":"testuser","password":"securepass123","role":"admin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(createBody), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(createBody), token)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	var created map[string]any
@@ -29,7 +30,7 @@ func TestUserCRUD(t *testing.T) {
 	assert.Equal(t, "admin", created["role"])
 
 	// Get by ID
-	resp = doRequest(t, http.MethodGet, "/api/v1/users/"+userID, nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/users/"+userID, nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var fetched map[string]any
@@ -37,7 +38,7 @@ func TestUserCRUD(t *testing.T) {
 	assert.Equal(t, "testuser", fetched["username"])
 
 	// List
-	resp = doRequest(t, http.MethodGet, "/api/v1/users", nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/users", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var listResult map[string]any
@@ -47,7 +48,7 @@ func TestUserCRUD(t *testing.T) {
 
 	// Update
 	updateBody := `{"username":"updateduser"}`
-	resp = doRequest(t, http.MethodPut, "/api/v1/users/"+userID, bytes.NewBufferString(updateBody), "")
+	resp = doRequest(t, http.MethodPut, "/api/v1/users/"+userID, bytes.NewBufferString(updateBody), token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var updated map[string]any
@@ -55,22 +56,23 @@ func TestUserCRUD(t *testing.T) {
 	assert.Equal(t, "updateduser", updated["username"])
 
 	// Delete
-	resp = doRequest(t, http.MethodDelete, "/api/v1/users/"+userID, nil, "")
+	resp = doRequest(t, http.MethodDelete, "/api/v1/users/"+userID, nil, token)
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 	resp.Body.Close()
 
 	// Verify deleted
-	resp = doRequest(t, http.MethodGet, "/api/v1/users/"+userID, nil, "")
+	resp = doRequest(t, http.MethodGet, "/api/v1/users/"+userID, nil, token)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
 }
 
 func TestCreateUser_DuplicateUsername(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// "admin" already exists from seed data
 	body := `{"username":"admin","password":"password123","role":"admin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	// Should fail with conflict or server error
@@ -80,9 +82,10 @@ func TestCreateUser_DuplicateUsername(t *testing.T) {
 
 func TestCreateUser_PasswordTooShort(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	body := `{"username":"shortpw","password":"short","role":"admin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -90,9 +93,10 @@ func TestCreateUser_PasswordTooShort(t *testing.T) {
 
 func TestCreateUser_InvalidRole(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	body := `{"username":"badrole","password":"password123","role":"superadmin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

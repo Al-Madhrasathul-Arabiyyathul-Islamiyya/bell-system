@@ -14,6 +14,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
+	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,12 @@ import (
 
 func newSystemRouter(stateRepo handlers.SystemStateRepository, schedSvc handlers.SchedulerService, notifier handlers.EventNotifier) http.Handler {
 	h := handlers.NewSystemHandler(stateRepo, schedSvc, notifier)
-	return router.SystemRoutes(h)
+	return router.SystemRoutes(h, testutil.PermissiveTokenService)
+}
+
+func authSystemReq(req *http.Request) *http.Request {
+	testutil.SetAuthHeader(req)
+	return req
 }
 
 // --- GET /state ---
@@ -78,7 +84,7 @@ func TestSystemHandler_SetState_Active(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, notifier).ServeHTTP(rr, req)
 
@@ -104,7 +110,7 @@ func TestSystemHandler_SetState_Paused(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, notifier).ServeHTTP(rr, req)
 
@@ -120,7 +126,7 @@ func TestSystemHandler_SetState_Paused(t *testing.T) {
 func TestSystemHandler_SetState_InvalidBody(t *testing.T) {
 	repo := &mocks.MockSystemStateRepo{}
 
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader([]byte("not json")))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader([]byte("not json"))))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -131,7 +137,7 @@ func TestSystemHandler_SetState_InvalidState(t *testing.T) {
 	repo := &mocks.MockSystemStateRepo{}
 
 	body, _ := json.Marshal(map[string]string{"state": "unknown"})
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -146,7 +152,7 @@ func TestSystemHandler_SetState_DBError(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -165,10 +171,10 @@ func TestSystemHandler_SetState_NilNotifier(t *testing.T) {
 	}
 
 	h := handlers.NewSystemHandler(repo, &mocks.MockSchedulerService{}, nil)
-	r := router.SystemRoutes(h)
+	r := router.SystemRoutes(h, testutil.PermissiveTokenService)
 
 	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
 
@@ -194,7 +200,7 @@ func TestSystemHandler_SetState_GetStateErrorAfterSet(t *testing.T) {
 	}
 
 	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -203,9 +209,9 @@ func TestSystemHandler_SetState_GetStateErrorAfterSet(t *testing.T) {
 
 func TestSystemHandler_CancelNextBell_NilScheduler(t *testing.T) {
 	h := handlers.NewSystemHandler(&mocks.MockSystemStateRepo{}, nil, nil)
-	r := router.SystemRoutes(h)
+	r := router.SystemRoutes(h, testutil.PermissiveTokenService)
 
-	req := httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil)
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
 
@@ -221,7 +227,7 @@ func TestSystemHandler_CancelNextBell_Success(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil)
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil))
 	rr := httptest.NewRecorder()
 	newSystemRouter(&mocks.MockSystemStateRepo{}, svc, nil).ServeHTTP(rr, req)
 
@@ -241,7 +247,7 @@ func TestSystemHandler_CancelNextBell_NoneToCancel(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil)
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/cancel-next-bell", nil))
 	rr := httptest.NewRecorder()
 	newSystemRouter(&mocks.MockSystemStateRepo{}, svc, nil).ServeHTTP(rr, req)
 
