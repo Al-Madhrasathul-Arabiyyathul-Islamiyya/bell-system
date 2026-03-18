@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func uploadAudioFile(t *testing.T, name, fileType, filename, content string) (int, map[string]any) {
+func uploadAudioFile(t *testing.T, name, fileType, filename, content, token string) (int, map[string]any) {
 	t.Helper()
 
 	var buf bytes.Buffer
@@ -27,6 +27,7 @@ func uploadAudioFile(t *testing.T, name, fileType, filename, content string) (in
 	req, err := http.NewRequest(http.MethodPost, testServer.URL+"/api/v1/audio", &buf)
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -38,8 +39,9 @@ func uploadAudioFile(t *testing.T, name, fileType, filename, content string) (in
 
 func TestAudioFileUpload(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
-	status, result := uploadAudioFile(t, "bell.mp3", "bell", "bell.mp3", "fake mp3 data")
+	status, result := uploadAudioFile(t, "bell.mp3", "bell", "bell.mp3", "fake mp3 data", token)
 	require.Equal(t, http.StatusCreated, status)
 
 	assert.NotEmpty(t, result["id"])
@@ -50,29 +52,30 @@ func TestAudioFileUpload(t *testing.T) {
 
 func TestAudioFileCRUD(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// Upload
-	status, created := uploadAudioFile(t, "anthem.mp3", "anthem", "anthem.mp3", "anthem data")
+	status, created := uploadAudioFile(t, "anthem.mp3", "anthem", "anthem.mp3", "anthem data", token)
 	require.Equal(t, http.StatusCreated, status)
 
 	audioID := created["id"].(string)
 
 	// List
-	resp := doRequest(t, http.MethodGet, "/api/v1/audio", nil, "")
+	resp := doRequest(t, http.MethodGet, "/api/v1/audio", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var listResult map[string]any
 	readJSON(t, resp, &listResult)
 	assert.GreaterOrEqual(t, listResult["total"].(float64), float64(1))
 
-	// Get by ID
+	// Get by ID (PUBLIC)
 	resp = doRequest(t, http.MethodGet, "/api/v1/audio/"+audioID, nil, "")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	resp.Body.Close()
 
 	// Update metadata
 	updateBody := `{"name":"updated-anthem.mp3","fileType":"other"}`
-	resp = doRequest(t, http.MethodPut, "/api/v1/audio/"+audioID, bytes.NewBufferString(updateBody), "")
+	resp = doRequest(t, http.MethodPut, "/api/v1/audio/"+audioID, bytes.NewBufferString(updateBody), token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	var updated map[string]any
@@ -81,11 +84,11 @@ func TestAudioFileCRUD(t *testing.T) {
 	assert.Equal(t, "other", updated["fileType"])
 
 	// Delete
-	resp = doRequest(t, http.MethodDelete, "/api/v1/audio/"+audioID, nil, "")
+	resp = doRequest(t, http.MethodDelete, "/api/v1/audio/"+audioID, nil, token)
 	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 	resp.Body.Close()
 
-	// Verify deleted
+	// Verify deleted (GET by ID is PUBLIC)
 	resp = doRequest(t, http.MethodGet, "/api/v1/audio/"+audioID, nil, "")
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
@@ -93,9 +96,10 @@ func TestAudioFileCRUD(t *testing.T) {
 
 func TestAudioFileChecksums(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// Upload a file
-	status, created := uploadAudioFile(t, "song.mp3", "school_song", "song.mp3", "song data")
+	status, created := uploadAudioFile(t, "song.mp3", "school_song", "song.mp3", "song data", token)
 	require.Equal(t, http.StatusCreated, status)
 
 	expectedChecksum := created["checksum"].(string)
@@ -123,7 +127,8 @@ func TestAudioFileChecksums(t *testing.T) {
 
 func TestAudioFileUpload_InvalidType(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
-	status, _ := uploadAudioFile(t, "bad.mp3", "invalid_type", "bad.mp3", "data")
+	status, _ := uploadAudioFile(t, "bad.mp3", "invalid_type", "bad.mp3", "data", token)
 	assert.Equal(t, http.StatusBadRequest, status)
 }

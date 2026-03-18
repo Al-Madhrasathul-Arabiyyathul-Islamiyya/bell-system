@@ -326,13 +326,36 @@ func getDayOfWeek() int {
 	return int(time.Now().Weekday()) + 1
 }
 
+// adminToken creates a fresh admin user directly in the DB (bypassing the API auth gate),
+// then logs in via the API to obtain a valid JWT. Use this to authenticate protected requests.
+func adminToken(t *testing.T) string {
+	t.Helper()
+
+	const username = "integration_admin"
+	const password = "integrationpass123"
+
+	hasher := services.NewPasswordHasher()
+	hash, err := hasher.Hash(password)
+	require.NoError(t, err)
+
+	_, err = testDB.ExecContext(context.Background(),
+		`MERGE Users AS target
+		 USING (SELECT @p1 AS Username) AS source ON target.Username = source.Username
+		 WHEN MATCHED THEN UPDATE SET PasswordHash = @p2, Role = 'admin'
+		 WHEN NOT MATCHED THEN INSERT (Username, PasswordHash, Role) VALUES (@p1, @p2, 'admin');`,
+		username, hash)
+	require.NoError(t, err, "failed to upsert integration admin user")
+
+	return loginAs(t, username, password)
+}
+
 // createTestUser creates a user via the API and returns the user ID.
-// This avoids depending on seed bcrypt hashes matching.
 func createTestUser(t *testing.T, username, password, role string) string {
 	t.Helper()
 
+	token := adminToken(t)
 	body := fmt.Sprintf(`{"username":%q,"password":%q,"role":%q}`, username, password, role)
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "failed to create test user %s", username)
 
 	var result map[string]any

@@ -33,9 +33,10 @@ func TestSystemState_GetState(t *testing.T) {
 
 func TestSystemState_SetStatePaused(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -46,16 +47,17 @@ func TestSystemState_SetStatePaused(t *testing.T) {
 
 func TestSystemState_SetStateActive(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// First pause
 	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Then activate
 	body, _ = json.Marshal(models.SystemStateRequest{State: "active"})
-	resp = doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), "")
+	resp = doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -66,19 +68,21 @@ func TestSystemState_SetStateActive(t *testing.T) {
 
 func TestSystemState_SetStateInvalid(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	body, _ := json.Marshal(map[string]string{"state": "invalid"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func TestSystemState_SetStatePersists(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// Set to paused
 	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -96,9 +100,10 @@ func TestSystemState_SetStatePersists(t *testing.T) {
 
 func TestSystemState_CancelNextBell_NoPending(t *testing.T) {
 	cleanAndSeed(t)
+	token := adminToken(t)
 
 	// No scheduler running in integration tests, so no pending bells
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/cancel-next-bell", nil, "")
+	resp := doRequest(t, http.MethodPost, "/api/v1/system/cancel-next-bell", nil, token)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
