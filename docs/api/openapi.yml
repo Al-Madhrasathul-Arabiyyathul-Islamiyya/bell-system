@@ -17,8 +17,8 @@ tags:
     description: System audio file management
   - name: System
     description: System status and control
-  - name: Media
-    description: Media file streaming from network share
+  - name: Sessions
+    description: Session management (morning/afternoon)
   - name: Users
     description: User management (admin only)
 
@@ -126,6 +126,7 @@ components:
           format: uuid
         days:
           type: array
+          description: "Days of the week: 1=Sunday, 2=Monday, 3=Tuesday, 4=Wednesday, 5=Thursday, 6=Friday, 7=Saturday"
           items:
             type: integer
             minimum: 1
@@ -158,6 +159,16 @@ components:
         lastUpdated:
           type: string
           format: date-time
+
+    ListResponse:
+      type: object
+      description: Generic list response used by all list endpoints
+      properties:
+        total:
+          type: integer
+        items:
+          type: array
+          items: {}
 
     Error:
       type: object
@@ -196,6 +207,199 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /auth/change-password:
+    post:
+      tags:
+        - Authentication
+      summary: Change password
+      description: Change the authenticated user's password
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - oldPassword
+                - newPassword
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+      responses:
+        '200':
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: Logout
+      description: Invalidate the current JWT token
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /sessions:
+    get:
+      tags:
+        - Sessions
+      summary: List all sessions
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+
+    post:
+      tags:
+        - Sessions
+      summary: Create session
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - startTime
+                - endTime
+              properties:
+                name:
+                  type: string
+                startTime:
+                  type: string
+                  format: time
+                endTime:
+                  type: string
+                  format: time
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /sessions/current:
+    get:
+      tags:
+        - Sessions
+      summary: Get current session
+      description: Returns the session that is active right now based on the current time
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /sessions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      tags:
+        - Sessions
+      summary: Get session by ID
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+    put:
+      tags:
+        - Sessions
+      summary: Update session
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                startTime:
+                  type: string
+                  format: time
+                endTime:
+                  type: string
+                  format: time
+      responses:
+        '200':
+          description: Session updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+    delete:
+      tags:
+        - Sessions
+      summary: Delete session
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Session deleted
 
   /schedule/current:
     get:
@@ -240,7 +444,7 @@ paths:
                           type: string
                           enum: [pending, current, completed]
 
-  /schedule/items:
+  /schedule:
     get:
       tags:
         - Schedule
@@ -267,11 +471,13 @@ paths:
               schema:
                 type: object
                 properties:
+                  total:
+                    type: integer
                   items:
                     type: array
                     items:
                       $ref: '#/components/schemas/ScheduleItem'
-    
+
     post:
       tags:
         - Schedule
@@ -316,7 +522,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ScheduleItem'
 
-  /schedule/items/{id}:
+  /schedule/{id}:
     parameters:
       - in: path
         name: id
@@ -324,7 +530,7 @@ paths:
         schema:
           type: string
           format: uuid
-    
+
     get:
       tags:
         - Schedule
@@ -338,7 +544,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScheduleItem'
-    
+
     put:
       tags:
         - Schedule
@@ -377,7 +583,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScheduleItem'
-    
+
     delete:
       tags:
         - Schedule
@@ -388,7 +594,7 @@ paths:
         '204':
           description: Schedule item deleted
 
-  /audio/files:
+  /audio:
     get:
       tags:
         - Audio
@@ -409,11 +615,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  files:
+                  total:
+                    type: integer
+                  items:
                     type: array
                     items:
                       $ref: '#/components/schemas/SystemAudioFile'
-    
+
     post:
       tags:
         - Audio
@@ -447,7 +655,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/SystemAudioFile'
 
-  /audio/files/{id}:
+  /audio/{id}:
     parameters:
       - in: path
         name: id
@@ -455,7 +663,7 @@ paths:
         schema:
           type: string
           format: uuid
-    
+
     get:
       tags:
         - Audio
@@ -469,7 +677,33 @@ paths:
               schema:
                 type: string
                 format: binary
-    
+
+    put:
+      tags:
+        - Audio
+      summary: Update audio metadata
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum: [bell, anthem, school_song, other]
+      responses:
+        '200':
+          description: Audio file updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemAudioFile'
+
     delete:
       tags:
         - Audio
@@ -485,27 +719,24 @@ paths:
       tags:
         - Audio
       summary: Get checksums for all system audio files
-      description: Returns a list of file IDs and their checksums for client synchronization
+      description: Returns a bare JSON array of file IDs, types, and checksums for client synchronization
       responses:
         '200':
           description: Audio file checksums
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  files:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                          format: uuid
-                        type:
-                          type: string
-                        checksum:
-                          type: string
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                    type:
+                      type: string
+                    checksum:
+                      type: string
 
   /system/state:
     get:
@@ -520,7 +751,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SystemState'
-    
+
     post:
       tags:
         - System
@@ -566,26 +797,6 @@ paths:
                   message:
                     type: string
 
-  /system/sessions:
-    get:
-      tags:
-        - System
-      summary: Get all sessions
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: List of sessions
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  sessions:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Session'
-
   /users:
     get:
       tags:
@@ -602,11 +813,13 @@ paths:
               schema:
                 type: object
                 properties:
-                  users:
+                  total:
+                    type: integer
+                  items:
                     type: array
                     items:
                       $ref: '#/components/schemas/User'
-    
+
     post:
       tags:
         - Users
@@ -636,7 +849,7 @@ paths:
         schema:
           type: string
           format: uuid
-    
+
     get:
       tags:
         - Users
@@ -651,7 +864,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-    
+
     put:
       tags:
         - Users
@@ -672,7 +885,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-    
+
     delete:
       tags:
         - Users

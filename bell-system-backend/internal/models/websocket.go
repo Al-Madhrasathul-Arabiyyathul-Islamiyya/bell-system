@@ -45,3 +45,20 @@ type SystemLogPayload struct {
 	Message string `json:"message"`
 	Source  string `json:"source"`
 }
+
+// ConnectionAcknowledgedPayload represents the payload sent after successful connection
+type ConnectionAcknowledgedPayload struct {
+	ConnectionID string `json:"connection_id"`
+	ClientType   string `json:"client_type"`
+	Message      string `json:"message"`
+}
+
+// ConnectedClientsPayload represents the payload for connected clients event
+type ConnectedClientsPayload struct {
+	Clients []ClientInfo `json:"clients"`
+}
+
+// BellCancelledPayload represents the payload for a bell cancelled event
+type BellCancelledPayload struct {
+	ScheduleItemID string `json:"scheduleItemId"`
+}

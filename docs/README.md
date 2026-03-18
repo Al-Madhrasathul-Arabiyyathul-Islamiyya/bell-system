@@ -6,7 +6,8 @@
 docs/
 ├── api/                    # API specifications
 │   ├── openapi.yml         # OpenAPI 3.0 spec (all REST endpoints)
-│   └── websocket-protocol.md  # WebSocket events and message formats
+│   ├── websocket-protocol.md  # WebSocket events and message formats
+│   └── websocket-client-guide.md  # Client integration guide for WebSocket
 ├── architecture/           # System design documents
 │   ├── system-overview.md  # Full system documentation and requirements
 │   └── implementation-plan.md  # Backend package structure and build plan

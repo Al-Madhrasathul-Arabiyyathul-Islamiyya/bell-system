@@ -2,3 +2,5 @@ bin/*
 tmp/*
 data/*
 *.exe
+coverage.out
+coverage/**

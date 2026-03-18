@@ -19,3 +19,17 @@ expiresIn = 180 # minutes
 
 [storage]
 audioDir = "./data/audio"
+
+[cors]
+allowedOrigins = ["http://localhost:3000", "http://localhost:5173"]
+maxAge = 300
+
+[websocket]
+pingInterval = 30   # seconds
+pongTimeout = 10    # seconds
+maxMessageSize = 512 # bytes
+
+[scheduler]
+checkInterval = 30  # seconds
+enabled = true
+timezone = "Indian/Maldives"  # IANA timezone for schedule comparisons

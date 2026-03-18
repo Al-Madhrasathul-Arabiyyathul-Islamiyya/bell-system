@@ -44,13 +44,13 @@ func (r *SystemAudioFileRepository) Create(ctx context.Context, audio *models.Sy
 // GetByID gets a system audio file by ID
 func (r *SystemAudioFileRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
 	query := `
-        SELECT Id, Name, FilePath, FileType, Checksum
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum
         FROM SystemAudioFiles
         WHERE Id = @p1
     `
 	var audio models.SystemAudioFile
 	err := r.DB.QueryRowContext(ctx, query, id).Scan(
-		&audio.ID, &audio.Name, &audio.FilePath, &audio.FilePath, &audio.Checksum,
+		&audio.ID, &audio.Name, &audio.FilePath, &audio.FileType, &audio.Checksum,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -74,7 +74,7 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 	}
 
 	query := fmt.Sprintf(`
-        SELECT Id, Name, FilePath, FileType, Checksum, CreatedAt, UpdatedAt
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum, CreatedAt, UpdatedAt
         FROM SystemAudioFiles
         WHERE Id IN (%s)
     `, strings.Join(idStrings, ", "))
@@ -89,6 +89,7 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 
 	for rows.Next() {
 		var sound models.SystemAudioFile
+		var updatedAt sql.NullTime
 
 		if err := rows.Scan(
 			&sound.ID,
@@ -97,9 +98,13 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 			&sound.FileType,
 			&sound.Checksum,
 			&sound.CreatedAt,
-			&sound.UpdatedAt,
+			&updatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan sound file: %w", err)
+		}
+
+		if updatedAt.Valid {
+			sound.UpdatedAt = updatedAt.Time
 		}
 
 		result[sound.ID] = &sound
@@ -115,9 +120,9 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 // List gets all system audio file
 func (r *SystemAudioFileRepository) List(ctx context.Context) ([]*models.SystemAudioFile, error) {
 	query := `
-        SELECT Id, Name, FilePath, FileType, Checksum
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum
         FROM SystemAudioFiles
-    `
+`
 	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)

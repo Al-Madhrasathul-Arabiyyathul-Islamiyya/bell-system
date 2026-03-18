@@ -1,4 +1,4 @@
-.PHONY: dev build test clean
+.PHONY: dev build test test-integration clean lint check setup-hooks
 
 # Application settings
 APP_NAME=bell-schedule-system
@@ -14,7 +14,11 @@ build:
 
 # Run tests
 test:
-	go test ./... -v
+	go test ./... -v -coverpkg=arabiyya.edu.mv/bell-system-backend/internal/...
+
+# Run integration tests (requires Docker)
+test-integration:
+	go test -tags integration -v -count=1 -timeout 300s ./tests/integration/
 
 # Clean built files
 clean:
@@ -33,3 +37,19 @@ migrate-down:
 deps:
 	go mod tidy
 	go mod vendor
+
+# Setup git hooks (repo-wide, run from any directory)
+setup-hooks:
+	git config core.hooksPath scripts/hooks
+
+# Lint: check formatting and run static analysis
+lint:
+	gofmt -l .
+	go vet ./...
+	staticcheck ./...
+
+# Full check: lint, tidy, test, and build
+check: lint
+	go mod tidy
+	go test ./... -count=1 -coverpkg=arabiyya.edu.mv/bell-system-backend/internal/...
+	go build ./cmd/server

@@ -54,7 +54,7 @@ func (r *ScheduleDayRepository) GetDaysForScheduleItems(ctx context.Context, ite
 
 	// Build query with the IDs directly in the SQL
 	query := fmt.Sprintf(`
-        SELECT ScheduleItemId, DayOfWeek
+        SELECT CONVERT(NVARCHAR(36), ScheduleItemId) AS ScheduleItemId, DayOfWeek
         FROM ScheduleDays
         WHERE ScheduleItemId IN (%s)
     `, strings.Join(idStrings, ", "))

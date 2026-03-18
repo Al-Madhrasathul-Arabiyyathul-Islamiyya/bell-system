@@ -17,6 +17,7 @@ import (
 // SessionRepository handles database operations for sessions
 type SessionRepository struct {
 	*Repository
+	NowFunc func() time.Time
 }
 
 // NewSessionRepository creates a new session repository
@@ -34,7 +35,9 @@ func (r *SessionRepository) Create(ctx context.Context, session *models.Session)
     `
 	_, err := r.DB.ExecContext(
 		ctx, query,
-		session.ID, session.Name, session.StartTime, session.EndTime,
+		session.ID, session.Name,
+		session.StartTime.Format("15:04"),
+		session.EndTime.Format("15:04"),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
@@ -45,7 +48,7 @@ func (r *SessionRepository) Create(ctx context.Context, session *models.Session)
 // GetByID gets a session by ID
 func (r *SessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Session, error) {
 	query := `
-        SELECT Id, Name, StartTime, EndTime
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
         WHERE Id = @p1
     `
@@ -75,7 +78,7 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 	}
 
 	query := fmt.Sprintf(`
-		SELECT Id, Name, StartTime, EndTime
+		SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
 		FROM Sessions
 		WHERE Id IN (%s)
 	`, strings.Join(idStrings, ", "))
@@ -113,7 +116,7 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 // List gets all sessions
 func (r *SessionRepository) List(ctx context.Context) ([]*models.Session, error) {
 	query := `
-        SELECT Id, Name, StartTime, EndTime
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
         ORDER BY StartTime
     `
@@ -141,11 +144,15 @@ func (r *SessionRepository) List(ctx context.Context) ([]*models.Session, error)
 
 // GetCurrentSession gets the session that includes the current time
 func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Session, error) {
-	now := time.Now()
+	nowFn := r.NowFunc
+	if nowFn == nil {
+		nowFn = time.Now
+	}
+	now := nowFn()
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 
 	query := `
-        SELECT Id, Name, StartTime, EndTime
+        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
         WHERE CAST(@p1 AS TIME) BETWEEN StartTime AND EndTime
     `
@@ -171,7 +178,10 @@ func (r *SessionRepository) Update(ctx context.Context, session *models.Session)
     `
 	_, err := r.DB.ExecContext(
 		ctx, query,
-		session.Name, session.StartTime, session.EndTime, session.ID,
+		session.Name,
+		session.StartTime.Format("15:04"),
+		session.EndTime.Format("15:04"),
+		session.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)

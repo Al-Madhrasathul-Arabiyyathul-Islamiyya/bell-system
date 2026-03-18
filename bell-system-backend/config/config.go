@@ -9,10 +9,13 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	JWT      JWTConfig
-	Storage  StorageConfig
+	Server    ServerConfig
+	Database  DatabaseConfig
+	JWT       JWTConfig
+	Storage   StorageConfig
+	CORS      CORSConfig
+	WebSocket WebSocketConfig
+	Scheduler SchedulerConfig
 }
 
 type ServerConfig struct {
@@ -37,8 +40,25 @@ type JWTConfig struct {
 	ExpiresIn int // in minutes
 }
 
+type CORSConfig struct {
+	AllowedOrigins []string
+	MaxAge         int // seconds
+}
+
 type StorageConfig struct {
 	AudioDir string
+}
+
+type SchedulerConfig struct {
+	CheckInterval int    // seconds, default 30
+	Enabled       bool   // default true
+	Timezone      string // IANA timezone for schedule comparisons, default "Indian/Maldives"
+}
+
+type WebSocketConfig struct {
+	PingInterval   int // seconds, default 30
+	PongTimeout    int // seconds, default 10
+	MaxMessageSize int // bytes, default 512
 }
 
 // LoadConfig loads the configuration from config.toml
