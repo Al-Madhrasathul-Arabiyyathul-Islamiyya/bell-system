@@ -28,9 +28,11 @@ jobs:
           go-version: "1.26.x"
           cache-dependency-path: bell-system-backend/go.sum
 
-      - name: Extract version
+      - name: Extract version and registry
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/backend/}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/backend/}" >> "$GITHUB_OUTPUT"
+          echo "registry=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Run tests
         run: go test ./... -count=1 -race
@@ -62,8 +64,8 @@ jobs:
           push: true
           build-args: VERSION=${{ steps.version.outputs.version }}
           tags: |
-            ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository }}/backend:latest
+            ${{ steps.version.outputs.registry }}/backend:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.registry }}/backend:latest
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -89,9 +91,11 @@ jobs:
           cache: yarn
           cache-dependency-path: admin-client/yarn.lock
 
-      - name: Extract version
+      - name: Extract version and registry
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/admin/}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/admin/}" >> "$GITHUB_OUTPUT"
+          echo "registry=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Install and build
         run: |
@@ -111,8 +115,8 @@ jobs:
           context: admin-client
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/admin:${{ steps.version.outputs.version }}
-            ghcr.io/${{ github.repository }}/admin:latest
+            ${{ steps.version.outputs.registry }}/admin:${{ steps.version.outputs.version }}
+            ${{ steps.version.outputs.registry }}/admin:latest
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -140,11 +144,17 @@ jobs:
         shell: bash
         run: echo "version=${GITHUB_REF#refs/tags/desktop/}" >> "$GITHUB_OUTPUT"
 
-      - name: Decode signing certificate
+      - name: Import signing certificate
+        id: cert
         shell: pwsh
         run: |
-          $cert = [System.Convert]::FromBase64String("${{ secrets.ARABIYYA_SIGNING_CERTIFICATE }}")
-          [System.IO.File]::WriteAllBytes("${{ github.workspace }}\signing-cert.pfx", $cert)
+          $pfxPath = "${{ github.workspace }}\signing-cert.pfx"
+          $certBytes = [System.Convert]::FromBase64String("${{ secrets.ARABIYYA_SIGNING_CERTIFICATE }}")
+          [System.IO.File]::WriteAllBytes($pfxPath, $certBytes)
+          $securePass = ConvertTo-SecureString -String "${{ secrets.ARABIYYA_SIGNING_CERTIFICATE_PASSWORD }}" -AsPlainText -Force
+          $cert = Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePass
+          Write-Host "Imported certificate: $($cert.Thumbprint)"
+          "thumbprint=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Restore dependencies
         run: dotnet restore desktop-client.slnx -p:Platform=x64
@@ -157,8 +167,7 @@ jobs:
             -p:Platform=x64 `
             -p:GenerateAppxPackageOnBuild=true `
             -p:AppxPackageSigningEnabled=true `
-            -p:PackageCertificateKeyFile="${{ github.workspace }}\signing-cert.pfx" `
-            -p:PackageCertificatePassword="${{ secrets.ARABIYYA_SIGNING_CERTIFICATE_PASSWORD }}" `
+            -p:PackageCertificateThumbprint="${{ steps.cert.outputs.thumbprint }}" `
             -p:AppxBundlePlatforms="x64" `
             -p:AppxBundle=Always
 
@@ -181,8 +190,13 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $cert = "${{ github.workspace }}\signing-cert.pfx"
-          if (Test-Path $cert) { Remove-Item $cert -Force }
+          $pfx = "${{ github.workspace }}\signing-cert.pfx"
+          if (Test-Path $pfx) { Remove-Item $pfx -Force }
+          $thumb = "${{ steps.cert.outputs.thumbprint }}"
+          if ($thumb) {
+            Get-ChildItem Cert:\CurrentUser\My\$thumb -ErrorAction SilentlyContinue |
+              Remove-Item -Force -ErrorAction SilentlyContinue
+          }
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
