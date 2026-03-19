@@ -539,6 +539,32 @@ func TestAuthHandler_ChangePassword_UpdateError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestAuthHandler_ChangePassword_UserNotFound(t *testing.T) {
+	userID := uuid.New()
+	userRepo := &mocks.MockUserRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.User, error) {
+			return nil, nil
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{}
+	tokenSvc := &mocks.MockTokenService{
+		ValidateTokenFunc: func(_ string) (*handlers.TokenClaims, error) {
+			return &handlers.TokenClaims{UserID: userID, Username: "admin", Role: models.RoleAdmin}, nil
+		},
+	}
+
+	body := `{"oldPassword":"oldpass12","newPassword":"newpass123"}`
+	req := httptest.NewRequest(http.MethodPost, "/change-password", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer valid-token")
+	rr := httptest.NewRecorder()
+
+	r := newAuthRouter(userRepo, tokenSvc, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
 func TestAuthHandler_ChangePassword_NilClaims(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}

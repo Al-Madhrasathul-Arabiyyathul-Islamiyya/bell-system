@@ -140,6 +140,61 @@ func TestAudioHandler_GetByID_StreamsFile(t *testing.T) {
 	assert.Contains(t, rr.Header().Get("Content-Disposition"), "bell.wav")
 }
 
+func TestAudioHandler_GetByID_FileOpenError(t *testing.T) {
+	fileID := uuid.New()
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{
+				ID:       fileID,
+				Name:     "bell",
+				FilePath: "/audio/" + fileID.String() + ".wav",
+				FileType: models.FileTypeBell,
+			}, nil
+		},
+	}
+
+	fs := &mocks.MockFileStorage{
+		OpenFunc: func(path string) (io.ReadCloser, error) {
+			return nil, errors.New("disk read error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_GetByID_MetadataOnly(t *testing.T) {
+	fileID := uuid.New()
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{
+				ID:       fileID,
+				Name:     "bell",
+				FilePath: "",
+				FileType: models.FileTypeBell,
+			}, nil
+		},
+	}
+
+	fs := &mocks.MockFileStorage{}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Contains(t, rr.Header().Get("Content-Type"), "application/json")
+}
+
 // --- Delete with FileStorage ---
 
 func TestAudioHandler_Delete_RemovesFile(t *testing.T) {

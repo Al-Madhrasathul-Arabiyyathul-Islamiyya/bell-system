@@ -622,6 +622,37 @@ func TestSessionHandler_Create_InvalidEndTime(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
+func TestSessionHandler_Update_UpdateTimes(t *testing.T) {
+	sessionID := uuid.New()
+
+	repo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.Session, error) {
+			return &models.Session{
+				ID:        id,
+				Name:      "Morning",
+				StartTime: time.Date(0, 1, 1, 7, 0, 0, 0, time.UTC),
+				EndTime:   time.Date(0, 1, 1, 12, 0, 0, 0, time.UTC),
+			}, nil
+		},
+		UpdateFunc: func(_ context.Context, session *models.Session) error {
+			assert.Equal(t, "Morning Updated", session.Name)
+			assert.Equal(t, 8, session.StartTime.Hour())
+			assert.Equal(t, 13, session.EndTime.Hour())
+			return nil
+		},
+	}
+
+	body := `{"name":"Morning Updated","startTime":"08:00","endTime":"13:00"}`
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+}
+
 func TestSessionHandler_Create_MissingFields(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 

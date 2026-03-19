@@ -76,6 +76,23 @@ func TestWithTx_RollbackOnPanic(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestWithTx_RollbackError(t *testing.T) {
+	repo, mock := mocks.NewMockDB(t)
+
+	mock.ExpectBegin()
+	mock.ExpectRollback().WillReturnError(errors.New("rollback failed"))
+
+	fnErr := errors.New("original error")
+	err := repo.WithTx(context.Background(), func(tx *sql.Tx) error {
+		return fnErr
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "error rolling back transaction")
+	assert.Contains(t, err.Error(), "original error")
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestWithTx_CommitError(t *testing.T) {
 	repo, mock := mocks.NewMockDB(t)
 

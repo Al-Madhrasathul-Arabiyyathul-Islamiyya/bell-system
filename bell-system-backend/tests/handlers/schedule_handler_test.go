@@ -628,6 +628,50 @@ func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 	assert.Equal(t, http.StatusCreated, rr.Code)
 }
 
+func TestScheduleHandler_Update_AllFields(t *testing.T) {
+	itemID := uuid.New()
+	newSoundID := uuid.New()
+	newSessionID := uuid.New()
+	existing := &models.ScheduleItem{
+		ID:      itemID,
+		Name:    "Old Name",
+		SoundID: uuid.New(),
+		Days:    []int{2, 3},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return existing, nil
+		},
+		UpdateFunc: func(_ context.Context, item *models.ScheduleItem) error {
+			assert.Equal(t, "New Name", item.Name)
+			assert.Equal(t, 9, item.Time.Hour())
+			assert.Equal(t, 30, item.Time.Minute())
+			assert.Equal(t, newSoundID, item.SoundID)
+			assert.Equal(t, &newSessionID, item.SessionID)
+			assert.Equal(t, []int{1, 2, 3, 4, 5}, item.Days)
+			return nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name":      "New Name",
+		"time":      "09:30",
+		"soundId":   newSoundID.String(),
+		"sessionId": newSessionID.String(),
+		"days":      []int{1, 2, 3, 4, 5},
+	})
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBuffer(body)))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+}
+
 func TestScheduleHandler_Update_InvalidUUID(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{}
 	dayRepo := &mocks.MockScheduleDayRepo{}

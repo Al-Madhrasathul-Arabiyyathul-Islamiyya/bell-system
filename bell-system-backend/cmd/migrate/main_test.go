@@ -300,6 +300,30 @@ func TestRunDownMigrations_DeleteRecordError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to record migration rollback")
 }
 
+func TestRunUpMigrations_CommitError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "001_init_up.sql"), []byte("CREATE TABLE test (id INT)"), 0644))
+
+	mock.ExpectQuery("SELECT COUNT").
+		WithArgs("001_init").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
+	mock.ExpectBegin()
+	mock.ExpectExec("CREATE TABLE test").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("INSERT INTO migrations").
+		WithArgs("001_init").
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit().WillReturnError(errors.New("commit failed"))
+
+	err = runUpMigrations(db, dir, []string{"001_init_up.sql"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to commit transaction")
+}
+
 func TestRunUpMigrations_BeginError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
@@ -317,6 +341,30 @@ func TestRunUpMigrations_BeginError(t *testing.T) {
 	err = runUpMigrations(db, dir, []string{"001_init_up.sql"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to begin transaction")
+}
+
+func TestRunDownMigrations_CommitError(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer db.Close()
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "001_init_down.sql"), []byte("DROP TABLE test"), 0644))
+
+	mock.ExpectQuery("SELECT COUNT").
+		WithArgs("001_init").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
+	mock.ExpectBegin()
+	mock.ExpectExec("DROP TABLE test").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec("DELETE FROM migrations").
+		WithArgs("001_init").
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectCommit().WillReturnError(errors.New("commit failed"))
+
+	err = runDownMigrations(db, dir, []string{"001_init_down.sql"})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to commit transaction")
 }
 
 func TestRunDownMigrations_BeginError(t *testing.T) {
