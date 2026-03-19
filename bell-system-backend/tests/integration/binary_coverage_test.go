@@ -144,18 +144,39 @@ func TestBinaryCoverage_Server(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, entries, "expected coverage data files in %s", coverDir)
 
-	// Convert to text format
+	// Convert to text format and write to the project's coverage directory
+	// so that scripts/coverage.sh can merge it into the final profile.
 	textOut := filepath.Join(tmpDir, "server.out")
 	convert := exec.Command("go", "tool", "covdata", "textfmt", "-i="+coverDir, "-o="+textOut)
 	out, err = convert.CombinedOutput()
-	if err == nil {
-		info, statErr := os.Stat(textOut)
-		if statErr == nil {
-			t.Logf("server binary coverage profile: %d bytes", info.Size())
-		}
-	} else {
+	if err != nil {
 		t.Logf("covdata convert: %s", string(out))
+		return
 	}
+
+	info, statErr := os.Stat(textOut)
+	if statErr != nil {
+		return
+	}
+	t.Logf("server binary coverage profile: %d bytes", info.Size())
+
+	// Copy profile to coverage/binary.out for merging by coverage.sh
+	destDir := filepath.Join(projectRoot, "coverage")
+	if mkErr := os.MkdirAll(destDir, 0o755); mkErr != nil {
+		t.Logf("could not create coverage dir: %v", mkErr)
+		return
+	}
+	src, readErr := os.ReadFile(textOut)
+	if readErr != nil {
+		t.Logf("could not read text profile: %v", readErr)
+		return
+	}
+	destPath := filepath.Join(destDir, "binary.out")
+	if writeErr := os.WriteFile(destPath, src, 0o644); writeErr != nil {
+		t.Logf("could not write binary.out: %v", writeErr)
+		return
+	}
+	t.Logf("binary coverage profile written to %s", destPath)
 }
 
 // findFreePort returns an available TCP port.
