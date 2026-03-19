@@ -158,6 +158,40 @@ func TestWSHandler_ClientConnection(t *testing.T) {
 	assert.Equal(t, "connection_acknowledged", msg.Type)
 }
 
+func TestWSHandler_AcceptFailure(t *testing.T) {
+	log, err := logger.New("test")
+	require.NoError(t, err)
+
+	cfg := config.WebSocketConfig{
+		PingInterval:   30,
+		PongTimeout:    10,
+		MaxMessageSize: 512,
+	}
+
+	hub := ws.NewHub(log)
+	done := make(chan struct{})
+	go hub.Run(done)
+	t.Cleanup(func() {
+		close(done)
+		<-hub.Done()
+	})
+
+	handler := ws.NewHandler(hub, validTokenService(), log, cfg)
+
+	// Use httptest.NewRecorder which doesn't support WebSocket upgrade → Accept fails
+	req := httptest.NewRequest(http.MethodGet, "/?token=valid&client_type=admin", nil)
+	rr := httptest.NewRecorder()
+
+	// Should not panic even though Accept fails
+	assert.NotPanics(t, func() {
+		handler.ServeHTTP(rr, req)
+	})
+
+	// No client should be registered
+	time.Sleep(50 * time.Millisecond)
+	assert.Equal(t, 0, hub.ClientCount())
+}
+
 func TestWSHandler_XRealIPHeader(t *testing.T) {
 	log, err := logger.New("test")
 	require.NoError(t, err)

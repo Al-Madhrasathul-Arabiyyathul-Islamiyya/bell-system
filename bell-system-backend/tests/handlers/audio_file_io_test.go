@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -206,6 +207,22 @@ func TestAudioHandler_ListChecksums_Success(t *testing.T) {
 	assert.Len(t, resp, 2)
 	assert.Equal(t, "aaa", resp[0].Checksum)
 	assert.Equal(t, "bbb", resp[1].Checksum)
+}
+
+func TestAudioHandler_ListChecksums_DBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
+			return nil, errors.New("database error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/checksums", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
 func TestAudioHandler_ListChecksums_Empty(t *testing.T) {

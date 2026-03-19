@@ -539,6 +539,23 @@ func TestAuthHandler_ChangePassword_UpdateError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestAuthHandler_ChangePassword_NilClaims(t *testing.T) {
+	userRepo := &mocks.MockUserRepo{}
+	hasher := &mocks.MockPasswordHasher{}
+	tokenSvc := &mocks.MockTokenService{}
+
+	// Call ChangePassword directly without auth middleware — no claims in context
+	h := handlers.NewAuthHandler(userRepo, tokenSvc, hasher)
+	body := `{"oldPassword":"old","newPassword":"newpass123"}`
+	req := httptest.NewRequest(http.MethodPost, "/change-password", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	h.ChangePassword(rr, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+}
+
 func TestAuthHandler_Logout_Success(t *testing.T) {
 	userID := uuid.New()
 	userRepo := &mocks.MockUserRepo{}
