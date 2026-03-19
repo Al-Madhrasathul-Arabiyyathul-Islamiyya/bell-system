@@ -79,6 +79,23 @@ func TestLoadConfig_MissingFile_ReturnsError(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to read config file")
 }
 
+func TestLoadConfig_InvalidTOML(t *testing.T) {
+	dir := t.TempDir()
+	content := `[server
+	this is not valid toml!!!
+`
+	err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	origDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	cfg, err := config.LoadConfig()
+	assert.Error(t, err)
+	assert.Nil(t, cfg)
+}
+
 func TestLoadConfig_PartialConfig_DefaultsToZeroValues(t *testing.T) {
 	dir := t.TempDir()
 	content := `

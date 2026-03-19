@@ -114,6 +114,24 @@ func TestTokenService_ValidateToken_InvalidSigningMethod(t *testing.T) {
 	assert.Nil(t, claims)
 }
 
+func TestTokenService_ValidateToken_MissingSubject(t *testing.T) {
+	secret := "test-secret"
+
+	// Craft a token without a "sub" claim
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"username": "admin",
+		"role":     "admin",
+		"exp":      time.Now().Add(time.Hour).Unix(),
+	})
+	tokenStr, err := token.SignedString([]byte(secret))
+	require.NoError(t, err)
+
+	svc := services.NewTokenService(secret, 60)
+	claims, err := svc.ValidateToken(tokenStr)
+	require.Error(t, err)
+	assert.Nil(t, claims)
+}
+
 func TestTokenService_ValidateToken_NonUUIDSubject(t *testing.T) {
 	secret := "test-secret"
 

@@ -147,6 +147,47 @@ func TestHub_ConnectedClients_BroadcastOnRegister(t *testing.T) {
 	assert.Equal(t, "connected_clients", msg.Type)
 }
 
+func TestHub_Broadcast_MarshalError(t *testing.T) {
+	hub, _ := startHub(t)
+
+	client := ws.NewTestClient(hub, "client", "Display")
+	hub.RegisterClient(client)
+	time.Sleep(50 * time.Millisecond)
+	client.DrainSend()
+
+	// Payload with an unmarshalable type triggers json.Marshal error
+	msg := models.WebSocketMessage{
+		Type:      "test",
+		Timestamp: time.Now().UTC(),
+		Payload:   make(chan int), // channels cannot be marshaled
+	}
+	hub.Broadcast(msg)
+	time.Sleep(50 * time.Millisecond)
+
+	data := client.ReadSend()
+	assert.Nil(t, data, "message should not be delivered when marshal fails")
+}
+
+func TestHub_BroadcastToAdmins_MarshalError(t *testing.T) {
+	hub, _ := startHub(t)
+
+	admin := ws.NewTestClient(hub, "admin", "Admin")
+	hub.RegisterClient(admin)
+	time.Sleep(50 * time.Millisecond)
+	admin.DrainSend()
+
+	msg := models.WebSocketMessage{
+		Type:      "test",
+		Timestamp: time.Now().UTC(),
+		Payload:   make(chan int),
+	}
+	hub.BroadcastToAdmins(msg)
+	time.Sleep(50 * time.Millisecond)
+
+	data := admin.ReadSend()
+	assert.Nil(t, data, "message should not be delivered when marshal fails")
+}
+
 func TestHub_GracefulShutdown(t *testing.T) {
 	log := newTestLogger(t)
 	hub := ws.NewHub(log)

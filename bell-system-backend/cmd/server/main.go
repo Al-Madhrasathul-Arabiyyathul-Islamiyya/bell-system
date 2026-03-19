@@ -25,28 +25,36 @@ import (
 	"github.com/go-chi/cors"
 )
 
+// Version is set at build time via -ldflags "-X main.Version=v1.2.3".
+var Version = "dev"
+
 func main() {
+	if err := run(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context) error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		fmt.Printf("Failed to load configuration: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
 	log, err := logger.New(cfg.Server.Environment)
 	if err != nil {
-		fmt.Printf("Failed to create logger: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to create logger: %w", err)
 	}
 	defer log.Close()
 
 	clk, err := clock.New(cfg.Scheduler.Timezone)
 	if err != nil {
-		log.Fatal("Failed to load timezone", err)
+		return fmt.Errorf("failed to load timezone: %w", err)
 	}
 
 	db, err := database.New(cfg.Database)
 	if err != nil {
-		log.Fatal("Failed to connect to database", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer db.Close()
 
@@ -63,7 +71,7 @@ func main() {
 	hasher := services.NewPasswordHasher()
 	fileStore, err := services.NewLocalFileStorage(cfg.Storage.AudioDir)
 	if err != nil {
-		log.Fatal("Failed to initialize file storage", err)
+		return fmt.Errorf("failed to initialize file storage: %w", err)
 	}
 
 	// WebSocket
@@ -115,7 +123,7 @@ func main() {
 
 	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+		fmt.Fprintf(w, `{"status":"ok","version":%q}`, Version)
 	})
 
 	// WebSocket endpoint — mounted before timeout middleware so long-lived connections aren't killed
@@ -133,12 +141,15 @@ func main() {
 		ReadTimeout: time.Duration(cfg.Server.ReadTimeout) * time.Second,
 	}
 
-	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+	serverCtx, serverStopCtx := context.WithCancel(ctx)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
-		<-sig
+		select {
+		case <-sig:
+		case <-ctx.Done():
+		}
 
 		// Shut down scheduler first, then WebSocket hub
 		if cfg.Scheduler.Enabled {
@@ -168,9 +179,10 @@ func main() {
 	log.Info(fmt.Sprintf("Starting server on port %d", cfg.Server.Port))
 	err = server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		log.Fatal("Server error", err)
+		return fmt.Errorf("server error: %w", err)
 	}
 
 	<-serverCtx.Done()
 	log.Info("Server stopped")
+	return nil
 }
