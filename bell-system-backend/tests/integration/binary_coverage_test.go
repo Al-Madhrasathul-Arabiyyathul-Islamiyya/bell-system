@@ -59,7 +59,7 @@ maxMessageSize = 512
 
 [scheduler]
 checkInterval = 60
-enabled = false
+enabled = true
 timezone = "UTC"
 `, port, testDBHost, testDBPort, saPassword, testDBName, testJWTSecret, audioDir)
 
