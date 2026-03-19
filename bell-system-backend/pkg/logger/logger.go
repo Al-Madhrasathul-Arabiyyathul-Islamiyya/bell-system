@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"os"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -10,6 +11,7 @@ import (
 // Logger is a wrapper around zap.Logger
 type Logger struct {
 	*zap.Logger
+	exitFunc func(int) // injectable for testing Fatal; defaults to os.Exit
 }
 
 // New creates a new logger
@@ -31,7 +33,7 @@ func New(environment string) (*Logger, error) {
 		return nil, fmt.Errorf("failed to build logger: %w", err)
 	}
 
-	return &Logger{logger}, nil
+	return &Logger{Logger: logger, exitFunc: os.Exit}, nil
 }
 
 // Info logs an info message
@@ -45,10 +47,18 @@ func (l *Logger) Error(msg string, err error, fields ...zap.Field) {
 	l.Logger.Error(msg, fields...)
 }
 
-// Fatal logs a fatal message and then exits
+// SetExitFunc overrides the function called by Fatal (default: os.Exit).
+// Intended for testing.
+func (l *Logger) SetExitFunc(f func(int)) {
+	l.exitFunc = f
+}
+
+// Fatal logs the message at error level and terminates the process.
+// The exit function is injectable for testing (defaults to os.Exit).
 func (l *Logger) Fatal(msg string, err error, fields ...zap.Field) {
 	fields = append(fields, zap.Error(err))
-	l.Logger.Fatal(msg, fields...)
+	l.Logger.Error(msg, fields...)
+	l.exitFunc(1)
 }
 
 // Close flushes any buffered log entries
