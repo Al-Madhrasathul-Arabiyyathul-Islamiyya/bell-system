@@ -25,6 +25,34 @@ if ! command -v go &>/dev/null; then
 fi
 echo "Using $(go version)"
 
+# Verify Docker is running (required for integration tests via testcontainers)
+if ! docker info &>/dev/null; then
+  echo ""
+  echo "Docker is not running. Attempting to start Docker Desktop..."
+  # Try to launch Docker Desktop from the Windows side
+  DOCKER_DESKTOP="/mnt/c/Program Files/Docker/Docker/Docker Desktop.exe"
+  if [[ -x "$DOCKER_DESKTOP" ]]; then
+    "$DOCKER_DESKTOP" &>/dev/null &
+    echo "Waiting for Docker to become ready (up to 60s)..."
+    for i in $(seq 1 60); do
+      if docker info &>/dev/null; then
+        echo "Docker is ready."
+        break
+      fi
+      if (( i == 60 )); then
+        echo "ERROR: Docker did not become ready within 60s." >&2
+        echo "       Start Docker Desktop manually, then re-run this script." >&2
+        exit 1
+      fi
+      sleep 1
+    done
+  else
+    echo "ERROR: Docker is not running and Docker Desktop was not found." >&2
+    echo "       Start Docker manually, then re-run this script." >&2
+    exit 1
+  fi
+fi
+
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$PROJECT_DIR"
 

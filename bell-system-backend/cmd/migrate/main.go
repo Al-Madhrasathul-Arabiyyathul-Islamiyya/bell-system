@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -16,40 +17,45 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run() error {
 	down := flag.Bool("down", false, "Run down migrations")
 	flag.Parse()
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	db, err := database.New(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer db.Close()
 
 	if err := ensureMigrationsTable(db.DB); err != nil {
-		log.Fatalf("Failed to create migrations table: %v", err)
+		return fmt.Errorf("failed to create migrations table: %w", err)
 	}
 
 	migrationsDir := "migrations"
 	files, err := getMigrationFiles(migrationsDir, *down)
 	if err != nil {
-		log.Fatalf("Failed to get migration files: %v", err)
+		return fmt.Errorf("failed to get migration files: %w", err)
 	}
 
 	if len(files) == 0 {
 		log.Println("No migrations to run")
-		return
+		return nil
 	}
 
 	if *down {
-		runDownMigrations(db.DB, migrationsDir, files)
-	} else {
-		runUpMigrations(db.DB, migrationsDir, files)
+		return runDownMigrations(db.DB, migrationsDir, files)
 	}
+	return runUpMigrations(db.DB, migrationsDir, files)
 }
 
 func ensureMigrationsTable(db *sql.DB) error {
@@ -97,13 +103,13 @@ func getMigrationFiles(dir string, down bool) ([]string, error) {
 	return files, nil
 }
 
-func runUpMigrations(db *sql.DB, dir string, files []string) {
+func runUpMigrations(db *sql.DB, dir string, files []string) error {
 	for _, file := range files {
 		baseName := strings.TrimSuffix(file, "_up.sql")
 		var count int
 		err := db.QueryRow("SELECT COUNT(*) FROM migrations WHERE name = @p1", baseName).Scan(&count)
 		if err != nil {
-			log.Fatalf("Failed to check migration status: %v", err)
+			return fmt.Errorf("failed to check migration status for %s: %w", baseName, err)
 		}
 
 		if count > 0 {
@@ -115,41 +121,42 @@ func runUpMigrations(db *sql.DB, dir string, files []string) {
 		filePath := filepath.Join(dir, file)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			log.Fatalf("Failed to read migration file: %v", err)
+			return fmt.Errorf("failed to read migration file %s: %w", file, err)
 		}
 
 		tx, err := db.Begin()
 		if err != nil {
-			log.Fatalf("Failed to begin transaction: %v", err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
 		}
 
 		_, err = tx.Exec(string(content))
 		if err != nil {
 			tx.Rollback()
-			log.Fatalf("Failed to execute migration: %v", err)
+			return fmt.Errorf("failed to execute migration %s: %w", baseName, err)
 		}
 
 		_, err = tx.Exec("INSERT INTO migrations (name) VALUES (@p1)", baseName)
 		if err != nil {
 			tx.Rollback()
-			log.Fatalf("Failed to record migration: %v", err)
+			return fmt.Errorf("failed to record migration %s: %w", baseName, err)
 		}
 
 		if err := tx.Commit(); err != nil {
-			log.Fatalf("Failed to commit transaction: %v", err)
+			return fmt.Errorf("failed to commit transaction for %s: %w", baseName, err)
 		}
 
 		log.Printf("Successfully applied migration: %s", baseName)
 	}
+	return nil
 }
 
-func runDownMigrations(db *sql.DB, dir string, files []string) {
+func runDownMigrations(db *sql.DB, dir string, files []string) error {
 	for _, file := range files {
 		baseName := strings.TrimSuffix(file, "_down.sql")
 		var count int
 		err := db.QueryRow("SELECT COUNT(*) FROM migrations WHERE name = @p1", baseName).Scan(&count)
 		if err != nil {
-			log.Fatalf("Failed to check migration status: %v", err)
+			return fmt.Errorf("failed to check migration status for %s: %w", baseName, err)
 		}
 
 		if count == 0 {
@@ -161,30 +168,31 @@ func runDownMigrations(db *sql.DB, dir string, files []string) {
 		filePath := filepath.Join(dir, file)
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			log.Fatalf("Failed to read migration file: %v", err)
+			return fmt.Errorf("failed to read migration file %s: %w", file, err)
 		}
 
 		tx, err := db.Begin()
 		if err != nil {
-			log.Fatalf("Failed to begin transaction: %v", err)
+			return fmt.Errorf("failed to begin transaction: %w", err)
 		}
 
 		_, err = tx.Exec(string(content))
 		if err != nil {
 			tx.Rollback()
-			log.Fatalf("Failed to execute migration: %v", err)
+			return fmt.Errorf("failed to execute migration %s: %w", baseName, err)
 		}
 
 		_, err = tx.Exec("DELETE FROM migrations WHERE name = @p1", baseName)
 		if err != nil {
 			tx.Rollback()
-			log.Fatalf("Failed to record migration rollback: %v", err)
+			return fmt.Errorf("failed to record migration rollback %s: %w", baseName, err)
 		}
 
 		if err := tx.Commit(); err != nil {
-			log.Fatalf("Failed to commit transaction: %v", err)
+			return fmt.Errorf("failed to commit transaction for %s: %w", baseName, err)
 		}
 
 		log.Printf("Successfully reverted migration: %s", baseName)
 	}
+	return nil
 }
