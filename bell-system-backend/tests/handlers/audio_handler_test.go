@@ -555,6 +555,78 @@ func TestAudioHandler_Delete_GetByIDDBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+// --- Notifier coverage ---
+
+func TestAudioHandler_Upload_NotifiesOnSuccess(t *testing.T) {
+	notifier := &mocks.MockEventNotifier{}
+	repo := &mocks.MockSystemAudioFileRepo{
+		CreateFunc: func(_ context.Context, _ *models.SystemAudioFile) error { return nil },
+	}
+
+	h := handlers.NewAudioHandler(repo, notifier)
+	r := router.AudioRoutes(h, testutil.PermissiveTokenService)
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("name", "test-bell")
+	_ = writer.WriteField("type", "bell")
+	part, _ := writer.CreateFormFile("file", "bell.wav")
+	_, _ = part.Write([]byte("fake audio data"))
+	writer.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/", &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, authAudioReq(req))
+
+	require.Equal(t, http.StatusCreated, rr.Code)
+	assert.True(t, notifier.AudioFilesUpdatedCalled)
+}
+
+func TestAudioHandler_Update_NotifiesOnSuccess(t *testing.T) {
+	fileID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{ID: fileID, Name: "old", FileType: models.FileTypeBell}, nil
+		},
+		UpdateFunc: func(_ context.Context, _ *models.SystemAudioFile) error { return nil },
+	}
+
+	h := handlers.NewAudioHandler(repo, notifier)
+	r := router.AudioRoutes(h, testutil.PermissiveTokenService)
+
+	body := `{"name":"updated"}`
+	req := httptest.NewRequest(http.MethodPut, "/"+fileID.String(), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, authAudioReq(req))
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.True(t, notifier.AudioFilesUpdatedCalled)
+}
+
+func TestAudioHandler_Delete_NotifiesOnSuccess(t *testing.T) {
+	fileID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{ID: id}, nil
+		},
+		DeleteFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+	}
+
+	h := handlers.NewAudioHandler(repo, notifier)
+	r := router.AudioRoutes(h, testutil.PermissiveTokenService)
+
+	req := authAudioReq(httptest.NewRequest(http.MethodDelete, "/"+fileID.String(), nil))
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNoContent, rr.Code)
+	assert.True(t, notifier.AudioFilesUpdatedCalled)
+}
+
 // --- File type validation ---
 
 func TestAudioHandler_FileTypes_AllValid(t *testing.T) {
