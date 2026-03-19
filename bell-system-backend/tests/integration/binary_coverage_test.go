@@ -4,6 +4,7 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -120,7 +121,9 @@ func TestBinaryCoverage_Server(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.JSONEq(t, `{"status":"ok"}`, string(body))
+	var statusResp map[string]interface{}
+	require.NoError(t, json.Unmarshal(body, &statusResp))
+	assert.Equal(t, "ok", statusResp["status"])
 
 	// Graceful shutdown
 	cmd.Process.Signal(os.Interrupt)

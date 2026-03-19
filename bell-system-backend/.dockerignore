@@ -1,2 +1,7 @@
-
-
+bin/
+coverage/
+tests/
+*.exe
+*.out
+*.test
+.git
