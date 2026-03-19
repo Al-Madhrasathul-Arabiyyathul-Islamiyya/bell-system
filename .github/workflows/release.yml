@@ -38,7 +38,8 @@ jobs:
       - name: Build Linux binary
         run: |
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-            go build -ldflags="-s -w" -o bell-system-server ./cmd/server
+            go build -ldflags="-s -w -X main.Version=${{ steps.version.outputs.version }}" \
+            -o bell-system-server ./cmd/server
           CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
             go build -ldflags="-s -w" -o bell-system-migrate ./cmd/migrate
           tar czf bell-system-backend-linux-amd64.tar.gz \
@@ -59,6 +60,7 @@ jobs:
         with:
           context: bell-system-backend
           push: true
+          build-args: VERSION=${{ steps.version.outputs.version }}
           tags: |
             ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
             ghcr.io/${{ github.repository }}/backend:latest

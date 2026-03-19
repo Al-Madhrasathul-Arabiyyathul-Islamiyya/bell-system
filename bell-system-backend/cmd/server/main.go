@@ -25,6 +25,9 @@ import (
 	"github.com/go-chi/cors"
 )
 
+// Version is set at build time via -ldflags "-X main.Version=v1.2.3".
+var Version = "dev"
+
 func main() {
 	if err := run(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -120,7 +123,7 @@ func run(ctx context.Context) error {
 
 	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+		fmt.Fprintf(w, `{"status":"ok","version":%q}`, Version)
 	})
 
 	// WebSocket endpoint — mounted before timeout middleware so long-lived connections aren't killed

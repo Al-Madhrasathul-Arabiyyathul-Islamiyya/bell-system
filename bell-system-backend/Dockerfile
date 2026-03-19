@@ -1,6 +1,8 @@
 # Build stage
 FROM golang:1.26-alpine AS builder
 
+ARG VERSION=dev
+
 RUN apk add --no-cache git
 
 WORKDIR /src
@@ -9,7 +11,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /bin/bell-system-server ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X main.Version=${VERSION}" -o /bin/bell-system-server ./cmd/server
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /bin/bell-system-migrate ./cmd/migrate
 
 # Runtime stage
