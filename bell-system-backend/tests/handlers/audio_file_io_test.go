@@ -140,6 +140,38 @@ func TestAudioHandler_GetByID_StreamsFile(t *testing.T) {
 	assert.Contains(t, rr.Header().Get("Content-Disposition"), "bell.wav")
 }
 
+func TestAudioHandler_GetByID_UnknownExtension_FallsBackToOctetStream(t *testing.T) {
+	fileID := uuid.New()
+	fileContent := "binary data"
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{
+				ID:       fileID,
+				Name:     "custom",
+				FilePath: "/audio/" + fileID.String() + ".bellsound",
+				FileType: models.FileTypeOther,
+			}, nil
+		},
+	}
+
+	fs := &mocks.MockFileStorage{
+		OpenFunc: func(path string) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader(fileContent)), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/octet-stream", rr.Header().Get("Content-Type"))
+	assert.Equal(t, fileContent, rr.Body.String())
+}
+
 func TestAudioHandler_GetByID_FileOpenError(t *testing.T) {
 	fileID := uuid.New()
 

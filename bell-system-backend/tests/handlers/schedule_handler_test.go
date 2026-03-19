@@ -601,6 +601,7 @@ func TestScheduleHandler_Create_DBError(t *testing.T) {
 
 func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 	soundID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
 	itemRepo := &mocks.MockScheduleItemRepo{
 		CreateFunc: func(_ context.Context, _ *models.ScheduleItem) error {
 			return nil
@@ -609,7 +610,9 @@ func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 			return nil, errors.New("fetch failed")
 		},
 	}
-	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	h := handlers.NewScheduleHandler(itemRepo, nil, nil, notifier)
+	r := router.ScheduleRoutes(h, testutil.PermissiveTokenService)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"name":    "Bell",
@@ -620,12 +623,11 @@ func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-
-	r := newScheduleRouter(itemRepo, dayRepo)
 	r.ServeHTTP(rr, req)
 
 	// Should still return 201 with the original item when GetByID fails
 	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.True(t, notifier.SchedulesUpdatedCalled)
 }
 
 func TestScheduleHandler_Update_AllFields(t *testing.T) {
@@ -849,6 +851,77 @@ func TestScheduleHandler_Delete_DBError(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+// --- Notifier coverage ---
+
+func TestScheduleHandler_Create_NotifiesOnSuccess(t *testing.T) {
+	soundID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		CreateFunc: func(_ context.Context, _ *models.ScheduleItem) error { return nil },
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: id, Name: "Bell", SoundID: soundID, Days: []int{2}}, nil
+		},
+	}
+	h := handlers.NewScheduleHandler(itemRepo, nil, nil, notifier)
+	r := router.ScheduleRoutes(h, testutil.PermissiveTokenService)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"name": "Bell", "time": "08:00", "soundId": soundID.String(), "days": []int{2},
+	})
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusCreated, rr.Code)
+	assert.True(t, notifier.SchedulesUpdatedCalled)
+}
+
+func TestScheduleHandler_Update_NotifiesOnSuccess(t *testing.T) {
+	itemID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: itemID, Name: "Old", SoundID: uuid.New(), Days: []int{2}}, nil
+		},
+		UpdateFunc: func(_ context.Context, _ *models.ScheduleItem) error { return nil },
+	}
+	h := handlers.NewScheduleHandler(itemRepo, nil, nil, notifier)
+	r := router.ScheduleRoutes(h, testutil.PermissiveTokenService)
+
+	body := `{"name":"New"}`
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.True(t, notifier.SchedulesUpdatedCalled)
+}
+
+func TestScheduleHandler_Delete_NotifiesOnSuccess(t *testing.T) {
+	itemID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: id}, nil
+		},
+		DeleteFunc: func(_ context.Context, _ uuid.UUID) error { return nil },
+	}
+	h := handlers.NewScheduleHandler(itemRepo, nil, nil, notifier)
+	r := router.ScheduleRoutes(h, testutil.PermissiveTokenService)
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodDelete, "/"+itemID.String(), nil))
+	rr := httptest.NewRecorder()
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNoContent, rr.Code)
+	assert.True(t, notifier.SchedulesUpdatedCalled)
 }
 
 func TestScheduleHandler_DaysValidation_EmptyDays(t *testing.T) {

@@ -229,6 +229,53 @@ func TestLoadAndSchedule_SkipsPastBells(t *testing.T) {
 	}
 }
 
+func TestLoadAndSchedule_TimerFiresAndCallsFireBell(t *testing.T) {
+	// Schedule a bell ~1s in the future so the AfterFunc closure fires,
+	// covering the inline func() { s.fireBell(st) } at scheduler.go:187-189.
+	// loadAndSchedule uses time.Date(now.Y, now.M, now.D, item.H, item.M, item.S, 0, ...)
+	// so the minimum granularity is 1 second.
+	now := time.Now()
+	bellTime := now.Add(1 * time.Second)
+
+	session := &models.Session{ID: uuid.New(), Name: "Morning"}
+	bellID := uuid.New()
+	soundID := uuid.New()
+	items := []*models.ScheduleItem{
+		{
+			ID:      bellID,
+			Name:    "Imminent Bell",
+			Time:    time.Date(0, 1, 1, bellTime.Hour(), bellTime.Minute(), bellTime.Second(), 0, time.UTC),
+			SoundID: soundID,
+		},
+	}
+
+	notifier := &mockNotifier{}
+	stateRepo := &mockStateRepo{state: "active"}
+	s := New(
+		&mockSessionRepo{session: session},
+		&mockItemRepo{items: items},
+		stateRepo,
+		notifier,
+		testLogger(),
+		30,
+	)
+	s.nowFunc = func() time.Time { return now }
+
+	s.loadAndSchedule()
+
+	// Wait for the timer to fire (up to 3s to be safe)
+	require.Eventually(t, func() bool {
+		notifier.mu.Lock()
+		defer notifier.mu.Unlock()
+		return len(notifier.bellTriggeredArgs) > 0
+	}, 3*time.Second, 50*time.Millisecond, "timer should have fired")
+
+	notifier.mu.Lock()
+	defer notifier.mu.Unlock()
+	assert.Equal(t, bellID.String(), notifier.bellTriggeredArgs[0].ScheduleItemID)
+	assert.Equal(t, soundID.String(), notifier.bellTriggeredArgs[0].SoundID)
+}
+
 func TestFireBell_NotifiesClients(t *testing.T) {
 	notifier := &mockNotifier{}
 	stateRepo := &mockStateRepo{state: "active"}

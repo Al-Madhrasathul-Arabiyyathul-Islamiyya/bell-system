@@ -85,6 +85,12 @@ head -1 "$COVER_DIR/unit.out" > "$COVER_DIR/merged.out"
 tail -n +2 "$COVER_DIR/unit.out" >> "$COVER_DIR/merged.out"
 tail -n +2 "$COVER_DIR/integration.out" >> "$COVER_DIR/merged.out"
 
+# Merge binary coverage if TestBinaryCoverage_Server produced it
+if [[ -f "$COVER_DIR/binary.out" ]]; then
+  tail -n +2 "$COVER_DIR/binary.out" >> "$COVER_DIR/merged.out"
+  echo "(binary coverage profile merged)"
+fi
+
 echo ""
 echo "--- Unit only ---"
 go tool cover -func="$COVER_DIR/unit.out" | tail -1
@@ -93,8 +99,14 @@ echo ""
 echo "--- Integration only ---"
 go tool cover -func="$COVER_DIR/integration.out" | tail -1
 
+if [[ -f "$COVER_DIR/binary.out" ]]; then
+  echo ""
+  echo "--- Binary only ---"
+  go tool cover -func="$COVER_DIR/binary.out" | tail -1
+fi
+
 echo ""
-echo "--- Merged (unit + integration) ---"
+echo "--- Merged (unit + integration + binary) ---"
 go tool cover -func="$COVER_DIR/merged.out" | tail -1
 
 echo ""
