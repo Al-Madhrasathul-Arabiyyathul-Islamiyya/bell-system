@@ -1,100 +1,190 @@
 name: Release
 
 on:
-  pull_request:
-    branches: [master]
+  push:
+    tags:
+      - "backend/v*"
+      - "admin/v*"
+      - "desktop/v*"
 
-defaults:
-  run:
-    working-directory: bell-system-backend
+permissions:
+  contents: write
+  packages: write
 
 jobs:
-  lint:
-    name: Lint
+  # ── Backend Release ──────────────────────────────────────────────
+  backend:
+    name: Backend Release
+    if: startsWith(github.ref, 'refs/tags/backend/v')
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bell-system-backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: "1.26.x"
+          cache-dependency-path: bell-system-backend/go.sum
 
-      - name: Check formatting
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/backend/}" >> "$GITHUB_OUTPUT"
+
+      - name: Run tests
+        run: go test ./... -count=1 -race
+
+      - name: Build Linux binary
         run: |
-          UNFORMATTED=$(gofmt -l .)
-          if [ -n "$UNFORMATTED" ]; then
-            echo "Files need formatting:"
-            echo "$UNFORMATTED"
-            exit 1
-          fi
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -ldflags="-s -w" -o bell-system-server ./cmd/server
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+            go build -ldflags="-s -w" -o bell-system-migrate ./cmd/migrate
+          tar czf bell-system-backend-linux-amd64.tar.gz \
+            bell-system-server bell-system-migrate
 
-      - name: Run go vet
-        run: go vet ./...
+      - name: Copy CA cert into Docker context
+        run: cp ../adcs-ca.pem .
 
-      - name: Check go.mod tidiness
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: bell-system-backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}/backend:latest
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Backend ${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          files: bell-system-backend/bell-system-backend-linux-amd64.tar.gz
+
+  # ── Admin Client Release ─────────────────────────────────────────
+  admin:
+    name: Admin Client Release
+    if: startsWith(github.ref, 'refs/tags/admin/v')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-client
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: admin-client/yarn.lock
+
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/admin/}" >> "$GITHUB_OUTPUT"
+
+      - name: Install and build
         run: |
-          cp go.mod go.mod.bak
-          cp go.sum go.sum.bak
-          go mod tidy
-          if ! diff -q go.mod go.mod.bak > /dev/null || ! diff -q go.sum go.sum.bak > /dev/null; then
-            echo "go.mod or go.sum is not tidy"
-            exit 1
-          fi
+          yarn install --frozen-lockfile
+          yarn build
 
-  test-with-coverage:
-    name: Test with Coverage
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          go-version: "1.26.x"
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run tests with coverage
-        run: go test ./... -v -count=1 -race -coverpkg=arabiyya.edu.mv/bell-system-backend/internal/... -coverprofile=coverage.out
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: admin-client
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/admin:${{ steps.version.outputs.version }}
+            ghcr.io/${{ github.repository }}/admin:latest
 
-      - name: Check coverage threshold
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Admin Client ${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+
+  # ── Desktop Client Release ───────────────────────────────────────
+  desktop:
+    name: Desktop Client Release
+    if: startsWith(github.ref, 'refs/tags/desktop/v')
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop-client
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF#refs/tags/desktop/}" >> "$GITHUB_OUTPUT"
+
+      - name: Decode signing certificate
+        shell: pwsh
         run: |
-          TOTAL=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
-          echo "Total coverage: ${TOTAL}%"
-          if [ "$(echo "$TOTAL < 60" | bc -l)" -eq 1 ]; then
-            echo "Coverage ${TOTAL}% is below 60% threshold"
+          $cert = [System.Convert]::FromBase64String("${{ secrets.ARABIYYA_SIGNING_CERTIFICATE }}")
+          [System.IO.File]::WriteAllBytes("${{ github.workspace }}\signing-cert.pfx", $cert)
+
+      - name: Restore dependencies
+        run: dotnet restore desktop-client.slnx -p:Platform=x64
+
+      - name: Build and package MSIX
+        shell: pwsh
+        run: |
+          dotnet publish ClientApp/ClientApp.csproj `
+            -c Release `
+            -p:Platform=x64 `
+            -p:GenerateAppxPackageOnBuild=true `
+            -p:AppxPackageSigningEnabled=true `
+            -p:PackageCertificateKeyFile="${{ github.workspace }}\signing-cert.pfx" `
+            -p:PackageCertificatePassword="${{ secrets.ARABIYYA_SIGNING_CERTIFICATE_PASSWORD }}" `
+            -p:AppxBundlePlatforms="x64" `
+            -p:AppxBundle=Always
+
+      - name: Find MSIX bundle
+        id: msix
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem -Recurse -Filter "*.msixbundle" | Select-Object -First 1
+          if (-not $msix) {
+            $msix = Get-ChildItem -Recurse -Filter "*.msix" | Select-Object -First 1
+          }
+          if (-not $msix) {
+            Write-Error "No MSIX or MSIX bundle found"
             exit 1
-          fi
+          }
+          Write-Host "Found: $($msix.FullName)"
+          "path=$($msix.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Upload coverage artifact
-        uses: actions/upload-artifact@v4
+      - name: Clean up certificate
+        if: always()
+        shell: pwsh
+        run: |
+          $cert = "${{ github.workspace }}\signing-cert.pfx"
+          if (Test-Path $cert) { Remove-Item $cert -Force }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: coverage
-          path: bell-system-backend/coverage.out
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.x"
-
-      - name: Build server
-        run: go build -o bell-schedule-system ./cmd/server
-
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.26.x"
-
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-
-      - name: Run govulncheck
-        run: govulncheck ./...
+          name: "Desktop Client ${{ steps.version.outputs.version }}"
+          generate_release_notes: true
+          files: ${{ steps.msix.outputs.path }}
