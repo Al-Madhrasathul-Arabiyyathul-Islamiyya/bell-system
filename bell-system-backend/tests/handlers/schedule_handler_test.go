@@ -601,6 +601,7 @@ func TestScheduleHandler_Create_DBError(t *testing.T) {
 
 func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 	soundID := uuid.New()
+	notifier := &mocks.MockEventNotifier{}
 	itemRepo := &mocks.MockScheduleItemRepo{
 		CreateFunc: func(_ context.Context, _ *models.ScheduleItem) error {
 			return nil
@@ -609,7 +610,9 @@ func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 			return nil, errors.New("fetch failed")
 		},
 	}
-	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	h := handlers.NewScheduleHandler(itemRepo, nil, nil, notifier)
+	r := router.ScheduleRoutes(h, testutil.PermissiveTokenService)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"name":    "Bell",
@@ -620,12 +623,11 @@ func TestScheduleHandler_Create_GetByIDFailsAfterCreate(t *testing.T) {
 	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(body)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-
-	r := newScheduleRouter(itemRepo, dayRepo)
 	r.ServeHTTP(rr, req)
 
 	// Should still return 201 with the original item when GetByID fails
 	assert.Equal(t, http.StatusCreated, rr.Code)
+	assert.True(t, notifier.SchedulesUpdatedCalled)
 }
 
 func TestScheduleHandler_Update_AllFields(t *testing.T) {
