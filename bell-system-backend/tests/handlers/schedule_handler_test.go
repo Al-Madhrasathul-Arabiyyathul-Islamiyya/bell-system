@@ -94,7 +94,7 @@ func TestScheduleHandler_List_Success(t *testing.T) {
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
 			return items, nil
 		},
 	}
@@ -117,9 +117,58 @@ func TestScheduleHandler_List_Success(t *testing.T) {
 	assert.Equal(t, "Morning Bell", resp.Data[0].Attributes.(map[string]any)["name"])
 }
 
+func TestScheduleHandler_List_WithSort(t *testing.T) {
+	var capturedSort string
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Bell", Days: []int{2}},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		ListFunc: func(_ context.Context, _ string, _ int, sortSQL string) ([]*models.ScheduleItem, error) {
+			capturedSort = sortSQL
+			return items, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/?sort=-name", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "ORDER BY Name DESC", capturedSort)
+}
+
+func TestScheduleHandler_List_WithFilter(t *testing.T) {
+	var capturedSessionID string
+	var capturedDay int
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		ListFunc: func(_ context.Context, filterSessionID string, filterDay int, _ string) ([]*models.ScheduleItem, error) {
+			capturedSessionID = filterSessionID
+			capturedDay = filterDay
+			return []*models.ScheduleItem{}, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	sid := uuid.New().String()
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/?filter[sessionId]="+sid+"&filter[day]=3", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, sid, capturedSessionID)
+	assert.Equal(t, 3, capturedDay)
+}
+
 func TestScheduleHandler_List_Empty(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
 			return []*models.ScheduleItem{}, nil
 		},
 	}
@@ -136,7 +185,7 @@ func TestScheduleHandler_List_Empty(t *testing.T) {
 
 func TestScheduleHandler_List_DBError(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
 			return nil, errors.New("database error")
 		},
 	}

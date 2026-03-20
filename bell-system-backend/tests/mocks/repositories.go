@@ -132,7 +132,7 @@ func (m *MockSessionRepo) Delete(ctx context.Context, id uuid.UUID) error {
 type MockScheduleItemRepo struct {
 	CreateFunc                     func(ctx context.Context, item *models.ScheduleItem) error
 	GetByIDFunc                    func(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error)
-	ListFunc                       func(ctx context.Context) ([]*models.ScheduleItem, error)
+	ListFunc                       func(ctx context.Context, filterSessionID string, filterDay int, sortSQL string) ([]*models.ScheduleItem, error)
 	GetCurrentSessionSchedulesFunc func(ctx context.Context, sessionID uuid.UUID) ([]*models.ScheduleItem, error)
 	UpdateFunc                     func(ctx context.Context, item *models.ScheduleItem) error
 	DeleteFunc                     func(ctx context.Context, id uuid.UUID) error
@@ -154,11 +154,11 @@ func (m *MockScheduleItemRepo) GetByID(ctx context.Context, id uuid.UUID) (*mode
 	return m.GetByIDFunc(ctx, id)
 }
 
-func (m *MockScheduleItemRepo) List(ctx context.Context) ([]*models.ScheduleItem, error) {
+func (m *MockScheduleItemRepo) List(ctx context.Context, filterSessionID string, filterDay int, sortSQL string) ([]*models.ScheduleItem, error) {
 	if m.ListFunc == nil {
 		panic("MockScheduleItemRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, filterSessionID, filterDay, sortSQL)
 }
 
 func (m *MockScheduleItemRepo) GetCurrentSessionSchedules(ctx context.Context, sessionID uuid.UUID) ([]*models.ScheduleItem, error) {

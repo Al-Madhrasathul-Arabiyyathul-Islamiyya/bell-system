@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
@@ -90,9 +91,24 @@ func validateDays(days []int) bool {
 	return true
 }
 
+var scheduleSortColumns = map[string]string{
+	"name": "Name",
+	"time": "Time",
+}
+
 // List handles GET /.
 func (h *ScheduleHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.Items.List(r.Context())
+	filters := jsonapi.ParseFilter(r, []string{"sessionId", "day"})
+	sortSQL := jsonapi.SortToSQL(jsonapi.ParseSort(r), scheduleSortColumns, "ORDER BY Time")
+
+	filterDay := 0
+	if d := filters["day"]; d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v >= 1 && v <= 7 {
+			filterDay = v
+		}
+	}
+
+	items, err := h.Items.List(r.Context(), filters["sessionId"], filterDay, sortSQL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list schedule items")
 		return
