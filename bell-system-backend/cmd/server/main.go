@@ -130,6 +130,7 @@ func run(ctx context.Context) error {
 	// API documentation (Scalar)
 	docsHTML, err := scalargo.NewV2(
 		scalargo.WithSpecDir("api"),
+		scalargo.WithBaseFileName("openapi.yaml"),
 		scalargo.WithDarkMode(),
 		scalargo.WithTheme(scalargo.ThemeKepler),
 	)
