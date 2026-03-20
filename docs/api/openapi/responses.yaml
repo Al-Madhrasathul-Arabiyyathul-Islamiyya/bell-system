@@ -1,0 +1,57 @@
+# Reusable error responses (JSON:API format)
+
+BadRequest:
+  description: Malformed or unparseable request
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+Unauthorized:
+  description: Missing or invalid authentication
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+Forbidden:
+  description: Insufficient permissions
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+NotFound:
+  description: Resource not found
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+Conflict:
+  description: Resource conflict (e.g. duplicate username)
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+UnsupportedMediaType:
+  description: Wrong Content-Type header
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+UnprocessableEntity:
+  description: Semantic validation failure
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'
+
+InternalServerError:
+  description: Internal server error
+  content:
+    application/vnd.api+json:
+      schema:
+        $ref: './schemas/jsonapi.yaml#/ErrorResponse'

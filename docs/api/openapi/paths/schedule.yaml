@@ -1,0 +1,162 @@
+# Schedule management paths (unpaginated)
+
+current:
+  get:
+    operationId: getCurrentSchedule
+    tags: [Schedule]
+    summary: Get current schedule
+    description: |
+      Documented JSON:API exception. Returns the current session's schedule
+      items for the current day. Public endpoint.
+    responses:
+      '200':
+        description: Current schedule
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/exceptions.yaml#/CurrentScheduleResponse'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+collection:
+  get:
+    operationId: listScheduleItems
+    tags: [Schedule]
+    summary: List schedule items
+    description: Returns an unpaginated collection of schedule items with optional filtering.
+    security:
+      - BearerAuth: []
+    parameters:
+      - $ref: '../parameters.yaml#/Sort'
+      - $ref: '../parameters.yaml#/FilterSessionId'
+      - $ref: '../parameters.yaml#/FilterDay'
+      - $ref: '../parameters.yaml#/Include'
+    responses:
+      '200':
+        description: Schedule item collection (unpaginated)
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/ScheduleItemCollectionDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  post:
+    operationId: createScheduleItem
+    tags: [Schedule]
+    summary: Create schedule item
+    description: Creates a new schedule item (bell) with session and sound relationships.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/ScheduleItemCreateRequest'
+    responses:
+      '201':
+        description: Schedule item created
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/ScheduleItemDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+item:
+  parameters:
+    - in: path
+      name: id
+      required: true
+      description: Schedule item UUID
+      schema:
+        type: string
+        format: uuid
+
+  get:
+    operationId: getScheduleItemById
+    tags: [Schedule]
+    summary: Get schedule item by ID
+    description: Returns a single schedule item. Supports `?include=session,sound` for compound documents.
+    security:
+      - BearerAuth: []
+    parameters:
+      - $ref: '../parameters.yaml#/Include'
+    responses:
+      '200':
+        description: Schedule item resource
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/ScheduleItemDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  put:
+    operationId: updateScheduleItem
+    tags: [Schedule]
+    summary: Update schedule item
+    description: Updates an existing schedule item.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/ScheduleItemUpdateRequest'
+    responses:
+      '200':
+        description: Schedule item updated
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/ScheduleItemDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  delete:
+    operationId: deleteScheduleItem
+    tags: [Schedule]
+    summary: Delete schedule item
+    description: Permanently removes a schedule item.
+    security:
+      - BearerAuth: []
+    responses:
+      '204':
+        description: Schedule item deleted
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'

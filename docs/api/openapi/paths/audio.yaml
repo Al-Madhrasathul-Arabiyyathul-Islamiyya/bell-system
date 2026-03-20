@@ -1,0 +1,217 @@
+# Audio file management paths (paginated)
+
+collection:
+  get:
+    operationId: listAudioFiles
+    tags: [Audio]
+    summary: List audio files
+    description: Returns a paginated collection of audio file metadata.
+    security:
+      - BearerAuth: []
+    parameters:
+      - $ref: '../parameters.yaml#/PageNumber'
+      - $ref: '../parameters.yaml#/PageSize'
+      - $ref: '../parameters.yaml#/Sort'
+      - $ref: '../parameters.yaml#/FilterFileType'
+      - $ref: '../parameters.yaml#/FieldsAudioFiles'
+    responses:
+      '200':
+        description: Audio file collection
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/AudioFileCollectionDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  post:
+    operationId: uploadAudioFile
+    tags: [Audio]
+    summary: Upload audio file
+    description: |
+      Accepts multipart/form-data (not JSON:API) because file uploads
+      require binary streaming.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [file, name, type]
+            properties:
+              file:
+                type: string
+                format: binary
+                description: The audio file to upload
+              name:
+                type: string
+                description: Display name for the audio file
+                example: bell.mp3
+              type:
+                type: string
+                enum: [bell, anthem, school_song, other]
+                description: Audio file category
+                example: bell
+    responses:
+      '201':
+        description: Audio file uploaded
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/AudioFileDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '415':
+        $ref: '../responses.yaml#/UnsupportedMediaType'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+checksums:
+  get:
+    operationId: listAudioChecksums
+    tags: [Audio]
+    summary: Get audio file checksums
+    description: |
+      Public endpoint for client sync. Returns a minimal JSON:API collection
+      with only file type and checksum attributes.
+    responses:
+      '200':
+        description: Audio file checksums
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/AudioChecksumDocument'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+item:
+  parameters:
+    - in: path
+      name: id
+      required: true
+      description: Audio file UUID
+      schema:
+        type: string
+        format: uuid
+
+  get:
+    operationId: getAudioFileById
+    tags: [Audio]
+    summary: Get audio file metadata
+    description: |
+      Public endpoint. Returns JSON:API metadata for the audio file.
+      Use `/audio/{id}/content` to download the binary.
+    responses:
+      '200':
+        description: Audio file metadata
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/AudioFileDocument'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  put:
+    operationId: updateAudioFile
+    tags: [Audio]
+    summary: Update audio file metadata
+    description: Updates the name or type of an existing audio file.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/AudioFileUpdateRequest'
+    responses:
+      '200':
+        description: Audio file updated
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/AudioFileDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  delete:
+    operationId: deleteAudioFile
+    tags: [Audio]
+    summary: Delete audio file
+    description: Permanently removes an audio file and its binary content.
+    security:
+      - BearerAuth: []
+    responses:
+      '204':
+        description: Audio file deleted
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+content:
+  parameters:
+    - in: path
+      name: id
+      required: true
+      description: Audio file UUID
+      schema:
+        type: string
+        format: uuid
+
+  get:
+    operationId: downloadAudioContent
+    tags: [Audio]
+    summary: Download audio file content
+    description: |
+      Public endpoint. Streams the binary audio content.
+      Content-Type is determined by the file extension.
+      Content-Disposition header includes the filename.
+    responses:
+      '200':
+        description: Audio file binary
+        headers:
+          Content-Disposition:
+            description: Attachment header with filename
+            schema:
+              type: string
+              example: 'attachment; filename="bell.wav"'
+        content:
+          audio/*:
+            schema:
+              type: string
+              format: binary
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'

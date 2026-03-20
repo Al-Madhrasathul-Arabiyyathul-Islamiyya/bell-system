@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: Bell Schedule System API
+  version: 1.0.0
+  description: |
+    Backend API for managing school bell schedules and audio playback.
+
+    This API follows JSON:API v1.1 for CRUD resource endpoints. Authentication,
+    binary download, and read-model endpoints are documented exceptions that use
+    plain JSON request/response bodies but still return JSON:API error envelopes
+    on failure.
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+
+tags:
+  - name: Authentication
+    description: |
+      User authentication endpoints. These are documented JSON:API exceptions —
+      they use plain JSON request/response bodies.
+  - name: Users
+    description: User management (admin only)
+  - name: Sessions
+    description: Session management (morning/afternoon)
+  - name: Schedule
+    description: Schedule management endpoints
+  - name: Audio
+    description: System audio file management
+  - name: System
+    description: System status and control
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from POST /auth/login
+
+paths:
+  /auth/login:
+    $ref: './paths/auth.yaml#/login'
+  /auth/change-password:
+    $ref: './paths/auth.yaml#/change-password'
+  /auth/logout:
+    $ref: './paths/auth.yaml#/logout'
+
+  /users:
+    $ref: './paths/users.yaml#/collection'
+  /users/{id}:
+    $ref: './paths/users.yaml#/item'
+
+  /sessions:
+    $ref: './paths/sessions.yaml#/collection'
+  /sessions/current:
+    $ref: './paths/sessions.yaml#/current'
+  /sessions/{id}:
+    $ref: './paths/sessions.yaml#/item'
+
+  /schedule/current:
+    $ref: './paths/schedule.yaml#/current'
+  /schedule:
+    $ref: './paths/schedule.yaml#/collection'
+  /schedule/{id}:
+    $ref: './paths/schedule.yaml#/item'
+
+  /audio:
+    $ref: './paths/audio.yaml#/collection'
+  /audio/checksums:
+    $ref: './paths/audio.yaml#/checksums'
+  /audio/{id}:
+    $ref: './paths/audio.yaml#/item'
+  /audio/{id}/content:
+    $ref: './paths/audio.yaml#/content'
+
+  /system/state:
+    $ref: './paths/system.yaml#/state'
+  /system/cancel-next-bell:
+    $ref: './paths/system.yaml#/cancel-next-bell'

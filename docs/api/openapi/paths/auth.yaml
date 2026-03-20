@@ -1,0 +1,75 @@
+# Authentication paths (documented JSON:API exceptions)
+
+login:
+  post:
+    operationId: loginUser
+    tags: [Authentication]
+    summary: Authenticate user
+    description: |
+      Documented JSON:API exception. Uses plain JSON request/response.
+      Returns a JWT token and user resource on success.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/exceptions.yaml#/LoginRequest'
+    responses:
+      '200':
+        description: Successful login
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/exceptions.yaml#/LoginResponse'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+change-password:
+  post:
+    operationId: changePassword
+    tags: [Authentication]
+    summary: Change password
+    description: |
+      Documented JSON:API exception. Uses plain JSON request body.
+      Returns 204 on success, JSON:API errors on failure.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/exceptions.yaml#/ChangePasswordRequest'
+    responses:
+      '204':
+        description: Password changed successfully
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+logout:
+  post:
+    operationId: logout
+    tags: [Authentication]
+    summary: Logout
+    description: |
+      Documented JSON:API exception. Invalidates the current session.
+      Returns 204 with no body.
+    security:
+      - BearerAuth: []
+    responses:
+      '204':
+        description: Logged out successfully
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'

@@ -1,0 +1,230 @@
+# JSON:API request body schemas
+
+UserCreateRequest:
+  type: object
+  description: Request body for creating a user
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type, attributes]
+      properties:
+        type:
+          type: string
+          enum: [users]
+        attributes:
+          type: object
+          required: [username, password, role]
+          properties:
+            username:
+              type: string
+              example: admin
+            password:
+              type: string
+              minLength: 8
+              example: securepass123
+            role:
+              type: string
+              enum: [admin, morning_user, afternoon_user]
+              example: admin
+
+UserUpdateRequest:
+  type: object
+  description: Request body for updating a user (all attributes optional)
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [users]
+        attributes:
+          type: object
+          properties:
+            username:
+              type: string
+            password:
+              type: string
+              minLength: 8
+            role:
+              type: string
+              enum: [admin, morning_user, afternoon_user]
+
+SessionCreateRequest:
+  type: object
+  description: Request body for creating a session
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type, attributes]
+      properties:
+        type:
+          type: string
+          enum: [sessions]
+        attributes:
+          type: object
+          required: [name, startTime, endTime]
+          properties:
+            name:
+              type: string
+              example: Morning
+            startTime:
+              type: string
+              example: "08:00"
+            endTime:
+              type: string
+              example: "12:00"
+
+SessionUpdateRequest:
+  type: object
+  description: Request body for updating a session (all attributes optional)
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [sessions]
+        attributes:
+          type: object
+          properties:
+            name:
+              type: string
+            startTime:
+              type: string
+            endTime:
+              type: string
+
+ScheduleItemCreateRequest:
+  type: object
+  description: Request body for creating a schedule item
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type, attributes, relationships]
+      properties:
+        type:
+          type: string
+          enum: [schedule-items]
+        attributes:
+          type: object
+          required: [name, time, days]
+          properties:
+            name:
+              type: string
+              example: First Bell
+            time:
+              type: string
+              example: "07:00"
+            days:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 7
+              example: [2, 3, 4, 5, 6]
+        relationships:
+          type: object
+          description: Related session and sound for this schedule item
+          properties:
+            session:
+              type: object
+              description: The session this item belongs to (nullable)
+              properties:
+                data:
+                  $ref: './jsonapi.yaml#/NullableSessionRelationshipData'
+            sound:
+              type: object
+              description: The audio file to play
+              required: [data]
+              properties:
+                data:
+                  $ref: './jsonapi.yaml#/AudioFileRelationshipData'
+
+ScheduleItemUpdateRequest:
+  type: object
+  description: Request body for updating a schedule item (all fields optional)
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [schedule-items]
+        attributes:
+          type: object
+          properties:
+            name:
+              type: string
+            time:
+              type: string
+            days:
+              type: array
+              items:
+                type: integer
+                minimum: 1
+                maximum: 7
+        relationships:
+          type: object
+          description: Updated session and/or sound relationships
+          properties:
+            session:
+              type: object
+              properties:
+                data:
+                  $ref: './jsonapi.yaml#/NullableSessionRelationshipData'
+            sound:
+              type: object
+              properties:
+                data:
+                  $ref: './jsonapi.yaml#/AudioFileRelationshipData'
+
+AudioFileUpdateRequest:
+  type: object
+  description: Request body for updating audio file metadata
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [audio-files]
+        attributes:
+          type: object
+          properties:
+            name:
+              type: string
+            fileType:
+              type: string
+              enum: [bell, anthem, school_song, other]
+
+SystemStateRequest:
+  type: object
+  description: Request body for setting system state
+  required: [data]
+  properties:
+    data:
+      type: object
+      required: [type, attributes]
+      properties:
+        type:
+          type: string
+          enum: [system-state]
+        attributes:
+          type: object
+          required: [state]
+          properties:
+            state:
+              type: string
+              enum: [active, paused]
+              example: active
