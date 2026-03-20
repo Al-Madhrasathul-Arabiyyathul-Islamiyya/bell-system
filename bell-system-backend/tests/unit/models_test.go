@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -355,9 +356,11 @@ func TestSystemStateRequest_JSON(t *testing.T) {
 // --- Response models ---
 
 func TestErrorResponse_JSON(t *testing.T) {
-	resp := models.ErrorResponse{}
-	resp.Error.Code = "NOT_FOUND"
-	resp.Error.Message = "User not found"
+	resp := jsonapi.ErrorDocument{
+		Errors: []jsonapi.Error{
+			{Status: "404", Code: "not_found", Title: "Not Found", Detail: "User not found"},
+		},
+	}
 
 	data, err := json.Marshal(resp)
 	require.NoError(t, err)
@@ -365,10 +368,14 @@ func TestErrorResponse_JSON(t *testing.T) {
 	var result map[string]any
 	require.NoError(t, json.Unmarshal(data, &result))
 
-	errObj, ok := result["error"].(map[string]any)
+	errArr, ok := result["errors"].([]any)
 	require.True(t, ok)
-	assert.Equal(t, "NOT_FOUND", errObj["code"])
-	assert.Equal(t, "User not found", errObj["message"])
+	require.Len(t, errArr, 1)
+
+	errObj, ok := errArr[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "not_found", errObj["code"])
+	assert.Equal(t, "User not found", errObj["detail"])
 }
 
 func TestSuccessResponse_JSON_MessageOmittedWhenEmpty(t *testing.T) {

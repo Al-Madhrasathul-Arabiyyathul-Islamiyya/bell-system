@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 )
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -13,9 +13,12 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 
+func writeJSONAPI(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", jsonapi.ContentType)
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(v)
+}
+
 func writeError(w http.ResponseWriter, status int, code, message string) {
-	resp := models.ErrorResponse{}
-	resp.Error.Code = code
-	resp.Error.Message = message
-	writeJSON(w, status, resp)
+	jsonapi.WriteError(w, status, code, "", message)
 }

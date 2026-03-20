@@ -14,6 +14,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
@@ -160,10 +161,11 @@ func TestUserHandler_GetByID_NotFound(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, rr.Code)
 
-	var resp models.ErrorResponse
+	var resp jsonapi.ErrorDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "not_found", resp.Error.Code)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "not_found", resp.Errors[0].Code)
 }
 
 func TestUserHandler_GetByID_InvalidUUID(t *testing.T) {
@@ -255,10 +257,11 @@ func TestUserHandler_Create_DuplicateUsername(t *testing.T) {
 
 	assert.Equal(t, http.StatusConflict, rr.Code)
 
-	var resp models.ErrorResponse
+	var resp jsonapi.ErrorDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "conflict", resp.Error.Code)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "conflict", resp.Errors[0].Code)
 }
 
 func TestUserHandler_Create_MissingFields(t *testing.T) {

@@ -10,6 +10,7 @@ import (
 
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 
 	"github.com/google/uuid"
@@ -71,10 +72,11 @@ func TestAuthMiddleware_MissingHeader(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 
-	var resp models.ErrorResponse
+	var resp jsonapi.ErrorDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "unauthorized", resp.Error.Code)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "unauthorized", resp.Errors[0].Code)
 }
 
 func TestAuthMiddleware_InvalidFormat(t *testing.T) {
@@ -170,10 +172,11 @@ func TestRequireRole_MorningUserRestricted(t *testing.T) {
 
 	assert.Equal(t, http.StatusForbidden, rr.Code)
 
-	var resp models.ErrorResponse
+	var resp jsonapi.ErrorDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "forbidden", resp.Error.Code)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "forbidden", resp.Errors[0].Code)
 }
 
 func TestRequireRole_AfternoonUserRestricted(t *testing.T) {
