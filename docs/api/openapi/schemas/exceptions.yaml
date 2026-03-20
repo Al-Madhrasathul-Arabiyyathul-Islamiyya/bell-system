@@ -1,0 +1,74 @@
+# Non-JSON:API exception schemas (auth, binary, read models)
+
+LoginRequest:
+  type: object
+  description: Plain JSON login request (documented JSON:API exception)
+  required: [username, password]
+  properties:
+    username:
+      type: string
+      example: admin
+    password:
+      type: string
+      example: securepass123
+
+LoginResponse:
+  type: object
+  description: Plain JSON login response with JWT token and user resource
+  properties:
+    token:
+      type: string
+      example: eyJhbGciOiJIUzI1NiIs...
+    user:
+      $ref: './resources.yaml#/UserResource'
+
+ChangePasswordRequest:
+  type: object
+  description: Plain JSON change-password request (documented JSON:API exception)
+  required: [oldPassword, newPassword]
+  properties:
+    oldPassword:
+      type: string
+    newPassword:
+      type: string
+      minLength: 8
+
+CurrentScheduleResponse:
+  type: object
+  description: |
+    Documented JSON:API exception. Returns the active session with its
+    schedule items for the current day.
+  properties:
+    session:
+      $ref: './resources.yaml#/SessionResource'
+    items:
+      type: array
+      items:
+        type: object
+        description: A schedule item in the current schedule
+        properties:
+          id:
+            type: string
+            format: uuid
+          name:
+            type: string
+            example: First Bell
+          time:
+            type: string
+            example: "07:00"
+          sound:
+            type: ['object', 'null']
+            description: The audio file associated with this bell
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+                example: bell.mp3
+              checksum:
+                type: string
+          status:
+            type: string
+            enum: [pending, current, completed]
+            example: pending

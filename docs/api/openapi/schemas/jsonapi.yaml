@@ -1,0 +1,157 @@
+# JSON:API v1.1 generic building blocks
+
+JsonApiError:
+  type: object
+  description: A single JSON:API error object
+  required: [status, code, title]
+  properties:
+    status:
+      type: string
+      description: HTTP status code as a string
+      example: "400"
+    code:
+      type: string
+      description: Stable machine-readable error code
+      example: invalid_request
+    title:
+      type: string
+      description: Short human-readable summary
+      example: Invalid request
+    detail:
+      type: string
+      description: Detailed explanation
+      example: invalid JSON body
+    source:
+      type: object
+      description: Pointer to the source of the error in the request
+      properties:
+        pointer:
+          type: string
+          description: JSON pointer to the request body field
+          example: /data/attributes/password
+        parameter:
+          type: string
+          description: Query parameter that caused the error
+          example: "filter[role]"
+
+ErrorResponse:
+  type: object
+  description: JSON:API error document containing one or more errors
+  required: [errors]
+  properties:
+    errors:
+      type: array
+      items:
+        $ref: './jsonapi.yaml#/JsonApiError'
+      example:
+        - status: "400"
+          code: invalid_request
+          title: Invalid request
+          detail: invalid JSON body
+
+ResourceIdentifier:
+  type: object
+  description: A JSON:API resource identifier (type + id pair)
+  required: [type, id]
+  properties:
+    type:
+      type: string
+    id:
+      type: string
+      format: uuid
+
+SessionRelationshipData:
+  type: object
+  description: Resource identifier for a session relationship
+  required: [type, id]
+  properties:
+    type:
+      type: string
+      enum: [sessions]
+    id:
+      type: string
+      format: uuid
+
+NullableSessionRelationshipData:
+  type: ['object', 'null']
+  description: Nullable resource identifier for a session relationship (null clears the relationship)
+  required: [type, id]
+  properties:
+    type:
+      type: string
+      enum: [sessions]
+    id:
+      type: string
+      format: uuid
+
+AudioFileRelationshipData:
+  type: object
+  description: Resource identifier for an audio-files relationship
+  required: [type, id]
+  properties:
+    type:
+      type: string
+      enum: [audio-files]
+    id:
+      type: string
+      format: uuid
+
+PaginationMeta:
+  type: object
+  description: Pagination metadata for paginated collections
+  required: [total, page]
+  properties:
+    total:
+      type: integer
+      example: 125
+    page:
+      type: object
+      required: [number, size, pages]
+      properties:
+        number:
+          type: integer
+          example: 2
+        size:
+          type: integer
+          example: 25
+        pages:
+          type: integer
+          example: 5
+
+UnpaginatedMeta:
+  type: object
+  description: Metadata for unpaginated (small, bounded) collections
+  required: [total]
+  properties:
+    total:
+      type: integer
+      example: 3
+
+PaginationLinks:
+  type: object
+  description: Pagination navigation links
+  required: [self, first, last]
+  properties:
+    self:
+      type: string
+      example: /api/v1/audio?page[number]=2&page[size]=25
+    first:
+      type: string
+      example: /api/v1/audio?page[number]=1&page[size]=25
+    prev:
+      type: string
+      example: /api/v1/audio?page[number]=1&page[size]=25
+    next:
+      type: string
+      example: /api/v1/audio?page[number]=3&page[size]=25
+    last:
+      type: string
+      example: /api/v1/audio?page[number]=5&page[size]=25
+
+SelfLink:
+  type: object
+  description: Object containing a self-referencing link
+  required: [self]
+  properties:
+    self:
+      type: string

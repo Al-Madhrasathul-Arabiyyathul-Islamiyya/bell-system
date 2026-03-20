@@ -1,0 +1,345 @@
+# JSON:API resource objects and document wrappers
+
+# ---- Resource attribute schemas ----
+
+UserAttributes:
+  type: object
+  description: User resource attributes
+  properties:
+    username:
+      type: string
+      example: admin
+    role:
+      type: string
+      enum: [admin, morning_user, afternoon_user]
+      example: admin
+    createdAt:
+      type: string
+      format: date-time
+      example: "2026-03-20T10:00:00Z"
+
+SessionAttributes:
+  type: object
+  description: Session resource attributes
+  properties:
+    name:
+      type: string
+      example: Morning
+    startTime:
+      type: string
+      description: "Start time in HH:MM format"
+      example: "08:00"
+    endTime:
+      type: string
+      description: "End time in HH:MM format"
+      example: "12:00"
+
+ScheduleItemAttributes:
+  type: object
+  description: Schedule item resource attributes
+  properties:
+    name:
+      type: string
+      example: First Bell
+    time:
+      type: string
+      description: "Bell time in HH:MM format"
+      example: "07:00"
+    days:
+      type: array
+      description: "Days of the week (1=Sunday through 7=Saturday)"
+      items:
+        type: integer
+        minimum: 1
+        maximum: 7
+      example: [2, 3, 4, 5, 6]
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+AudioFileAttributes:
+  type: object
+  description: Audio file resource attributes
+  properties:
+    name:
+      type: string
+      example: bell.mp3
+    fileType:
+      type: string
+      enum: [bell, anthem, school_song, other]
+      example: bell
+    checksum:
+      type: string
+      description: SHA-256 checksum of the file
+      example: "a1b2c3d4e5f6..."
+    createdAt:
+      type: string
+      format: date-time
+    updatedAt:
+      type: string
+      format: date-time
+
+SystemStateAttributes:
+  type: object
+  description: System state resource attributes
+  properties:
+    state:
+      type: string
+      enum: [active, paused]
+      example: active
+    lastUpdated:
+      type: string
+      format: date-time
+
+# ---- JSON:API resource objects ----
+
+UserResource:
+  type: object
+  description: A JSON:API user resource
+  required: [type, id, attributes]
+  properties:
+    type:
+      type: string
+      enum: [users]
+    id:
+      type: string
+      format: uuid
+    attributes:
+      $ref: './resources.yaml#/UserAttributes'
+    links:
+      $ref: './jsonapi.yaml#/SelfLink'
+
+SessionResource:
+  type: object
+  description: A JSON:API session resource
+  required: [type, id, attributes]
+  properties:
+    type:
+      type: string
+      enum: [sessions]
+    id:
+      type: string
+      format: uuid
+    attributes:
+      $ref: './resources.yaml#/SessionAttributes'
+    links:
+      $ref: './jsonapi.yaml#/SelfLink'
+
+ScheduleItemResource:
+  type: object
+  description: A JSON:API schedule-item resource with session and sound relationships
+  required: [type, id, attributes]
+  properties:
+    type:
+      type: string
+      enum: [schedule-items]
+    id:
+      type: string
+      format: uuid
+    attributes:
+      $ref: './resources.yaml#/ScheduleItemAttributes'
+    relationships:
+      type: object
+      description: Related session and sound resources
+      properties:
+        session:
+          type: object
+          description: The session this schedule item belongs to
+          properties:
+            data:
+              $ref: './jsonapi.yaml#/NullableSessionRelationshipData'
+        sound:
+          type: object
+          description: The audio file played when this bell fires
+          required: [data]
+          properties:
+            data:
+              $ref: './jsonapi.yaml#/AudioFileRelationshipData'
+    links:
+      $ref: './jsonapi.yaml#/SelfLink'
+
+AudioFileResource:
+  type: object
+  description: A JSON:API audio-file resource
+  required: [type, id, attributes]
+  properties:
+    type:
+      type: string
+      enum: [audio-files]
+    id:
+      type: string
+      format: uuid
+    attributes:
+      $ref: './resources.yaml#/AudioFileAttributes'
+    links:
+      type: object
+      description: Resource links including binary content download URL
+      properties:
+        self:
+          type: string
+          example: /api/v1/audio/uuid
+        content:
+          type: string
+          description: URL to download the binary audio content
+          example: /api/v1/audio/uuid/content
+
+SystemStateResource:
+  type: object
+  description: A JSON:API system-state resource
+  required: [type, id, attributes]
+  properties:
+    type:
+      type: string
+      enum: [system-state]
+    id:
+      type: string
+      description: Always "current"
+      example: current
+    attributes:
+      $ref: './resources.yaml#/SystemStateAttributes'
+
+AudioChecksumResource:
+  type: object
+  description: A minimal audio-file resource with only checksum attributes
+  required: [type, id, attributes]
+  properties:
+    type:
+      type: string
+      enum: [audio-files]
+    id:
+      type: string
+      format: uuid
+    attributes:
+      type: object
+      description: Minimal attributes for client sync
+      properties:
+        fileType:
+          type: string
+          enum: [bell, anthem, school_song, other]
+        checksum:
+          type: string
+
+# ---- JSON:API document wrappers (responses) ----
+
+UserDocument:
+  type: object
+  description: Single user resource document
+  required: [data]
+  properties:
+    data:
+      $ref: './resources.yaml#/UserResource'
+
+UserCollectionDocument:
+  type: object
+  description: Paginated user collection document
+  required: [data, meta, links]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: './resources.yaml#/UserResource'
+    meta:
+      $ref: './jsonapi.yaml#/PaginationMeta'
+    links:
+      $ref: './jsonapi.yaml#/PaginationLinks'
+
+SessionDocument:
+  type: object
+  description: Single session resource document
+  required: [data]
+  properties:
+    data:
+      $ref: './resources.yaml#/SessionResource'
+
+SessionCollectionDocument:
+  type: object
+  description: Unpaginated session collection document
+  required: [data, meta, links]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: './resources.yaml#/SessionResource'
+    meta:
+      $ref: './jsonapi.yaml#/UnpaginatedMeta'
+    links:
+      $ref: './jsonapi.yaml#/SelfLink'
+
+ScheduleItemDocument:
+  type: object
+  description: Single schedule-item resource document (may include sideloaded resources)
+  required: [data]
+  properties:
+    data:
+      $ref: './resources.yaml#/ScheduleItemResource'
+    included:
+      type: array
+      description: Sideloaded related resources when ?include is used
+      items:
+        oneOf:
+          - $ref: './resources.yaml#/SessionResource'
+          - $ref: './resources.yaml#/AudioFileResource'
+
+ScheduleItemCollectionDocument:
+  type: object
+  description: Unpaginated schedule-item collection document
+  required: [data, meta, links]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: './resources.yaml#/ScheduleItemResource'
+    meta:
+      $ref: './jsonapi.yaml#/UnpaginatedMeta'
+    links:
+      $ref: './jsonapi.yaml#/SelfLink'
+    included:
+      type: array
+      description: Sideloaded related resources when ?include is used
+      items:
+        oneOf:
+          - $ref: './resources.yaml#/SessionResource'
+          - $ref: './resources.yaml#/AudioFileResource'
+
+AudioFileDocument:
+  type: object
+  description: Single audio-file resource document
+  required: [data]
+  properties:
+    data:
+      $ref: './resources.yaml#/AudioFileResource'
+
+AudioFileCollectionDocument:
+  type: object
+  description: Paginated audio-file collection document
+  required: [data, meta, links]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: './resources.yaml#/AudioFileResource'
+    meta:
+      $ref: './jsonapi.yaml#/PaginationMeta'
+    links:
+      $ref: './jsonapi.yaml#/PaginationLinks'
+
+SystemStateDocument:
+  type: object
+  description: Single system-state resource document
+  required: [data]
+  properties:
+    data:
+      $ref: './resources.yaml#/SystemStateResource'
+
+AudioChecksumDocument:
+  type: object
+  description: Collection of minimal audio-file resources for client sync
+  required: [data]
+  properties:
+    data:
+      type: array
+      items:
+        $ref: './resources.yaml#/AudioChecksumResource'

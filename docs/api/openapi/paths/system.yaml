@@ -1,0 +1,76 @@
+# System status and control paths
+
+state:
+  get:
+    operationId: getSystemState
+    tags: [System]
+    summary: Get system state
+    description: |
+      Public endpoint. Returns whether the bell system is active or paused.
+    security: []
+    responses:
+      '200':
+        description: Current system state
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SystemStateDocument'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  post:
+    operationId: setSystemState
+    tags: [System]
+    summary: Set system state
+    description: Sets the bell system state to active or paused.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/SystemStateRequest'
+    responses:
+      '200':
+        description: System state updated
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SystemStateDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+cancel-next-bell:
+  post:
+    operationId: cancelNextBell
+    tags: [System]
+    summary: Cancel next scheduled bell
+    description: Prevents the next scheduled bell from playing.
+    security:
+      - BearerAuth: []
+    responses:
+      '204':
+        description: Next bell cancelled
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        description: No pending bell to cancel
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/jsonapi.yaml#/ErrorResponse'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'

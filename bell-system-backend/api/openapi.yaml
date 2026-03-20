@@ -1,2 +1,2019 @@
+openapi: 3.2.0
+info:
+  title: Bell Schedule System API
+  version: 1.0.0
+  description: |
+    Backend API for managing school bell schedules and audio playback.
 
-
+    This API follows JSON:API v1.1 for CRUD resource endpoints. Authentication,
+    binary download, and read-model endpoints are documented exceptions that use
+    plain JSON request/response bodies but still return JSON:API error envelopes
+    on failure.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Development server
+tags:
+  - name: Authentication
+    description: |
+      User authentication endpoints. These are documented JSON:API exceptions —
+      they use plain JSON request/response bodies.
+  - name: Users
+    description: User management (admin only)
+  - name: Sessions
+    description: Session management (morning/afternoon)
+  - name: Schedule
+    description: Schedule management endpoints
+  - name: Audio
+    description: System audio file management
+  - name: System
+    description: System status and control
+paths:
+  /auth/login:
+    post:
+      operationId: loginUser
+      tags:
+        - Authentication
+      summary: Authenticate user
+      description: |
+        Documented JSON:API exception. Uses plain JSON request/response.
+        Returns a JWT token and user resource on success.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Plain JSON login request (documented JSON:API exception)
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  example: securepass123
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                type: object
+                description: Plain JSON login response with JWT token and user resource
+                properties:
+                  token:
+                    type: string
+                    example: eyJhbGciOiJIUzI1NiIs...
+                  user:
+                    type: object
+                    description: A JSON:API user resource
+                    required: &ref_5
+                      - type
+                      - id
+                      - attributes
+                    properties: &ref_6
+                      type:
+                        type: string
+                        enum:
+                          - users
+                      id:
+                        type: string
+                        format: uuid
+                      attributes:
+                        type: object
+                        description: User resource attributes
+                        properties:
+                          username:
+                            type: string
+                            example: admin
+                          role:
+                            type: string
+                            enum:
+                              - admin
+                              - morning_user
+                              - afternoon_user
+                            example: admin
+                          createdAt:
+                            type: string
+                            format: date-time
+                            example: '2026-03-20T10:00:00Z'
+                      links:
+                        type: object
+                        description: Object containing a self-referencing link
+                        required: &ref_14
+                          - self
+                        properties: &ref_15
+                          self:
+                            type: string
+        '400':
+          description: Malformed or unparseable request
+          content: &ref_2
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: &ref_0
+                  - errors
+                properties: &ref_1
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      description: A single JSON:API error object
+                      required:
+                        - status
+                        - code
+                        - title
+                      properties:
+                        status:
+                          type: string
+                          description: HTTP status code as a string
+                          example: '400'
+                        code:
+                          type: string
+                          description: Stable machine-readable error code
+                          example: invalid_request
+                        title:
+                          type: string
+                          description: Short human-readable summary
+                          example: Invalid request
+                        detail:
+                          type: string
+                          description: Detailed explanation
+                          example: invalid JSON body
+                        source:
+                          type: object
+                          description: Pointer to the source of the error in the request
+                          properties:
+                            pointer:
+                              type: string
+                              description: JSON pointer to the request body field
+                              example: /data/attributes/password
+                            parameter:
+                              type: string
+                              description: Query parameter that caused the error
+                              example: filter[role]
+                    example:
+                      - status: '400'
+                        code: invalid_request
+                        title: Invalid request
+                        detail: invalid JSON body
+        '401':
+          description: Missing or invalid authentication
+          content: &ref_3
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content: &ref_4
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags:
+        - Authentication
+      summary: Change password
+      description: |
+        Documented JSON:API exception. Uses plain JSON request body.
+        Returns 204 on success, JSON:API errors on failure.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Plain JSON change-password request (documented JSON:API exception)
+              required:
+                - oldPassword
+                - newPassword
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 8
+      responses:
+        '204':
+          description: Password changed successfully
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '422':
+          description: Semantic validation failure
+          content: &ref_8
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /auth/logout:
+    post:
+      operationId: logout
+      tags:
+        - Authentication
+      summary: Logout
+      description: |
+        Documented JSON:API exception. Invalidates the current session.
+        Returns 204 with no body.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Logged out successfully
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /users:
+    get:
+      operationId: listUsers
+      tags:
+        - Users
+      summary: List all users
+      description: Admin only. Returns a paginated collection of users.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page[number]
+          in: query
+          description: Page number (1-based)
+          schema: &ref_34
+            type: integer
+            minimum: 1
+            default: 1
+        - name: page[size]
+          in: query
+          description: Number of items per page
+          schema: &ref_35
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: sort
+          in: query
+          description: |
+            Comma-separated sort fields. Prefix with `-` for descending.
+            Example: `name`, `-createdAt`, `type,-createdAt`
+          schema: &ref_13
+            type: string
+        - name: filter[role]
+          in: query
+          description: Filter users by role
+          schema:
+            type: string
+            enum:
+              - admin
+              - morning_user
+              - afternoon_user
+      responses:
+        '200':
+          description: User collection
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Paginated user collection document
+                required:
+                  - data
+                  - meta
+                  - links
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: A JSON:API user resource
+                      required: *ref_5
+                      properties: *ref_6
+                  meta:
+                    type: object
+                    description: Pagination metadata for paginated collections
+                    required: &ref_36
+                      - total
+                      - page
+                    properties: &ref_37
+                      total:
+                        type: integer
+                        example: 125
+                      page:
+                        type: object
+                        required:
+                          - number
+                          - size
+                          - pages
+                        properties:
+                          number:
+                            type: integer
+                            example: 2
+                          size:
+                            type: integer
+                            example: 25
+                          pages:
+                            type: integer
+                            example: 5
+                  links:
+                    type: object
+                    description: Pagination navigation links
+                    required: &ref_38
+                      - self
+                      - first
+                      - last
+                    properties: &ref_39
+                      self:
+                        type: string
+                        example: /api/v1/audio?page[number]=2&page[size]=25
+                      first:
+                        type: string
+                        example: /api/v1/audio?page[number]=1&page[size]=25
+                      prev:
+                        type: string
+                        example: /api/v1/audio?page[number]=1&page[size]=25
+                      next:
+                        type: string
+                        example: /api/v1/audio?page[number]=3&page[size]=25
+                      last:
+                        type: string
+                        example: /api/v1/audio?page[number]=5&page[size]=25
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: &ref_7
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content: *ref_4
+    post:
+      operationId: createUser
+      tags:
+        - Users
+      summary: Create user
+      description: Admin only. Creates a new system user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for creating a user
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                    - attributes
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - users
+                    attributes:
+                      type: object
+                      required:
+                        - username
+                        - password
+                        - role
+                      properties:
+                        username:
+                          type: string
+                          example: admin
+                        password:
+                          type: string
+                          minLength: 8
+                          example: securepass123
+                        role:
+                          type: string
+                          enum:
+                            - admin
+                            - morning_user
+                            - afternoon_user
+                          example: admin
+      responses:
+        '201':
+          description: User created
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single user resource document
+                required: &ref_9
+                  - data
+                properties: &ref_10
+                  data:
+                    type: object
+                    description: A JSON:API user resource
+                    required: *ref_5
+                    properties: *ref_6
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '409':
+          description: Resource conflict (e.g. duplicate username)
+          content: &ref_12
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /users/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        description: User UUID
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getUserById
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Admin only. Returns a single user resource.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User resource
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single user resource document
+                required: *ref_9
+                properties: *ref_10
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: &ref_11
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content: *ref_4
+    put:
+      operationId: updateUser
+      tags:
+        - Users
+      summary: Update user
+      description: Admin only. Updates an existing user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for updating a user (all attributes optional)
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - users
+                    attributes:
+                      type: object
+                      properties:
+                        username:
+                          type: string
+                        password:
+                          type: string
+                          minLength: 8
+                        role:
+                          type: string
+                          enum:
+                            - admin
+                            - morning_user
+                            - afternoon_user
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single user resource document
+                required: *ref_9
+                properties: *ref_10
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '409':
+          description: Resource conflict (e.g. duplicate username)
+          content: *ref_12
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+    delete:
+      operationId: deleteUser
+      tags:
+        - Users
+      summary: Delete user
+      description: Admin only. Permanently removes a user.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: User deleted
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /sessions:
+    get:
+      operationId: listSessions
+      tags:
+        - Sessions
+      summary: List all sessions
+      description: Returns an unpaginated collection of all sessions.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sort
+          in: query
+          description: |
+            Comma-separated sort fields. Prefix with `-` for descending.
+            Example: `name`, `-createdAt`, `type,-createdAt`
+          schema: *ref_13
+      responses:
+        '200':
+          description: Session collection (unpaginated)
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Unpaginated session collection document
+                required:
+                  - data
+                  - meta
+                  - links
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: A JSON:API session resource
+                      required: &ref_16
+                        - type
+                        - id
+                        - attributes
+                      properties: &ref_17
+                        type:
+                          type: string
+                          enum:
+                            - sessions
+                        id:
+                          type: string
+                          format: uuid
+                        attributes:
+                          type: object
+                          description: Session resource attributes
+                          properties:
+                            name:
+                              type: string
+                              example: Morning
+                            startTime:
+                              type: string
+                              description: Start time in HH:MM format
+                              example: '08:00'
+                            endTime:
+                              type: string
+                              description: End time in HH:MM format
+                              example: '12:00'
+                        links:
+                          type: object
+                          description: Object containing a self-referencing link
+                          required: *ref_14
+                          properties: *ref_15
+                  meta:
+                    type: object
+                    description: Metadata for unpaginated (small, bounded) collections
+                    required: &ref_20
+                      - total
+                    properties: &ref_21
+                      total:
+                        type: integer
+                        example: 3
+                  links:
+                    type: object
+                    description: Object containing a self-referencing link
+                    required: *ref_14
+                    properties: *ref_15
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '500':
+          description: Internal server error
+          content: *ref_4
+    post:
+      operationId: createSession
+      tags:
+        - Sessions
+      summary: Create session
+      description: Creates a new session (e.g. Morning, Afternoon).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for creating a session
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                    - attributes
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - sessions
+                    attributes:
+                      type: object
+                      required:
+                        - name
+                        - startTime
+                        - endTime
+                      properties:
+                        name:
+                          type: string
+                          example: Morning
+                        startTime:
+                          type: string
+                          example: '08:00'
+                        endTime:
+                          type: string
+                          example: '12:00'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single session resource document
+                required: &ref_18
+                  - data
+                properties: &ref_19
+                  data:
+                    type: object
+                    description: A JSON:API session resource
+                    required: *ref_16
+                    properties: *ref_17
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '409':
+          description: Resource conflict (e.g. duplicate username)
+          content: *ref_12
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /sessions/current:
+    get:
+      operationId: getCurrentSession
+      tags:
+        - Sessions
+      summary: Get current session
+      description: |
+        Public endpoint. Returns the session that is active based on
+        the current time of day.
+      security: []
+      responses:
+        '200':
+          description: Current session
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single session resource document
+                required: *ref_18
+                properties: *ref_19
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /sessions/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        description: Session UUID
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getSessionById
+      tags:
+        - Sessions
+      summary: Get session by ID
+      description: Returns a single session resource.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Session resource
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single session resource document
+                required: *ref_18
+                properties: *ref_19
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+    put:
+      operationId: updateSession
+      tags:
+        - Sessions
+      summary: Update session
+      description: Updates an existing session.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for updating a session (all attributes optional)
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - sessions
+                    attributes:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        startTime:
+                          type: string
+                        endTime:
+                          type: string
+      responses:
+        '200':
+          description: Session updated
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single session resource document
+                required: *ref_18
+                properties: *ref_19
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '409':
+          description: Resource conflict (e.g. duplicate username)
+          content: *ref_12
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+    delete:
+      operationId: deleteSession
+      tags:
+        - Sessions
+      summary: Delete session
+      description: Permanently removes a session.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Session deleted
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /schedule/current:
+    get:
+      operationId: getCurrentSchedule
+      tags:
+        - Schedule
+      summary: Get current schedule
+      description: |
+        Documented JSON:API exception. Returns the current session's schedule
+        items for the current day. Public endpoint.
+      security: []
+      responses:
+        '200':
+          description: Current schedule
+          content:
+            application/json:
+              schema:
+                type: object
+                description: |
+                  Documented JSON:API exception. Returns the active session with its
+                  schedule items for the current day.
+                properties:
+                  session:
+                    type: object
+                    description: A JSON:API session resource
+                    required: *ref_16
+                    properties: *ref_17
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      description: A schedule item in the current schedule
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: First Bell
+                        time:
+                          type: string
+                          example: '07:00'
+                        sound:
+                          type:
+                            - object
+                            - 'null'
+                          description: The audio file associated with this bell
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                            name:
+                              type: string
+                              example: bell.mp3
+                            checksum:
+                              type: string
+                        status:
+                          type: string
+                          enum:
+                            - pending
+                            - current
+                            - completed
+                          example: pending
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /schedule:
+    get:
+      operationId: listScheduleItems
+      tags:
+        - Schedule
+      summary: List schedule items
+      description: Returns an unpaginated collection of schedule items with optional filtering.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sort
+          in: query
+          description: |
+            Comma-separated sort fields. Prefix with `-` for descending.
+            Example: `name`, `-createdAt`, `type,-createdAt`
+          schema: *ref_13
+        - name: filter[sessionId]
+          in: query
+          description: Filter schedule items by session ID
+          schema:
+            type: string
+            format: uuid
+        - name: filter[day]
+          in: query
+          description: Filter schedule items by day of the week (1=Sunday through 7=Saturday)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 7
+        - name: include
+          in: query
+          description: |
+            Comma-separated related resources to sideload via compound documents.
+            Example: `session,sound`
+          schema: &ref_31
+            type: string
+      responses:
+        '200':
+          description: Schedule item collection (unpaginated)
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Unpaginated schedule-item collection document
+                required:
+                  - data
+                  - meta
+                  - links
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: A JSON:API schedule-item resource with session and sound relationships
+                      required: &ref_27
+                        - type
+                        - id
+                        - attributes
+                      properties: &ref_28
+                        type:
+                          type: string
+                          enum:
+                            - schedule-items
+                        id:
+                          type: string
+                          format: uuid
+                        attributes:
+                          type: object
+                          description: Schedule item resource attributes
+                          properties:
+                            name:
+                              type: string
+                              example: First Bell
+                            time:
+                              type: string
+                              description: Bell time in HH:MM format
+                              example: '07:00'
+                            days:
+                              type: array
+                              description: Days of the week (1=Sunday through 7=Saturday)
+                              items:
+                                type: integer
+                                minimum: 1
+                                maximum: 7
+                              example:
+                                - 2
+                                - 3
+                                - 4
+                                - 5
+                                - 6
+                            createdAt:
+                              type: string
+                              format: date-time
+                            updatedAt:
+                              type: string
+                              format: date-time
+                        relationships:
+                          type: object
+                          description: Related session and sound resources
+                          properties:
+                            session:
+                              type: object
+                              description: The session this schedule item belongs to
+                              properties:
+                                data:
+                                  type: &ref_22
+                                    - object
+                                    - 'null'
+                                  description: Nullable resource identifier for a session relationship (null clears the relationship)
+                                  required: &ref_23
+                                    - type
+                                    - id
+                                  properties: &ref_24
+                                    type:
+                                      type: string
+                                      enum:
+                                        - sessions
+                                    id:
+                                      type: string
+                                      format: uuid
+                            sound:
+                              type: object
+                              description: The audio file played when this bell fires
+                              required:
+                                - data
+                              properties:
+                                data:
+                                  type: object
+                                  description: Resource identifier for an audio-files relationship
+                                  required: &ref_25
+                                    - type
+                                    - id
+                                  properties: &ref_26
+                                    type:
+                                      type: string
+                                      enum:
+                                        - audio-files
+                                    id:
+                                      type: string
+                                      format: uuid
+                        links:
+                          type: object
+                          description: Object containing a self-referencing link
+                          required: *ref_14
+                          properties: *ref_15
+                  meta:
+                    type: object
+                    description: Metadata for unpaginated (small, bounded) collections
+                    required: *ref_20
+                    properties: *ref_21
+                  links:
+                    type: object
+                    description: Object containing a self-referencing link
+                    required: *ref_14
+                    properties: *ref_15
+                  included:
+                    type: array
+                    description: Sideloaded related resources when ?include is used
+                    items:
+                      oneOf:
+                        - type: object
+                          description: A JSON:API session resource
+                          required: *ref_16
+                          properties: *ref_17
+                        - type: object
+                          description: A JSON:API audio-file resource
+                          required: &ref_29
+                            - type
+                            - id
+                            - attributes
+                          properties: &ref_30
+                            type:
+                              type: string
+                              enum:
+                                - audio-files
+                            id:
+                              type: string
+                              format: uuid
+                            attributes:
+                              type: object
+                              description: Audio file resource attributes
+                              properties:
+                                name:
+                                  type: string
+                                  example: bell.mp3
+                                fileType:
+                                  type: string
+                                  enum:
+                                    - bell
+                                    - anthem
+                                    - school_song
+                                    - other
+                                  example: bell
+                                checksum:
+                                  type: string
+                                  description: SHA-256 checksum of the file
+                                  example: a1b2c3d4e5f6...
+                                createdAt:
+                                  type: string
+                                  format: date-time
+                                updatedAt:
+                                  type: string
+                                  format: date-time
+                            links:
+                              type: object
+                              description: Resource links including binary content download URL
+                              properties:
+                                self:
+                                  type: string
+                                  example: /api/v1/audio/uuid
+                                content:
+                                  type: string
+                                  description: URL to download the binary audio content
+                                  example: /api/v1/audio/uuid/content
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '500':
+          description: Internal server error
+          content: *ref_4
+    post:
+      operationId: createScheduleItem
+      tags:
+        - Schedule
+      summary: Create schedule item
+      description: Creates a new schedule item (bell) with session and sound relationships.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for creating a schedule item
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                    - attributes
+                    - relationships
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - schedule-items
+                    attributes:
+                      type: object
+                      required:
+                        - name
+                        - time
+                        - days
+                      properties:
+                        name:
+                          type: string
+                          example: First Bell
+                        time:
+                          type: string
+                          example: '07:00'
+                        days:
+                          type: array
+                          items:
+                            type: integer
+                            minimum: 1
+                            maximum: 7
+                          example:
+                            - 2
+                            - 3
+                            - 4
+                            - 5
+                            - 6
+                    relationships:
+                      type: object
+                      description: Related session and sound for this schedule item
+                      properties:
+                        session:
+                          type: object
+                          description: The session this item belongs to (nullable)
+                          properties:
+                            data:
+                              type: *ref_22
+                              description: Nullable resource identifier for a session relationship (null clears the relationship)
+                              required: *ref_23
+                              properties: *ref_24
+                        sound:
+                          type: object
+                          description: The audio file to play
+                          required:
+                            - data
+                          properties:
+                            data:
+                              type: object
+                              description: Resource identifier for an audio-files relationship
+                              required: *ref_25
+                              properties: *ref_26
+      responses:
+        '201':
+          description: Schedule item created
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single schedule-item resource document (may include sideloaded resources)
+                required: &ref_32
+                  - data
+                properties: &ref_33
+                  data:
+                    type: object
+                    description: A JSON:API schedule-item resource with session and sound relationships
+                    required: *ref_27
+                    properties: *ref_28
+                  included:
+                    type: array
+                    description: Sideloaded related resources when ?include is used
+                    items:
+                      oneOf:
+                        - type: object
+                          description: A JSON:API session resource
+                          required: *ref_16
+                          properties: *ref_17
+                        - type: object
+                          description: A JSON:API audio-file resource
+                          required: *ref_29
+                          properties: *ref_30
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /schedule/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        description: Schedule item UUID
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getScheduleItemById
+      tags:
+        - Schedule
+      summary: Get schedule item by ID
+      description: Returns a single schedule item. Supports `?include=session,sound` for compound documents.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: include
+          in: query
+          description: |
+            Comma-separated related resources to sideload via compound documents.
+            Example: `session,sound`
+          schema: *ref_31
+      responses:
+        '200':
+          description: Schedule item resource
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single schedule-item resource document (may include sideloaded resources)
+                required: *ref_32
+                properties: *ref_33
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+    put:
+      operationId: updateScheduleItem
+      tags:
+        - Schedule
+      summary: Update schedule item
+      description: Updates an existing schedule item.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for updating a schedule item (all fields optional)
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - schedule-items
+                    attributes:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        time:
+                          type: string
+                        days:
+                          type: array
+                          items:
+                            type: integer
+                            minimum: 1
+                            maximum: 7
+                    relationships:
+                      type: object
+                      description: Updated session and/or sound relationships
+                      properties:
+                        session:
+                          type: object
+                          properties:
+                            data:
+                              type: *ref_22
+                              description: Nullable resource identifier for a session relationship (null clears the relationship)
+                              required: *ref_23
+                              properties: *ref_24
+                        sound:
+                          type: object
+                          properties:
+                            data:
+                              type: object
+                              description: Resource identifier for an audio-files relationship
+                              required: *ref_25
+                              properties: *ref_26
+      responses:
+        '200':
+          description: Schedule item updated
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single schedule-item resource document (may include sideloaded resources)
+                required: *ref_32
+                properties: *ref_33
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+    delete:
+      operationId: deleteScheduleItem
+      tags:
+        - Schedule
+      summary: Delete schedule item
+      description: Permanently removes a schedule item.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Schedule item deleted
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /audio:
+    get:
+      operationId: listAudioFiles
+      tags:
+        - Audio
+      summary: List audio files
+      description: Returns a paginated collection of audio file metadata.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page[number]
+          in: query
+          description: Page number (1-based)
+          schema: *ref_34
+        - name: page[size]
+          in: query
+          description: Number of items per page
+          schema: *ref_35
+        - name: sort
+          in: query
+          description: |
+            Comma-separated sort fields. Prefix with `-` for descending.
+            Example: `name`, `-createdAt`, `type,-createdAt`
+          schema: *ref_13
+        - name: filter[fileType]
+          in: query
+          description: Filter audio files by type
+          schema:
+            type: string
+            enum:
+              - bell
+              - anthem
+              - school_song
+              - other
+        - name: fields[audio-files]
+          in: query
+          description: Sparse fieldset — comma-separated attribute names to return
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audio file collection
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Paginated audio-file collection document
+                required:
+                  - data
+                  - meta
+                  - links
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: A JSON:API audio-file resource
+                      required: *ref_29
+                      properties: *ref_30
+                  meta:
+                    type: object
+                    description: Pagination metadata for paginated collections
+                    required: *ref_36
+                    properties: *ref_37
+                  links:
+                    type: object
+                    description: Pagination navigation links
+                    required: *ref_38
+                    properties: *ref_39
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '500':
+          description: Internal server error
+          content: *ref_4
+    post:
+      operationId: uploadAudioFile
+      tags:
+        - Audio
+      summary: Upload audio file
+      description: |
+        Accepts multipart/form-data (not JSON:API) because file uploads
+        require binary streaming.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - name
+                - type
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The audio file to upload
+                name:
+                  type: string
+                  description: Display name for the audio file
+                  example: bell.mp3
+                type:
+                  type: string
+                  enum:
+                    - bell
+                    - anthem
+                    - school_song
+                    - other
+                  description: Audio file category
+                  example: bell
+      responses:
+        '201':
+          description: Audio file uploaded
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single audio-file resource document
+                required: &ref_40
+                  - data
+                properties: &ref_41
+                  data:
+                    type: object
+                    description: A JSON:API audio-file resource
+                    required: *ref_29
+                    properties: *ref_30
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '415':
+          description: Wrong Content-Type header
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /audio/checksums:
+    get:
+      operationId: listAudioChecksums
+      tags:
+        - Audio
+      summary: Get audio file checksums
+      description: |
+        Public endpoint for client sync. Returns a minimal JSON:API collection
+        with only file type and checksum attributes.
+      security: []
+      responses:
+        '200':
+          description: Audio file checksums
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Collection of minimal audio-file resources for client sync
+                required:
+                  - data
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      description: A minimal audio-file resource with only checksum attributes
+                      required:
+                        - type
+                        - id
+                        - attributes
+                      properties:
+                        type:
+                          type: string
+                          enum:
+                            - audio-files
+                        id:
+                          type: string
+                          format: uuid
+                        attributes:
+                          type: object
+                          description: Minimal attributes for client sync
+                          properties:
+                            fileType:
+                              type: string
+                              enum:
+                                - bell
+                                - anthem
+                                - school_song
+                                - other
+                            checksum:
+                              type: string
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /audio/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        description: Audio file UUID
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getAudioFileById
+      tags:
+        - Audio
+      summary: Get audio file metadata
+      description: |
+        Public endpoint. Returns JSON:API metadata for the audio file.
+        Use `/audio/{id}/content` to download the binary.
+      security: []
+      responses:
+        '200':
+          description: Audio file metadata
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single audio-file resource document
+                required: *ref_40
+                properties: *ref_41
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+    put:
+      operationId: updateAudioFile
+      tags:
+        - Audio
+      summary: Update audio file metadata
+      description: Updates the name or type of an existing audio file.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for updating audio file metadata
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - audio-files
+                    attributes:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        fileType:
+                          type: string
+                          enum:
+                            - bell
+                            - anthem
+                            - school_song
+                            - other
+      responses:
+        '200':
+          description: Audio file updated
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single audio-file resource document
+                required: *ref_40
+                properties: *ref_41
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+    delete:
+      operationId: deleteAudioFile
+      tags:
+        - Audio
+      summary: Delete audio file
+      description: Permanently removes an audio file and its binary content.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Audio file deleted
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /audio/{id}/content:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        description: Audio file UUID
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: downloadAudioContent
+      tags:
+        - Audio
+      summary: Download audio file content
+      description: |
+        Public endpoint. Streams the binary audio content.
+        Content-Type is determined by the file extension.
+        Content-Disposition header includes the filename.
+      security: []
+      responses:
+        '200':
+          description: Audio file binary
+          headers:
+            Content-Disposition:
+              description: Attachment header with filename
+              schema:
+                type: string
+                example: attachment; filename="bell.wav"
+          content:
+            audio/*:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /system/state:
+    get:
+      operationId: getSystemState
+      tags:
+        - System
+      summary: Get system state
+      description: |
+        Public endpoint. Returns whether the bell system is active or paused.
+      security: []
+      responses:
+        '200':
+          description: Current system state
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single system-state resource document
+                required: &ref_42
+                  - data
+                properties: &ref_43
+                  data:
+                    type: object
+                    description: A JSON:API system-state resource
+                    required:
+                      - type
+                      - id
+                      - attributes
+                    properties:
+                      type:
+                        type: string
+                        enum:
+                          - system-state
+                      id:
+                        type: string
+                        description: Always "current"
+                        example: current
+                      attributes:
+                        type: object
+                        description: System state resource attributes
+                        properties:
+                          state:
+                            type: string
+                            enum:
+                              - active
+                              - paused
+                            example: active
+                          lastUpdated:
+                            type: string
+                            format: date-time
+        '404':
+          description: Resource not found
+          content: *ref_11
+        '500':
+          description: Internal server error
+          content: *ref_4
+    post:
+      operationId: setSystemState
+      tags:
+        - System
+      summary: Set system state
+      description: Sets the bell system state to active or paused.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/vnd.api+json:
+            schema:
+              type: object
+              description: Request body for setting system state
+              required:
+                - data
+              properties:
+                data:
+                  type: object
+                  required:
+                    - type
+                    - attributes
+                  properties:
+                    type:
+                      type: string
+                      enum:
+                        - system-state
+                    attributes:
+                      type: object
+                      required:
+                        - state
+                      properties:
+                        state:
+                          type: string
+                          enum:
+                            - active
+                            - paused
+                          example: active
+      responses:
+        '200':
+          description: System state updated
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: Single system-state resource document
+                required: *ref_42
+                properties: *ref_43
+        '400':
+          description: Malformed or unparseable request
+          content: *ref_2
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '422':
+          description: Semantic validation failure
+          content: *ref_8
+        '500':
+          description: Internal server error
+          content: *ref_4
+  /system/cancel-next-bell:
+    post:
+      operationId: cancelNextBell
+      tags:
+        - System
+      summary: Cancel next scheduled bell
+      description: Prevents the next scheduled bell from playing.
+      security:
+        - BearerAuth: []
+      responses:
+        '204':
+          description: Next bell cancelled
+        '401':
+          description: Missing or invalid authentication
+          content: *ref_3
+        '403':
+          description: Insufficient permissions
+          content: *ref_7
+        '404':
+          description: No pending bell to cancel
+          content:
+            application/vnd.api+json:
+              schema:
+                type: object
+                description: JSON:API error document containing one or more errors
+                required: *ref_0
+                properties: *ref_1
+        '500':
+          description: Internal server error
+          content: *ref_4
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from POST /auth/login

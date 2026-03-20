@@ -1,0 +1,148 @@
+# User management paths (admin only, paginated)
+
+collection:
+  get:
+    operationId: listUsers
+    tags: [Users]
+    summary: List all users
+    description: Admin only. Returns a paginated collection of users.
+    security:
+      - BearerAuth: []
+    parameters:
+      - $ref: '../parameters.yaml#/PageNumber'
+      - $ref: '../parameters.yaml#/PageSize'
+      - $ref: '../parameters.yaml#/Sort'
+      - $ref: '../parameters.yaml#/FilterRole'
+    responses:
+      '200':
+        description: User collection
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/UserCollectionDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  post:
+    operationId: createUser
+    tags: [Users]
+    summary: Create user
+    description: Admin only. Creates a new system user.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/UserCreateRequest'
+    responses:
+      '201':
+        description: User created
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/UserDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '409':
+        $ref: '../responses.yaml#/Conflict'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+item:
+  parameters:
+    - in: path
+      name: id
+      required: true
+      description: User UUID
+      schema:
+        type: string
+        format: uuid
+
+  get:
+    operationId: getUserById
+    tags: [Users]
+    summary: Get user by ID
+    description: Admin only. Returns a single user resource.
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: User resource
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/UserDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  put:
+    operationId: updateUser
+    tags: [Users]
+    summary: Update user
+    description: Admin only. Updates an existing user.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/UserUpdateRequest'
+    responses:
+      '200':
+        description: User updated
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/UserDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '409':
+        $ref: '../responses.yaml#/Conflict'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  delete:
+    operationId: deleteUser
+    tags: [Users]
+    summary: Delete user
+    description: Admin only. Permanently removes a user.
+    security:
+      - BearerAuth: []
+    responses:
+      '204':
+        description: User deleted
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
