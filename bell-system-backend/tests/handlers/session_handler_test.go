@@ -44,7 +44,7 @@ func TestSessionHandler_List_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ string) ([]*models.Session, error) {
 			return sessions, nil
 		},
 	}
@@ -66,9 +66,33 @@ func TestSessionHandler_List_Success(t *testing.T) {
 	assert.Equal(t, "sessions", resp.Data[0].Type)
 }
 
+func TestSessionHandler_List_WithSort(t *testing.T) {
+	var capturedSort string
+	sessions := []*models.Session{
+		{ID: uuid.New(), Name: "Afternoon"},
+		{ID: uuid.New(), Name: "Morning"},
+	}
+
+	repo := &mocks.MockSessionRepo{
+		ListFunc: func(_ context.Context, sortSQL string) ([]*models.Session, error) {
+			capturedSort = sortSQL
+			return sessions, nil
+		},
+	}
+
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/?sort=-name", nil))
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "ORDER BY Name DESC", capturedSort)
+}
+
 func TestSessionHandler_List_Empty(t *testing.T) {
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ string) ([]*models.Session, error) {
 			return []*models.Session{}, nil
 		},
 	}
@@ -329,7 +353,7 @@ func TestSessionHandler_Delete_NotFound(t *testing.T) {
 
 func TestSessionHandler_List_DBError(t *testing.T) {
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ string) ([]*models.Session, error) {
 			return nil, errors.New("database error")
 		},
 	}

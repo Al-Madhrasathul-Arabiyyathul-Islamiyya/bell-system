@@ -25,7 +25,7 @@ type SessionRepository interface {
 	Create(ctx context.Context, session *models.Session) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Session, error)
 	GetSessionsByIDs(ctx context.Context, sessionIDs []uuid.UUID) (map[uuid.UUID]*models.Session, error)
-	List(ctx context.Context) ([]*models.Session, error)
+	List(ctx context.Context, sortSQL string) ([]*models.Session, error)
 	GetCurrentSession(ctx context.Context) (*models.Session, error)
 	Update(ctx context.Context, session *models.Session) error
 	Delete(ctx context.Context, id uuid.UUID) error

@@ -29,7 +29,7 @@ func (m *mockSessionRepo) GetByID(context.Context, uuid.UUID) (*models.Session, 
 func (m *mockSessionRepo) GetSessionsByIDs(context.Context, []uuid.UUID) (map[uuid.UUID]*models.Session, error) {
 	return nil, nil
 }
-func (m *mockSessionRepo) List(context.Context) ([]*models.Session, error) { return nil, nil }
+func (m *mockSessionRepo) List(context.Context, string) ([]*models.Session, error) { return nil, nil }
 func (m *mockSessionRepo) GetCurrentSession(_ context.Context) (*models.Session, error) {
 	return m.session, m.err
 }

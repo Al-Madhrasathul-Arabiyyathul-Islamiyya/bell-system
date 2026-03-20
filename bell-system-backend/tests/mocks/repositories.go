@@ -71,7 +71,7 @@ type MockSessionRepo struct {
 	CreateFunc            func(ctx context.Context, session *models.Session) error
 	GetByIDFunc           func(ctx context.Context, id uuid.UUID) (*models.Session, error)
 	GetSessionsByIDsFunc  func(ctx context.Context, sessionIDs []uuid.UUID) (map[uuid.UUID]*models.Session, error)
-	ListFunc              func(ctx context.Context) ([]*models.Session, error)
+	ListFunc              func(ctx context.Context, sortSQL string) ([]*models.Session, error)
 	GetCurrentSessionFunc func(ctx context.Context) (*models.Session, error)
 	UpdateFunc            func(ctx context.Context, session *models.Session) error
 	DeleteFunc            func(ctx context.Context, id uuid.UUID) error
@@ -100,11 +100,11 @@ func (m *MockSessionRepo) GetSessionsByIDs(ctx context.Context, sessionIDs []uui
 	return m.GetSessionsByIDsFunc(ctx, sessionIDs)
 }
 
-func (m *MockSessionRepo) List(ctx context.Context) ([]*models.Session, error) {
+func (m *MockSessionRepo) List(ctx context.Context, sortSQL string) ([]*models.Session, error) {
 	if m.ListFunc == nil {
 		panic("MockSessionRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, sortSQL)
 }
 
 func (m *MockSessionRepo) GetCurrentSession(ctx context.Context) (*models.Session, error) {
