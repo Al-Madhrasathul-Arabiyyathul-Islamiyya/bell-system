@@ -62,7 +62,9 @@ jobs:
           cache-dependency-path: bell-system-backend/go.sum
 
       - name: Run tests with coverage
-        run: go test ./... -v -count=1 -race -coverprofile=unit.out -coverpkg=./...
+        run: |
+          COVERPKGS="arabiyya.edu.mv/bell-system-backend/cmd/...,arabiyya.edu.mv/bell-system-backend/config,arabiyya.edu.mv/bell-system-backend/internal/...,arabiyya.edu.mv/bell-system-backend/pkg/..."
+          go test ./... -v -count=1 -race -coverprofile=unit.out -coverpkg="$COVERPKGS"
 
       - name: Print coverage summary
         run: go tool cover -func=unit.out | tail -1
@@ -103,8 +105,9 @@ jobs:
 
       - name: Run integration tests with coverage
         run: |
+          COVERPKGS="arabiyya.edu.mv/bell-system-backend/cmd/...,arabiyya.edu.mv/bell-system-backend/config,arabiyya.edu.mv/bell-system-backend/internal/...,arabiyya.edu.mv/bell-system-backend/pkg/..."
           go test -tags integration -v -count=1 -timeout 300s \
-            -coverprofile=integration.out -coverpkg=./... \
+            -coverprofile=integration.out -coverpkg="$COVERPKGS" \
             ./tests/integration/
 
       - name: Print integration coverage summary
