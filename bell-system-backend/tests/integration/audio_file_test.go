@@ -124,7 +124,7 @@ func TestAudioFileChecksums(t *testing.T) {
 		itemAttrs := item.Attributes.(map[string]any)
 		if itemAttrs["checksum"] == expectedChecksum {
 			found = true
-			assert.Equal(t, "school_song", itemAttrs["type"])
+			assert.Equal(t, "school_song", itemAttrs["fileType"])
 			break
 		}
 	}

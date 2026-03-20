@@ -191,8 +191,8 @@ func TestWebSocket_ScheduleUpdateNotifiesClients(t *testing.T) {
 
 	// Create a schedule item via REST — should trigger schedules_updated
 	sessionID := getSessionIDForWS(t, adminToken)
-	body := fmt.Sprintf(`{"name":"WS Test Bell","time":"08:00","soundId":"%s","sessionId":"%s","days":[2,3,4,5,6]}`, audioID, sessionID)
-	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), adminToken)
+	body := fmt.Sprintf(`{"data":{"type":"schedule-items","attributes":{"name":"WS Test Bell","time":"08:00","days":[2,3,4,5,6]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`, audioID, sessionID)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), adminToken)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 	resp.Body.Close()
 
@@ -306,9 +306,9 @@ func createTestAudioFileForWS(t *testing.T, token string) string {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var result map[string]any
-	readJSON(t, resp, &result)
-	return result["id"].(string)
+	doc := readDocument(t, resp)
+	require.NotNil(t, doc.Data)
+	return doc.Data.ID
 }
 
 // getSessionIDForWS returns the first session ID.
@@ -318,9 +318,7 @@ func getSessionIDForWS(t *testing.T, token string) string {
 	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var result map[string]any
-	readJSON(t, resp, &result)
-	items := result["items"].([]any)
-	require.NotEmpty(t, items)
-	return items[0].(map[string]any)["id"].(string)
+	col := readCollection(t, resp)
+	require.NotEmpty(t, col.Data)
+	return col.Data[0].ID
 }
