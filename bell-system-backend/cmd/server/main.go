@@ -20,6 +20,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/pkg/clock"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
+	scalargo "github.com/bdpiprava/scalar-go"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -124,6 +125,20 @@ func run(ctx context.Context) error {
 	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"status":"ok","version":%q}`, Version)
+	})
+
+	// API documentation (Scalar)
+	docsHTML, err := scalargo.NewV2(
+		scalargo.WithSpecDir("api"),
+		scalargo.WithDarkMode(),
+		scalargo.WithTheme(scalargo.ThemeKepler),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize API docs: %w", err)
+	}
+	r.Get("/docs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, docsHTML)
 	})
 
 	// WebSocket endpoint — mounted before timeout middleware so long-lived connections aren't killed
