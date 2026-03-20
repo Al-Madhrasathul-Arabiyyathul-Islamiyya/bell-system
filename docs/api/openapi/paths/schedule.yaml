@@ -8,6 +8,7 @@ current:
     description: |
       Documented JSON:API exception. Returns the current session's schedule
       items for the current day. Public endpoint.
+    security: []
     responses:
       '200':
         description: Current schedule

@@ -84,6 +84,7 @@ checksums:
     description: |
       Public endpoint for client sync. Returns a minimal JSON:API collection
       with only file type and checksum attributes.
+    security: []
     responses:
       '200':
         description: Audio file checksums
@@ -91,6 +92,8 @@ checksums:
           application/vnd.api+json:
             schema:
               $ref: '../schemas/resources.yaml#/AudioChecksumDocument'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
       '500':
         $ref: '../responses.yaml#/InternalServerError'
 
@@ -111,6 +114,7 @@ item:
     description: |
       Public endpoint. Returns JSON:API metadata for the audio file.
       Use `/audio/{id}/content` to download the binary.
+    security: []
     responses:
       '200':
         description: Audio file metadata
@@ -193,6 +197,7 @@ content:
       Public endpoint. Streams the binary audio content.
       Content-Type is determined by the file extension.
       Content-Disposition header includes the filename.
+    security: []
     responses:
       '200':
         description: Audio file binary

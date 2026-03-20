@@ -132,7 +132,9 @@ func run(ctx context.Context) error {
 		scalargo.WithSpecDir("api"),
 		scalargo.WithBaseFileName("openapi.yaml"),
 		scalargo.WithDarkMode(),
+		scalargo.WithOperationsSorter(scalargo.SorterMethod),
 		scalargo.WithTheme(scalargo.ThemeKepler),
+		scalargo.WithPersistAuth(true),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to initialize API docs: %w", err)

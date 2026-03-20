@@ -8,6 +8,7 @@ login:
     description: |
       Documented JSON:API exception. Uses plain JSON request/response.
       Returns a JWT token and user resource on success.
+    security: []
     requestBody:
       required: true
       content:

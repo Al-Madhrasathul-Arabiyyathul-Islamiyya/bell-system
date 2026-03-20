@@ -7,6 +7,7 @@ state:
     summary: Get system state
     description: |
       Public endpoint. Returns whether the bell system is active or paused.
+    security: []
     responses:
       '200':
         description: Current system state
@@ -14,6 +15,8 @@ state:
           application/vnd.api+json:
             schema:
               $ref: '../schemas/resources.yaml#/SystemStateDocument'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
       '500':
         $ref: '../responses.yaml#/InternalServerError'
 

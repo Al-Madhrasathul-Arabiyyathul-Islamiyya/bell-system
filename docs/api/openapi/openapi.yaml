@@ -9,6 +9,9 @@ info:
     binary download, and read-model endpoints are documented exceptions that use
     plain JSON request/response bodies but still return JSON:API error envelopes
     on failure.
+  license:
+    name: MIT
+    identifier: MIT
 servers:
   - url: http://localhost:8080/api/v1
     description: Development server

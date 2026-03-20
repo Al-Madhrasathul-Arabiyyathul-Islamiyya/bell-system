@@ -63,6 +63,7 @@ current:
     description: |
       Public endpoint. Returns the session that is active based on
       the current time of day.
+    security: []
     responses:
       '200':
         description: Current session
