@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -119,10 +120,14 @@ func (h *ScheduleHandler) List(w http.ResponseWriter, r *http.Request) {
 		resources[i] = jsonapi.MarshalScheduleItem(item)
 	}
 
+	includes := jsonapi.ParseInclude(r)
+	included := collectIncluded(items, includes)
+
 	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
-		Data:  resources,
-		Meta:  map[string]any{"total": len(items)},
-		Links: map[string]any{"self": "/api/v1/schedule"},
+		Data:     resources,
+		Included: included,
+		Meta:     map[string]any{"total": len(items)},
+		Links:    map[string]any{"self": "/api/v1/schedule"},
 	})
 }
 
@@ -148,7 +153,40 @@ func (h *ScheduleHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalScheduleItem(item))})
+	includes := jsonapi.ParseInclude(r)
+	included := collectIncluded([]*models.ScheduleItem{item}, includes)
+
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{
+		Data:     resourcePtr(jsonapi.MarshalScheduleItem(item)),
+		Included: included,
+	})
+}
+
+// collectIncluded builds a deduplicated list of included resources from schedule items.
+func collectIncluded(items []*models.ScheduleItem, includes []string) []jsonapi.Resource {
+	includeSession := slices.Contains(includes, "session")
+	includeSound := slices.Contains(includes, "sound")
+
+	if !includeSession && !includeSound {
+		return nil
+	}
+
+	var included []jsonapi.Resource
+	seenSessions := map[uuid.UUID]bool{}
+	seenSounds := map[uuid.UUID]bool{}
+
+	for _, item := range items {
+		if includeSession && item.Session != nil && !seenSessions[item.Session.ID] {
+			included = append(included, jsonapi.MarshalSession(item.Session))
+			seenSessions[item.Session.ID] = true
+		}
+		if includeSound && item.Sound != nil && !seenSounds[item.Sound.ID] {
+			included = append(included, jsonapi.MarshalAudioFile(item.Sound))
+			seenSounds[item.Sound.ID] = true
+		}
+	}
+
+	return included
 }
 
 type scheduleCreateAttributes struct {

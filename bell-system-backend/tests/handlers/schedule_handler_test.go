@@ -141,6 +141,152 @@ func TestScheduleHandler_List_WithSort(t *testing.T) {
 	assert.Equal(t, "ORDER BY Name DESC", capturedSort)
 }
 
+func TestScheduleHandler_List_IncludeSession(t *testing.T) {
+	sessionID := uuid.New()
+	session := &models.Session{ID: sessionID, Name: "Morning"}
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Bell 1", SessionID: &sessionID, Session: session, Days: []int{2}},
+		{ID: uuid.New(), Name: "Bell 2", SessionID: &sessionID, Session: session, Days: []int{2}},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+			return items, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/?include=session", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp.Included, 1) // deduplicated
+	assert.Equal(t, "sessions", resp.Included[0].Type)
+	assert.Equal(t, sessionID.String(), resp.Included[0].ID)
+}
+
+func TestScheduleHandler_List_IncludeSound(t *testing.T) {
+	soundID := uuid.New()
+	sound := &models.SystemAudioFile{ID: soundID, Name: "bell.wav", FileType: models.FileTypeBell}
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Bell 1", SoundID: soundID, Sound: sound, Days: []int{2}},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+			return items, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/?include=sound", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp.Included, 1)
+	assert.Equal(t, "audio-files", resp.Included[0].Type)
+}
+
+func TestScheduleHandler_List_IncludeBoth(t *testing.T) {
+	sessionID := uuid.New()
+	soundID := uuid.New()
+	session := &models.Session{ID: sessionID, Name: "Morning"}
+	sound := &models.SystemAudioFile{ID: soundID, Name: "bell.wav", FileType: models.FileTypeBell}
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Bell", SessionID: &sessionID, Session: session, SoundID: soundID, Sound: sound, Days: []int{2}},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+			return items, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/?include=session,sound", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Len(t, resp.Included, 2)
+}
+
+func TestScheduleHandler_List_NoInclude(t *testing.T) {
+	items := []*models.ScheduleItem{
+		{ID: uuid.New(), Name: "Bell", Days: []int{2}},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+			return items, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Empty(t, resp.Included)
+}
+
+func TestScheduleHandler_GetByID_IncludeSession(t *testing.T) {
+	itemID := uuid.New()
+	sessionID := uuid.New()
+	session := &models.Session{ID: sessionID, Name: "Morning"}
+	item := &models.ScheduleItem{
+		ID: itemID, Name: "Bell", SessionID: &sessionID, Session: session, Days: []int{2},
+	}
+
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
+			return item, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	req := authScheduleReq(httptest.NewRequest(http.MethodGet, "/"+itemID.String()+"?include=session", nil))
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.Document
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp.Included, 1)
+	assert.Equal(t, "sessions", resp.Included[0].Type)
+}
+
 func TestScheduleHandler_List_WithFilter(t *testing.T) {
 	var capturedSessionID string
 	var capturedDay int
