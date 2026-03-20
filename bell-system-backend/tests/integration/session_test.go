@@ -89,3 +89,20 @@ func TestSessionList_Ordered(t *testing.T) {
 	assert.Equal(t, "Morning Session", firstAttrs["name"])
 	assert.Equal(t, "Afternoon Session", secondAttrs["name"])
 }
+
+func TestSessionList_SortByName(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	resp := doRequest(t, http.MethodGet, "/api/v1/sessions?sort=name", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	require.GreaterOrEqual(t, len(col.Data), 2)
+
+	// Verify alphabetical order by name: Afternoon before Morning
+	firstAttrs := col.Data[0].Attributes.(map[string]any)
+	secondAttrs := col.Data[1].Attributes.(map[string]any)
+	assert.Equal(t, "Afternoon Session", firstAttrs["name"])
+	assert.Equal(t, "Morning Session", secondAttrs["name"])
+}

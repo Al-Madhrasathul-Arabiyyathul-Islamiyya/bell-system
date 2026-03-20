@@ -99,3 +99,59 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+func TestUserList_Pagination(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	// Create extra users to ensure we have enough for pagination
+	for i := 0; i < 3; i++ {
+		createTestUser(t, fmt.Sprintf("pageuser%d", i), "securepass123", "admin")
+	}
+
+	// Request page 1 with size 2
+	resp := doRequest(t, http.MethodGet, "/api/v1/users?page[number]=1&page[size]=2", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	assert.Len(t, col.Data, 2)
+	assert.GreaterOrEqual(t, col.Meta["total"].(float64), float64(4))
+	assert.Equal(t, float64(2), col.Meta["pageSize"])
+	assert.Equal(t, float64(1), col.Meta["page"])
+}
+
+func TestUserList_FilterByRole(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	// Create users with different roles
+	createTestUser(t, "filteradmin", "securepass123", "admin")
+	createTestUser(t, "filtermorning", "securepass123", "morning_user")
+
+	resp := doRequest(t, http.MethodGet, "/api/v1/users?filter[role]=morning_user", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	for _, item := range col.Data {
+		attrs := item.Attributes.(map[string]any)
+		assert.Equal(t, "morning_user", attrs["role"])
+	}
+}
+
+func TestUserList_SortDescending(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	resp := doRequest(t, http.MethodGet, "/api/v1/users?sort=-username", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	require.GreaterOrEqual(t, len(col.Data), 2)
+
+	// Verify descending order
+	for i := 1; i < len(col.Data); i++ {
+		prev := col.Data[i-1].Attributes.(map[string]any)["username"].(string)
+		curr := col.Data[i].Attributes.(map[string]any)["username"].(string)
+		assert.GreaterOrEqual(t, prev, curr, "expected descending username order")
+	}
+}

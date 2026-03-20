@@ -5,6 +5,7 @@ package integration_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"testing"
@@ -137,4 +138,40 @@ func TestAudioFileUpload_InvalidType(t *testing.T) {
 
 	status, _ := uploadAudioFile(t, "bad.mp3", "invalid_type", "bad.mp3", "data", token)
 	assert.Equal(t, http.StatusBadRequest, status)
+}
+
+func TestAudioFileList_FilterByType(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	// Upload files of different types
+	uploadAudioFile(t, "bell1.mp3", "bell", "bell1.mp3", "data1", token)
+	uploadAudioFile(t, "anthem1.mp3", "anthem", "anthem1.mp3", "data2", token)
+
+	resp := doRequest(t, http.MethodGet, "/api/v1/audio?filter[fileType]=bell", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	for _, item := range col.Data {
+		attrs := item.Attributes.(map[string]any)
+		assert.Equal(t, "bell", attrs["fileType"])
+	}
+}
+
+func TestAudioFileList_Pagination(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	// Upload several files
+	for i := 0; i < 3; i++ {
+		uploadAudioFile(t, fmt.Sprintf("page%d.mp3", i), "bell", fmt.Sprintf("page%d.mp3", i), fmt.Sprintf("data%d", i), token)
+	}
+
+	resp := doRequest(t, http.MethodGet, "/api/v1/audio?page[number]=1&page[size]=2", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	assert.Len(t, col.Data, 2)
+	assert.GreaterOrEqual(t, col.Meta["total"].(float64), float64(3))
+	assert.Equal(t, float64(2), col.Meta["pageSize"])
 }

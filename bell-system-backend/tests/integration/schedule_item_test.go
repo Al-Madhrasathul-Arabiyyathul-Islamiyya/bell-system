@@ -161,3 +161,96 @@ func TestScheduleItem_InvalidTime(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+func TestScheduleItemList_FilterBySession(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	soundID := createTestAudioFile(t, token)
+	sessionID := getSessionID(t, token)
+
+	// Create an item in the session
+	body := fmt.Sprintf(
+		`{"data":{"type":"schedule-items","attributes":{"name":"Filter Test","time":"09:00","days":[1]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
+	)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+
+	// Filter by session
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule?filter[sessionId]="+sessionID, nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	assert.GreaterOrEqual(t, len(col.Data), 1)
+}
+
+func TestScheduleItemList_IncludeSession(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	soundID := createTestAudioFile(t, token)
+	sessionID := getSessionID(t, token)
+
+	// Create an item
+	body := fmt.Sprintf(
+		`{"data":{"type":"schedule-items","attributes":{"name":"Include Test","time":"10:00","days":[1,2]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
+	)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+
+	// List with include=session
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule?include=session", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	require.NotEmpty(t, col.Data)
+	require.NotEmpty(t, col.Included, "expected included resources for session")
+
+	// Verify included contains a session resource
+	foundSession := false
+	for _, inc := range col.Included {
+		if inc.Type == "sessions" {
+			foundSession = true
+			break
+		}
+	}
+	assert.True(t, foundSession, "expected sessions in included resources")
+}
+
+func TestScheduleItemList_IncludeSound(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	soundID := createTestAudioFile(t, token)
+	sessionID := getSessionID(t, token)
+
+	// Create an item
+	body := fmt.Sprintf(
+		`{"data":{"type":"schedule-items","attributes":{"name":"Sound Include","time":"11:00","days":[3]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
+	)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	resp.Body.Close()
+
+	// List with include=sound
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule?include=sound", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	require.NotEmpty(t, col.Data)
+	require.NotEmpty(t, col.Included, "expected included resources for sound")
+
+	foundSound := false
+	for _, inc := range col.Included {
+		if inc.Type == "audio-files" {
+			foundSound = true
+			break
+		}
+	}
+	assert.True(t, foundSound, "expected audio-files in included resources")
+}
