@@ -117,15 +117,36 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 	return result, nil
 }
 
-// List gets all system audio file
-func (r *SystemAudioFileRepository) List(ctx context.Context) ([]*models.SystemAudioFile, error) {
-	query := `
+// List gets audio files with pagination, optional file type filter, and sorting.
+func (r *SystemAudioFileRepository) List(ctx context.Context, page, size int, filterFileType, sortSQL string) ([]*models.SystemAudioFile, int, error) {
+	where := ""
+	var args []any
+	if filterFileType != "" {
+		where = " WHERE FileType = @p1"
+		args = append(args, sql.Named("p1", filterFileType))
+	}
+
+	// Count total matching rows
+	countQuery := "SELECT COUNT(*) FROM SystemAudioFiles" + where
+	var total int
+	if err := r.DB.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count audio files: %w", err)
+	}
+
+	// Fetch page
+	offset := (page - 1) * size
+	query := fmt.Sprintf(`
         SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum
         FROM SystemAudioFiles
-`
-	rows, err := r.DB.QueryContext(ctx, query)
+        %s
+        %s
+        OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
+    `, where, sortSQL)
+
+	fetchArgs := append(args, sql.Named("offset", offset), sql.Named("size", size))
+	rows, err := r.DB.QueryContext(ctx, query, fetchArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list sessions: %w", err)
+		return nil, 0, fmt.Errorf("failed to list audio files: %w", err)
 	}
 	defer rows.Close()
 
@@ -133,16 +154,16 @@ func (r *SystemAudioFileRepository) List(ctx context.Context) ([]*models.SystemA
 	for rows.Next() {
 		var audio models.SystemAudioFile
 		if err := rows.Scan(&audio.ID, &audio.Name, &audio.FilePath, &audio.FileType, &audio.Checksum); err != nil {
-			return nil, fmt.Errorf("failed to scan session: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan audio file: %w", err)
 		}
 		audios = append(audios, &audio)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating session rows: %w", err)
+		return nil, 0, fmt.Errorf("error iterating audio file rows: %w", err)
 	}
 
-	return audios, nil
+	return audios, total, nil
 }
 
 // Update updates a system audio file

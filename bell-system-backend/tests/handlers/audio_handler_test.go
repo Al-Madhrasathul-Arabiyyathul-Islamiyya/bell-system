@@ -43,8 +43,8 @@ func TestAudioHandler_List_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
-			return files, nil
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			return files, len(files), nil
 		},
 	}
 
@@ -67,8 +67,8 @@ func TestAudioHandler_List_Success(t *testing.T) {
 
 func TestAudioHandler_List_Empty(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
-			return []*models.SystemAudioFile{}, nil
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			return []*models.SystemAudioFile{}, 0, nil
 		},
 	}
 
@@ -83,8 +83,8 @@ func TestAudioHandler_List_Empty(t *testing.T) {
 
 func TestAudioHandler_List_DBError(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
-			return nil, errors.New("database error")
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			return nil, 0, errors.New("database error")
 		},
 	}
 
@@ -672,4 +672,66 @@ func TestAudioHandler_FileTypes_AllValid(t *testing.T) {
 			require.Equal(t, http.StatusCreated, rr.Code)
 		})
 	}
+}
+
+// --- Pagination/filter/sort tests ---
+
+func TestAudioHandler_List_WithPagination(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		ListFunc: func(_ context.Context, page, size int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			assert.Equal(t, 2, page)
+			assert.Equal(t, 5, size)
+			return []*models.SystemAudioFile{
+				{ID: uuid.New(), Name: "bell.mp3", FileType: models.FileTypeBell},
+			}, 11, nil
+		},
+	}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?page[number]=2&page[size]=5", nil))
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, float64(11), resp.Meta["total"])
+	assert.Equal(t, float64(2), resp.Meta["page"])
+}
+
+func TestAudioHandler_List_WithFilter(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		ListFunc: func(_ context.Context, _, _ int, filterFileType, _ string) ([]*models.SystemAudioFile, int, error) {
+			assert.Equal(t, "bell", filterFileType)
+			return []*models.SystemAudioFile{}, 0, nil
+		},
+	}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?filter[fileType]=bell", nil))
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestAudioHandler_List_WithSort(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		ListFunc: func(_ context.Context, _, _ int, _, sortSQL string) ([]*models.SystemAudioFile, int, error) {
+			assert.Equal(t, "ORDER BY CreatedAt DESC", sortSQL)
+			return []*models.SystemAudioFile{}, 0, nil
+		},
+	}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?sort=-createdAt", nil))
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
 }

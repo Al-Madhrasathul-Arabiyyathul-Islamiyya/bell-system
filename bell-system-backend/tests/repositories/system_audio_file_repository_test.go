@@ -101,6 +101,9 @@ func TestSystemAudioFileRepository_List_Success(t *testing.T) {
 	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+
 	rows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum"}).
 		AddRow(uuid.New(), "bell.mp3", "/audio/bell.mp3", "bell", "h1").
 		AddRow(uuid.New(), "anthem.mp3", "/audio/anthem.mp3", "anthem", "h2").
@@ -109,22 +112,27 @@ func TestSystemAudioFileRepository_List_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, err := repo.List(ctx)
+	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
 	require.NoError(t, err)
 	assert.Len(t, audios, 3)
+	assert.Equal(t, 3, total)
 }
 
 func TestSystemAudioFileRepository_List_Empty(t *testing.T) {
 	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
 	rows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum"})
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, err := repo.List(ctx)
+	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
 	require.NoError(t, err)
 	assert.Empty(t, audios)
+	assert.Equal(t, 0, total)
 }
 
 func TestSystemAudioFileRepository_Update_Success(t *testing.T) {
@@ -213,31 +221,42 @@ func TestSystemAudioFileRepository_List_DBError(t *testing.T) {
 	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnError(errors.New("query failed"))
 
-	audios, err := repo.List(ctx)
+	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
 	require.Error(t, err)
 	assert.Nil(t, audios)
+	assert.Equal(t, 0, total)
 }
 
 func TestSystemAudioFileRepository_List_ScanError(t *testing.T) {
 	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
 	rows := sqlmock.NewRows([]string{"Id", "Name"}).
 		AddRow(uuid.New(), "Bad Row")
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, err := repo.List(ctx)
+	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
 	require.Error(t, err)
 	assert.Nil(t, audios)
+	assert.Equal(t, 0, total)
 }
 
 func TestSystemAudioFileRepository_List_RowsError(t *testing.T) {
 	repo, mock := mocks.NewMockSystemAudioFileRepo(t)
 	ctx := context.Background()
+
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
 	rows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum"}).
 		AddRow(uuid.New(), "bell.mp3", "/audio/bell.mp3", "bell", "h1").
@@ -245,9 +264,10 @@ func TestSystemAudioFileRepository_List_RowsError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, err := repo.List(ctx)
+	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
 	require.Error(t, err)
 	assert.Nil(t, audios)
+	assert.Equal(t, 0, total)
 }
 
 func TestSystemAudioFileRepository_Update_DBError(t *testing.T) {
