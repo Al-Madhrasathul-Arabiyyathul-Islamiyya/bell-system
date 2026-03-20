@@ -17,7 +17,7 @@ type MockUserRepo struct {
 	CreateFunc        func(ctx context.Context, user *models.User) error
 	GetByIDFunc       func(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetByUsernameFunc func(ctx context.Context, username string) (*models.User, error)
-	ListFunc          func(ctx context.Context) ([]*models.User, error)
+	ListFunc          func(ctx context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error)
 	UpdateFunc        func(ctx context.Context, user *models.User) error
 	DeleteFunc        func(ctx context.Context, id uuid.UUID) error
 }
@@ -45,11 +45,11 @@ func (m *MockUserRepo) GetByUsername(ctx context.Context, username string) (*mod
 	return m.GetByUsernameFunc(ctx, username)
 }
 
-func (m *MockUserRepo) List(ctx context.Context) ([]*models.User, error) {
+func (m *MockUserRepo) List(ctx context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error) {
 	if m.ListFunc == nil {
 		panic("MockUserRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, page, size, filterRole, sortSQL)
 }
 
 func (m *MockUserRepo) Update(ctx context.Context, user *models.User) error {

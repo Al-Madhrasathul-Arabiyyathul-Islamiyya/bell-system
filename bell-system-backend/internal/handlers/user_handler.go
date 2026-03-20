@@ -27,9 +27,19 @@ func NewUserHandler(users UserRepository, passwords PasswordHasher) *UserHandler
 	}
 }
 
+var userSortColumns = map[string]string{
+	"username":  "Username",
+	"role":      "Role",
+	"createdAt": "CreatedAt",
+}
+
 // List handles GET /.
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-	users, err := h.Users.List(r.Context())
+	p := jsonapi.ParsePagination(r)
+	filters := jsonapi.ParseFilter(r, []string{"role"})
+	sortSQL := jsonapi.SortToSQL(jsonapi.ParseSort(r), userSortColumns, "ORDER BY Username")
+
+	users, total, err := h.Users.List(r.Context(), p.Page, p.Size, filters["role"], sortSQL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list users")
 		return
@@ -42,8 +52,8 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
 		Data:  resources,
-		Meta:  map[string]any{"total": len(users)},
-		Links: map[string]any{"self": "/api/v1/users"},
+		Meta:  jsonapi.PaginationMeta(total, p.Page, p.Size),
+		Links: jsonapi.PaginationLinks("/api/v1/users", p, total),
 	})
 }
 

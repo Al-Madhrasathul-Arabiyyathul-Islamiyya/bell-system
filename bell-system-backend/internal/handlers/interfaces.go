@@ -15,7 +15,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *models.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
-	List(ctx context.Context) ([]*models.User, error)
+	List(ctx context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error)
 	Update(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

@@ -55,8 +55,8 @@ func TestUserHandler_List_Success(t *testing.T) {
 	}
 
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context) ([]*models.User, error) {
-			return users, nil
+		ListFunc: func(_ context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error) {
+			return users, len(users), nil
 		},
 	}
 	hasher := &mocks.MockPasswordHasher{}
@@ -80,8 +80,8 @@ func TestUserHandler_List_Success(t *testing.T) {
 
 func TestUserHandler_List_Empty(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context) ([]*models.User, error) {
-			return []*models.User{}, nil
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.User, int, error) {
+			return []*models.User{}, 0, nil
 		},
 	}
 	hasher := &mocks.MockPasswordHasher{}
@@ -103,8 +103,8 @@ func TestUserHandler_List_Empty(t *testing.T) {
 
 func TestUserHandler_List_DBError(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context) ([]*models.User, error) {
-			return nil, errors.New("database error")
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.User, int, error) {
+			return nil, 0, errors.New("database error")
 		},
 	}
 	hasher := &mocks.MockPasswordHasher{}
@@ -733,4 +733,79 @@ func TestUserHandler_Delete_GetByIDDBError(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+// --- Pagination/filter/sort tests ---
+
+func TestUserHandler_List_WithPagination(t *testing.T) {
+	userRepo := &mocks.MockUserRepo{
+		ListFunc: func(_ context.Context, page, size int, _, _ string) ([]*models.User, int, error) {
+			assert.Equal(t, 2, page)
+			assert.Equal(t, 5, size)
+			return []*models.User{
+				{ID: uuid.New(), Username: "user6", Role: models.RoleAdmin, CreatedAt: time.Now()},
+			}, 11, nil
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?page[number]=2&page[size]=5", nil))
+	rr := httptest.NewRecorder()
+
+	r := newUserRouter(userRepo, hasher)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, float64(11), resp.Meta["total"])
+	assert.Equal(t, float64(2), resp.Meta["page"])
+	assert.Equal(t, float64(5), resp.Meta["pageSize"])
+	assert.Equal(t, float64(3), resp.Meta["totalPages"])
+	assert.Contains(t, resp.Links["self"], "page[number]=2")
+}
+
+func TestUserHandler_List_WithFilter(t *testing.T) {
+	userRepo := &mocks.MockUserRepo{
+		ListFunc: func(_ context.Context, _, _ int, filterRole, _ string) ([]*models.User, int, error) {
+			assert.Equal(t, "admin", filterRole)
+			return []*models.User{
+				{ID: uuid.New(), Username: "admin", Role: models.RoleAdmin, CreatedAt: time.Now()},
+			}, 1, nil
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?filter[role]=admin", nil))
+	rr := httptest.NewRecorder()
+
+	r := newUserRouter(userRepo, hasher)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, float64(1), resp.Meta["total"])
+}
+
+func TestUserHandler_List_WithSort(t *testing.T) {
+	userRepo := &mocks.MockUserRepo{
+		ListFunc: func(_ context.Context, _, _ int, _, sortSQL string) ([]*models.User, int, error) {
+			assert.Equal(t, "ORDER BY CreatedAt DESC", sortSQL)
+			return []*models.User{}, 0, nil
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?sort=-createdAt", nil))
+	rr := httptest.NewRecorder()
+
+	r := newUserRouter(userRepo, hasher)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
 }
