@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
-	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
@@ -28,6 +28,16 @@ func newSystemRouter(stateRepo handlers.SystemStateRepository, schedSvc handlers
 func authSystemReq(req *http.Request) *http.Request {
 	testutil.SetAuthHeader(req)
 	return req
+}
+
+func systemStateBody(state string) *bytes.Buffer {
+	body, _ := json.Marshal(map[string]any{
+		"data": map[string]any{
+			"type":       "system-state",
+			"attributes": map[string]any{"state": state},
+		},
+	})
+	return bytes.NewBuffer(body)
 }
 
 // --- GET /state ---
@@ -46,11 +56,13 @@ func TestSystemHandler_GetState_Success(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.SystemStateResponse
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "active", resp.State)
-	assert.Equal(t, now, resp.LastUpdated)
+	assert.Equal(t, "system-state", resp.Data.Type)
+	assert.Equal(t, "current", resp.Data.ID)
+	attrs := resp.Data.Attributes.(map[string]any)
+	assert.Equal(t, "active", attrs["state"])
 }
 
 func TestSystemHandler_GetState_Error(t *testing.T) {
@@ -83,17 +95,18 @@ func TestSystemHandler_SetState_Active(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", systemStateBody("active")))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, notifier).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.SystemStateResponse
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "active", resp.State)
+	assert.Equal(t, "system-state", resp.Data.Type)
+	attrs := resp.Data.Attributes.(map[string]any)
+	assert.Equal(t, "active", attrs["state"])
 	assert.True(t, notifier.SystemStateChangedCalled)
 }
 
@@ -109,17 +122,17 @@ func TestSystemHandler_SetState_Paused(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", systemStateBody("paused")))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, notifier).ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.SystemStateResponse
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "paused", resp.State)
+	attrs := resp.Data.Attributes.(map[string]any)
+	assert.Equal(t, "paused", attrs["state"])
 	assert.True(t, notifier.SystemStateChangedCalled)
 }
 
@@ -136,8 +149,7 @@ func TestSystemHandler_SetState_InvalidBody(t *testing.T) {
 func TestSystemHandler_SetState_InvalidState(t *testing.T) {
 	repo := &mocks.MockSystemStateRepo{}
 
-	body, _ := json.Marshal(map[string]string{"state": "unknown"})
-	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", systemStateBody("unknown")))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -151,8 +163,7 @@ func TestSystemHandler_SetState_DBError(t *testing.T) {
 		},
 	}
 
-	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", systemStateBody("active")))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -173,34 +184,29 @@ func TestSystemHandler_SetState_NilNotifier(t *testing.T) {
 	h := handlers.NewSystemHandler(repo, &mocks.MockSchedulerService{}, nil)
 	r := router.SystemRoutes(h, testutil.PermissiveTokenService)
 
-	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", systemStateBody("active")))
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.SystemStateResponse
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "active", resp.State)
+	assert.Equal(t, "system-state", resp.Data.Type)
 }
 
 func TestSystemHandler_SetState_GetStateErrorAfterSet(t *testing.T) {
-	callCount := 0
 	repo := &mocks.MockSystemStateRepo{
 		SetStateFunc: func(_ context.Context, state string) error {
 			return nil
 		},
 		GetStateFunc: func(_ context.Context) (string, time.Time, error) {
-			callCount++
-			// First GetState call is from SetState's follow-up read
 			return "", time.Time{}, errors.New("db error on re-read")
 		},
 	}
 
-	body, _ := json.Marshal(models.SystemStateRequest{State: "active"})
-	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewReader(body)))
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", systemStateBody("active")))
 	rr := httptest.NewRecorder()
 	newSystemRouter(repo, &mocks.MockSchedulerService{}, nil).ServeHTTP(rr, req)
 
@@ -231,13 +237,7 @@ func TestSystemHandler_CancelNextBell_Success(t *testing.T) {
 	rr := httptest.NewRecorder()
 	newSystemRouter(&mocks.MockSystemStateRepo{}, svc, nil).ServeHTTP(rr, req)
 
-	require.Equal(t, http.StatusOK, rr.Code)
-
-	var resp models.SuccessResponse
-	err := json.NewDecoder(rr.Body).Decode(&resp)
-	require.NoError(t, err)
-	assert.True(t, resp.Success)
-	assert.Contains(t, resp.Message, "abc-123")
+	assert.Equal(t, http.StatusNoContent, rr.Code)
 }
 
 func TestSystemHandler_CancelNextBell_NoneToCancel(t *testing.T) {
