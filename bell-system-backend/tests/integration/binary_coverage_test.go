@@ -95,6 +95,13 @@ func TestBinaryCoverage_Server(t *testing.T) {
 	out, err := build.CombinedOutput()
 	require.NoError(t, err, "build failed: %s", string(out))
 
+	// Copy OpenAPI spec so Scalar can find it at api/openapi.yaml
+	apiDir := filepath.Join(tmpDir, "api")
+	require.NoError(t, os.MkdirAll(apiDir, 0o755))
+	specSrc, err := os.ReadFile(filepath.Join(projectRoot, "api", "openapi.yaml"))
+	require.NoError(t, err, "could not read OpenAPI spec")
+	require.NoError(t, os.WriteFile(filepath.Join(apiDir, "openapi.yaml"), specSrc, 0o644))
+
 	// Write config with a free port
 	port := findFreePort(t)
 	writeTestConfig(t, tmpDir, port)
