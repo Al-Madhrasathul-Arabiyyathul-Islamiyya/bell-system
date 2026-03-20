@@ -23,6 +23,7 @@ import (
 	ws "arabiyya.edu.mv/bell-system-backend/internal/websocket"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
+	scalargo "github.com/bdpiprava/scalar-go"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/stretchr/testify/require"
@@ -195,6 +196,25 @@ func TestMain(m *testing.M) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"status":"ok"}`))
 	})
+
+	// API documentation (Scalar) — mirrors cmd/server/main.go
+	docsHTML, err := scalargo.NewV2(
+		scalargo.WithSpecDir("../../api"),
+		scalargo.WithBaseFileName("openapi.yaml"),
+		scalargo.WithDarkMode(),
+		scalargo.WithOperationsSorter(scalargo.SorterMethod),
+		scalargo.WithTheme(scalargo.ThemeKepler),
+		scalargo.WithPersistAuth(true),
+	)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to initialize API docs: %v\n", err)
+		os.Exit(1)
+	}
+	r.Get("/docs", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, docsHTML)
+	})
+
 	r.Handle("/ws", wsHandler)
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.Timeout(time.Second * 30))
