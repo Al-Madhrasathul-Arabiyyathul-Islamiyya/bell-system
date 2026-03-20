@@ -17,43 +17,41 @@ func TestUserCRUD(t *testing.T) {
 	token := adminToken(t)
 
 	// Create
-	createBody := `{"username":"testuser","password":"securepass123","role":"admin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(createBody), token)
+	createBody := `{"data":{"type":"users","attributes":{"username":"testuser","password":"securepass123","role":"admin"}}}`
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(createBody), token)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var created map[string]any
-	readJSON(t, resp, &created)
-
-	userID, ok := created["id"].(string)
-	require.True(t, ok)
-	assert.Equal(t, "testuser", created["username"])
-	assert.Equal(t, "admin", created["role"])
+	doc := readDocument(t, resp)
+	userID := doc.Data.ID
+	require.NotEmpty(t, userID)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "testuser", attrs["username"])
+	assert.Equal(t, "admin", attrs["role"])
 
 	// Get by ID
 	resp = doRequest(t, http.MethodGet, "/api/v1/users/"+userID, nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var fetched map[string]any
-	readJSON(t, resp, &fetched)
-	assert.Equal(t, "testuser", fetched["username"])
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "testuser", attrs["username"])
 
 	// List
 	resp = doRequest(t, http.MethodGet, "/api/v1/users", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var listResult map[string]any
-	readJSON(t, resp, &listResult)
-	total := listResult["total"].(float64)
+	col := readCollection(t, resp)
+	total := col.Meta["total"].(float64)
 	assert.GreaterOrEqual(t, total, float64(4)) // 3 seeded + 1 created
 
 	// Update
-	updateBody := `{"username":"updateduser"}`
-	resp = doRequest(t, http.MethodPut, "/api/v1/users/"+userID, bytes.NewBufferString(updateBody), token)
+	updateBody := `{"data":{"type":"users","attributes":{"username":"updateduser"}}}`
+	resp = doJSONAPIRequest(t, http.MethodPut, "/api/v1/users/"+userID, bytes.NewBufferString(updateBody), token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var updated map[string]any
-	readJSON(t, resp, &updated)
-	assert.Equal(t, "updateduser", updated["username"])
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "updateduser", attrs["username"])
 
 	// Delete
 	resp = doRequest(t, http.MethodDelete, "/api/v1/users/"+userID, nil, token)
@@ -71,8 +69,8 @@ func TestCreateUser_DuplicateUsername(t *testing.T) {
 	token := adminToken(t)
 
 	// "admin" already exists from seed data
-	body := `{"username":"admin","password":"password123","role":"admin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
+	body := `{"data":{"type":"users","attributes":{"username":"admin","password":"password123","role":"admin"}}}`
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	// Should fail with conflict or server error
@@ -84,8 +82,8 @@ func TestCreateUser_PasswordTooShort(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
-	body := `{"username":"shortpw","password":"short","role":"admin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
+	body := `{"data":{"type":"users","attributes":{"username":"shortpw","password":"short","role":"admin"}}}`
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -95,8 +93,8 @@ func TestCreateUser_InvalidRole(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
-	body := `{"username":"badrole","password":"password123","role":"superadmin"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
+	body := `{"data":{"type":"users","attributes":{"username":"badrole","password":"password123","role":"superadmin"}}}`
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

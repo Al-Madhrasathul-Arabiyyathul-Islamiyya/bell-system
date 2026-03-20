@@ -4,10 +4,13 @@ package integration_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"net/http"
 	"testing"
+
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -35,11 +38,11 @@ func createTestAudioFile(t *testing.T, token string) string {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var result map[string]any
-	readJSON(t, resp, &result)
-	id, ok := result["id"].(string)
-	require.True(t, ok)
-	return id
+	var doc jsonapi.Document
+	json.NewDecoder(resp.Body).Decode(&doc)
+	resp.Body.Close()
+	require.NotNil(t, doc.Data)
+	return doc.Data.ID
 }
 
 // getSessionID returns the ID of the first session from the list.
@@ -49,11 +52,9 @@ func getSessionID(t *testing.T, token string) string {
 	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var result map[string]any
-	readJSON(t, resp, &result)
-	items := result["items"].([]any)
-	require.NotEmpty(t, items)
-	return items[0].(map[string]any)["id"].(string)
+	col := readCollection(t, resp)
+	require.NotEmpty(t, col.Data)
+	return col.Data[0].ID
 }
 
 func TestScheduleItemCRUD(t *testing.T) {
@@ -65,37 +66,38 @@ func TestScheduleItemCRUD(t *testing.T) {
 
 	// Create
 	createBody := fmt.Sprintf(
-		`{"sessionId":"%s","name":"First Bell","time":"07:00","soundId":"%s","days":[1,2,3,4,5]}`,
-		sessionID, soundID,
+		`{"data":{"type":"schedule-items","attributes":{"name":"First Bell","time":"07:00","days":[1,2,3,4,5]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(createBody), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(createBody), token)
 	if resp.StatusCode != http.StatusCreated {
 		var errBody map[string]any
-		readJSON(t, resp, &errBody)
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		resp.Body.Close()
 		t.Fatalf("schedule item create failed with status %d: %v", resp.StatusCode, errBody)
 	}
 
-	var created map[string]any
-	readJSON(t, resp, &created)
-
-	itemID, ok := created["id"].(string)
-	require.True(t, ok)
-	assert.Equal(t, "First Bell", created["name"])
+	doc := readDocument(t, resp)
+	itemID := doc.Data.ID
+	require.NotEmpty(t, itemID)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "First Bell", attrs["name"])
 
 	// Get by ID — should include relations
 	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, token)
 	if resp.StatusCode != http.StatusOK {
 		var errBody map[string]any
-		readJSON(t, resp, &errBody)
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		resp.Body.Close()
 		t.Fatalf("schedule item get by ID failed with status %d: %v", resp.StatusCode, errBody)
 	}
 
-	var fetched map[string]any
-	readJSON(t, resp, &fetched)
-	assert.Equal(t, "First Bell", fetched["name"])
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "First Bell", attrs["name"])
 
 	// Verify days are present
-	days, ok := fetched["days"].([]any)
+	days, ok := attrs["days"].([]any)
 	require.True(t, ok)
 	assert.Len(t, days, 5)
 
@@ -103,18 +105,17 @@ func TestScheduleItemCRUD(t *testing.T) {
 	resp = doRequest(t, http.MethodGet, "/api/v1/schedule", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var listResult map[string]any
-	readJSON(t, resp, &listResult)
-	assert.GreaterOrEqual(t, listResult["total"].(float64), float64(1))
+	col := readCollection(t, resp)
+	assert.GreaterOrEqual(t, col.Meta["total"].(float64), float64(1))
 
 	// Update
-	updateBody := `{"name":"Updated Bell"}`
-	resp = doRequest(t, http.MethodPut, "/api/v1/schedule/"+itemID, bytes.NewBufferString(updateBody), token)
+	updateBody := `{"data":{"type":"schedule-items","attributes":{"name":"Updated Bell"}}}`
+	resp = doJSONAPIRequest(t, http.MethodPut, "/api/v1/schedule/"+itemID, bytes.NewBufferString(updateBody), token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var updated map[string]any
-	readJSON(t, resp, &updated)
-	assert.Equal(t, "Updated Bell", updated["name"])
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "Updated Bell", attrs["name"])
 
 	// Delete
 	resp = doRequest(t, http.MethodDelete, "/api/v1/schedule/"+itemID, nil, token)
@@ -132,11 +133,13 @@ func TestScheduleItem_InvalidDays(t *testing.T) {
 	token := adminToken(t)
 
 	soundID := createTestAudioFile(t, token)
+	sessionID := getSessionID(t, token)
 
 	body := fmt.Sprintf(
-		`{"name":"Bad Days","time":"08:00","soundId":"%s","days":[0,8]}`, soundID,
+		`{"data":{"type":"schedule-items","attributes":{"name":"Bad Days","time":"08:00","days":[0,8]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
@@ -147,11 +150,13 @@ func TestScheduleItem_InvalidTime(t *testing.T) {
 	token := adminToken(t)
 
 	soundID := createTestAudioFile(t, token)
+	sessionID := getSessionID(t, token)
 
 	body := fmt.Sprintf(
-		`{"name":"Bad Time","time":"not-a-time","soundId":"%s","days":[1]}`, soundID,
+		`{"data":{"type":"schedule-items","attributes":{"name":"Bad Time","time":"not-a-time","days":[1]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
 	)
-	resp := doRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(body), token)
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)

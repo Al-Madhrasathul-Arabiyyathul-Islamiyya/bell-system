@@ -16,42 +16,40 @@ func TestSessionCRUD(t *testing.T) {
 	token := adminToken(t)
 
 	// Create
-	createBody := `{"name":"Evening Session","startTime":"18:30","endTime":"21:00"}`
-	resp := doRequest(t, http.MethodPost, "/api/v1/sessions", bytes.NewBufferString(createBody), token)
+	createBody := `{"data":{"type":"sessions","attributes":{"name":"Evening Session","startTime":"18:30","endTime":"21:00"}}}`
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/sessions", bytes.NewBufferString(createBody), token)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var created map[string]any
-	readJSON(t, resp, &created)
-
-	sessionID, ok := created["id"].(string)
-	require.True(t, ok)
-	assert.Equal(t, "Evening Session", created["name"])
+	doc := readDocument(t, resp)
+	sessionID := doc.Data.ID
+	require.NotEmpty(t, sessionID)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "Evening Session", attrs["name"])
 
 	// Get by ID
 	resp = doRequest(t, http.MethodGet, "/api/v1/sessions/"+sessionID, nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var fetched map[string]any
-	readJSON(t, resp, &fetched)
-	assert.Equal(t, "Evening Session", fetched["name"])
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "Evening Session", attrs["name"])
 
 	// List
 	resp = doRequest(t, http.MethodGet, "/api/v1/sessions", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var listResult map[string]any
-	readJSON(t, resp, &listResult)
-	total := listResult["total"].(float64)
+	col := readCollection(t, resp)
+	total := col.Meta["total"].(float64)
 	assert.GreaterOrEqual(t, total, float64(3)) // 2 seeded + 1 created
 
 	// Update
-	updateBody := `{"name":"Late Evening Session"}`
-	resp = doRequest(t, http.MethodPut, "/api/v1/sessions/"+sessionID, bytes.NewBufferString(updateBody), token)
+	updateBody := `{"data":{"type":"sessions","attributes":{"name":"Late Evening Session"}}}`
+	resp = doJSONAPIRequest(t, http.MethodPut, "/api/v1/sessions/"+sessionID, bytes.NewBufferString(updateBody), token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var updated map[string]any
-	readJSON(t, resp, &updated)
-	assert.Equal(t, "Late Evening Session", updated["name"])
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "Late Evening Session", attrs["name"])
 
 	// Delete
 	resp = doRequest(t, http.MethodDelete, "/api/v1/sessions/"+sessionID, nil, token)
@@ -82,16 +80,12 @@ func TestSessionList_Ordered(t *testing.T) {
 	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var listResult map[string]any
-	readJSON(t, resp, &listResult)
-
-	items, ok := listResult["items"].([]any)
-	require.True(t, ok)
-	require.GreaterOrEqual(t, len(items), 2)
+	col := readCollection(t, resp)
+	require.GreaterOrEqual(t, len(col.Data), 2)
 
 	// Verify Morning comes before Afternoon (ordered by StartTime)
-	first := items[0].(map[string]any)
-	second := items[1].(map[string]any)
-	assert.Equal(t, "Morning Session", first["name"])
-	assert.Equal(t, "Afternoon Session", second["name"])
+	firstAttrs := col.Data[0].Attributes.(map[string]any)
+	secondAttrs := col.Data[1].Attributes.(map[string]any)
+	assert.Equal(t, "Morning Session", firstAttrs["name"])
+	assert.Equal(t, "Afternoon Session", secondAttrs["name"])
 }
