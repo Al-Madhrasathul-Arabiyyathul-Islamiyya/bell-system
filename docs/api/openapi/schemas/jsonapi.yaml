@@ -73,9 +73,8 @@ SessionRelationshipData:
       format: uuid
 
 NullableSessionRelationshipData:
-  type: object
+  type: ['object', 'null']
   description: Nullable resource identifier for a session relationship (null clears the relationship)
-  nullable: true
   required: [type, id]
   properties:
     type:

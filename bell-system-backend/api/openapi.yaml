@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.2.0
 info:
   title: Bell Schedule System API
   version: 1.0.0
@@ -447,7 +447,9 @@ components:
                 type: string
                 example: "07:00"
               sound:
-                type: object
+                type:
+                  - object
+                  - "null"
                 properties:
                   id:
                     type: string
@@ -458,7 +460,6 @@ components:
                   checksum:
                     type: string
                 description: The audio file associated with this bell
-                nullable: true
               status:
                 type: string
                 enum:
@@ -556,7 +557,9 @@ components:
           format: date-time
       description: Schedule item resource attributes
     NullableSessionRelationshipData:
-      type: object
+      type:
+        - object
+        - "null"
       properties:
         type:
           type: string
@@ -569,7 +572,6 @@ components:
         - type
         - id
       description: Nullable resource identifier for a session relationship (null clears the relationship)
-      nullable: true
     AudioFileRelationshipData:
       type: object
       properties:

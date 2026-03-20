@@ -57,8 +57,7 @@ CurrentScheduleResponse:
             type: string
             example: "07:00"
           sound:
-            type: object
-            nullable: true
+            type: ['object', 'null']
             description: The audio file associated with this bell
             properties:
               id:
