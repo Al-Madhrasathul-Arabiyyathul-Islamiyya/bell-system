@@ -345,6 +345,52 @@ func TestParseFilter_EmptyValue(t *testing.T) {
 	assert.False(t, hasRole)
 }
 
+func TestSortToSQL_Empty(t *testing.T) {
+	result := jsonapi.SortToSQL(nil, map[string]string{"name": "Name"}, "ORDER BY Name")
+	assert.Equal(t, "ORDER BY Name", result)
+}
+
+func TestSortToSQL_SingleAsc(t *testing.T) {
+	sorts := []jsonapi.SortField{{Field: "username", Desc: false}}
+	colMap := map[string]string{"username": "Username", "role": "Role"}
+	result := jsonapi.SortToSQL(sorts, colMap, "ORDER BY Username")
+	assert.Equal(t, "ORDER BY Username ASC", result)
+}
+
+func TestSortToSQL_SingleDesc(t *testing.T) {
+	sorts := []jsonapi.SortField{{Field: "createdAt", Desc: true}}
+	colMap := map[string]string{"createdAt": "CreatedAt"}
+	result := jsonapi.SortToSQL(sorts, colMap, "ORDER BY CreatedAt")
+	assert.Equal(t, "ORDER BY CreatedAt DESC", result)
+}
+
+func TestSortToSQL_Multiple(t *testing.T) {
+	sorts := []jsonapi.SortField{
+		{Field: "role", Desc: false},
+		{Field: "username", Desc: true},
+	}
+	colMap := map[string]string{"username": "Username", "role": "Role"}
+	result := jsonapi.SortToSQL(sorts, colMap, "ORDER BY Username")
+	assert.Equal(t, "ORDER BY Role ASC, Username DESC", result)
+}
+
+func TestSortToSQL_UnknownFieldsIgnored(t *testing.T) {
+	sorts := []jsonapi.SortField{{Field: "unknown", Desc: false}}
+	colMap := map[string]string{"name": "Name"}
+	result := jsonapi.SortToSQL(sorts, colMap, "ORDER BY Name")
+	assert.Equal(t, "ORDER BY Name", result)
+}
+
+func TestSortToSQL_MixedKnownAndUnknown(t *testing.T) {
+	sorts := []jsonapi.SortField{
+		{Field: "unknown", Desc: false},
+		{Field: "name", Desc: true},
+	}
+	colMap := map[string]string{"name": "Name"}
+	result := jsonapi.SortToSQL(sorts, colMap, "ORDER BY Name")
+	assert.Equal(t, "ORDER BY Name DESC", result)
+}
+
 func TestParseInclude_Empty(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 	includes := jsonapi.ParseInclude(r)

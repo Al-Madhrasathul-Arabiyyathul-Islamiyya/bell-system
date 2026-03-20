@@ -53,6 +53,27 @@ func ParseFilter(r *http.Request, allowedKeys []string) map[string]string {
 	return filters
 }
 
+// SortToSQL converts parsed sort fields into a SQL ORDER BY clause using a column whitelist.
+// Unknown field names are silently ignored. Returns defaultOrder if no valid sorts found.
+func SortToSQL(sorts []SortField, columnMap map[string]string, defaultOrder string) string {
+	var parts []string
+	for _, s := range sorts {
+		col, ok := columnMap[s.Field]
+		if !ok {
+			continue
+		}
+		if s.Desc {
+			parts = append(parts, col+" DESC")
+		} else {
+			parts = append(parts, col+" ASC")
+		}
+	}
+	if len(parts) == 0 {
+		return defaultOrder
+	}
+	return "ORDER BY " + strings.Join(parts, ", ")
+}
+
 // ParseInclude parses the `include` query parameter into a slice of relationship names.
 func ParseInclude(r *http.Request) []string {
 	raw := r.URL.Query().Get("include")
