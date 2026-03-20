@@ -14,6 +14,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
@@ -54,15 +55,14 @@ func TestAudioHandler_List_Success(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
 
-	var resp struct {
-		Total int                      `json:"total"`
-		Items []models.SystemAudioFile `json:"items"`
-	}
+	var resp jsonapi.CollectionDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, 2, resp.Total)
-	assert.Len(t, resp.Items, 2)
+	assert.Equal(t, float64(2), resp.Meta["total"])
+	assert.Len(t, resp.Data, 2)
+	assert.Equal(t, "audio-files", resp.Data[0].Type)
 }
 
 func TestAudioHandler_List_Empty(t *testing.T) {
@@ -97,7 +97,7 @@ func TestAudioHandler_List_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
-// --- GET /{id} (get audio file by ID) ---
+// --- GET /{id} (get audio file metadata) ---
 
 func TestAudioHandler_GetByID_Success(t *testing.T) {
 	fileID := uuid.New()
@@ -123,6 +123,13 @@ func TestAudioHandler_GetByID_Success(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
+
+	var resp jsonapi.Document
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "audio-files", resp.Data.Type)
+	assert.Equal(t, fileID.String(), resp.Data.ID)
 }
 
 func TestAudioHandler_GetByID_NotFound(t *testing.T) {
@@ -180,6 +187,7 @@ func TestAudioHandler_Upload_Success(t *testing.T) {
 	r.ServeHTTP(rr, authAudioReq(req))
 
 	require.Equal(t, http.StatusCreated, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
 }
 
 func TestAudioHandler_Upload_MissingFile(t *testing.T) {
@@ -237,9 +245,9 @@ func TestAudioHandler_Update_Success(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/"+fileID.String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -255,9 +263,9 @@ func TestAudioHandler_Update_NotFound(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -402,9 +410,9 @@ func TestAudioHandler_Upload_DBError(t *testing.T) {
 func TestAudioHandler_Update_InvalidUUID(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{}
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -420,9 +428,9 @@ func TestAudioHandler_Update_ErrNotFound(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -438,9 +446,9 @@ func TestAudioHandler_Update_GetByIDDBError(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -457,7 +465,7 @@ func TestAudioHandler_Update_InvalidJSON(t *testing.T) {
 	}
 
 	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -476,9 +484,9 @@ func TestAudioHandler_Update_DBError(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -500,9 +508,9 @@ func TestAudioHandler_Update_FileTypeOnly(t *testing.T) {
 		},
 	}
 
-	body := `{"fileType":"anthem"}`
+	body := jsonapiBody("audio-files", map[string]string{"fileType": "anthem"})
 	req := httptest.NewRequest(http.MethodPut, "/"+fileID.String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouter(repo)
@@ -596,9 +604,9 @@ func TestAudioHandler_Update_NotifiesOnSuccess(t *testing.T) {
 	h := handlers.NewAudioHandler(repo, notifier)
 	r := router.AudioRoutes(h, testutil.PermissiveTokenService)
 
-	body := `{"name":"updated"}`
+	body := jsonapiBody("audio-files", map[string]string{"name": "updated"})
 	req := httptest.NewRequest(http.MethodPut, "/"+fileID.String(), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 	r.ServeHTTP(rr, authAudioReq(req))
 

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -43,10 +43,20 @@ func (h *AudioHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list audio files")
 		return
 	}
-	writeJSON(w, http.StatusOK, models.ListResponse{Total: len(files), Items: files})
+
+	resources := make([]jsonapi.Resource, len(files))
+	for i, f := range files {
+		resources[i] = jsonapi.MarshalAudioFile(f)
+	}
+
+	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
+		Data:  resources,
+		Meta:  map[string]any{"total": len(files)},
+		Links: map[string]any{"self": "/api/v1/audio"},
+	})
 }
 
-// GetByID handles GET /{id}.
+// GetByID handles GET /{id} — returns JSON:API metadata.
 func (h *AudioHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
@@ -68,26 +78,51 @@ func (h *AudioHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if h.FileStorage != nil && file.FilePath != "" {
-		reader, err := h.FileStorage.Open(file.FilePath)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "internal_error", "failed to read audio file")
-			return
-		}
-		defer reader.Close()
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalAudioFile(file))})
+}
 
-		ext := filepath.Ext(file.FilePath)
-		contentType := mime.TypeByExtension(ext)
-		if contentType == "" {
-			contentType = "application/octet-stream"
-		}
-		w.Header().Set("Content-Type", contentType)
-		w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s%s"`, file.Name, ext))
-		io.Copy(w, reader)
+// GetContent handles GET /{id}/content — streams binary audio.
+func (h *AudioHandler) GetContent(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid audio file ID")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, file)
+	file, err := h.AudioFiles.GetByID(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, pkgerrors.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not_found", "audio file not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to get audio file")
+		return
+	}
+	if file == nil {
+		writeError(w, http.StatusNotFound, "not_found", "audio file not found")
+		return
+	}
+
+	if h.FileStorage == nil || file.FilePath == "" {
+		writeError(w, http.StatusNotFound, "not_found", "audio content not available")
+		return
+	}
+
+	reader, err := h.FileStorage.Open(file.FilePath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal_error", "failed to read audio file")
+		return
+	}
+	defer reader.Close()
+
+	ext := filepath.Ext(file.FilePath)
+	contentType := mime.TypeByExtension(ext)
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s%s"`, file.Name, ext))
+	io.Copy(w, reader)
 }
 
 // Upload handles POST / (multipart file upload).
@@ -137,13 +172,13 @@ func (h *AudioHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, audioFile)
+	writeJSONAPI(w, http.StatusCreated, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalAudioFile(audioFile))})
 	if h.Notifier != nil {
 		h.Notifier.NotifyAudioFilesUpdated()
 	}
 }
 
-type audioUpdateRequest struct {
+type audioUpdateAttributes struct {
 	Name     string          `json:"name,omitempty"`
 	FileType models.FileType `json:"fileType,omitempty"`
 }
@@ -170,17 +205,23 @@ func (h *AudioHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req audioUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "audio-files")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if req.Name != "" {
-		existing.Name = req.Name
+	var attrs audioUpdateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
 	}
-	if req.FileType != "" {
-		existing.FileType = req.FileType
+
+	if attrs.Name != "" {
+		existing.Name = attrs.Name
+	}
+	if attrs.FileType != "" {
+		existing.FileType = attrs.FileType
 	}
 
 	if err := h.AudioFiles.Update(r.Context(), existing); err != nil {
@@ -188,7 +229,7 @@ func (h *AudioHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, existing)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalAudioFile(existing))})
 	if h.Notifier != nil {
 		h.Notifier.NotifyAudioFilesUpdated()
 	}
@@ -239,16 +280,14 @@ func (h *AudioHandler) ListChecksums(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type checksumEntry struct {
-		ID       uuid.UUID       `json:"id"`
-		Type     models.FileType `json:"type"`
-		Checksum string          `json:"checksum"`
-	}
-
-	entries := make([]checksumEntry, len(files))
+	resources := make([]jsonapi.Resource, len(files))
 	for i, f := range files {
-		entries[i] = checksumEntry{ID: f.ID, Type: f.FileType, Checksum: f.Checksum}
+		resources[i] = jsonapi.MarshalAudioChecksum(f)
 	}
 
-	writeJSON(w, http.StatusOK, entries)
+	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
+		Data:  resources,
+		Meta:  map[string]any{"total": len(files)},
+		Links: map[string]any{"self": "/api/v1/audio/checksums"},
+	})
 }

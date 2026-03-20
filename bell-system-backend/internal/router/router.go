@@ -108,6 +108,7 @@ func AudioRoutes(h *handlers.AudioHandler, tokenSvc handlers.TokenService) chi.R
 	r := chi.NewRouter()
 	r.Get("/checksums", h.ListChecksums)
 	r.Get("/{id}", h.GetByID)
+	r.Get("/{id}/content", h.GetContent)
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(tokenSvc))
 		r.Get("/", h.List)
