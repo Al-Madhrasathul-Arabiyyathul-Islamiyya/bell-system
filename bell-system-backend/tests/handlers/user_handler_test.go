@@ -35,6 +35,16 @@ func authReq(req *http.Request) *http.Request {
 	return req
 }
 
+// jsonapiBody builds a JSON:API request body.
+func jsonapiBody(typ string, attrs any, rels ...map[string]any) string {
+	data := map[string]any{"type": typ, "attributes": attrs}
+	if len(rels) > 0 {
+		data["relationships"] = rels[0]
+	}
+	body, _ := json.Marshal(map[string]any{"data": data})
+	return string(body)
+}
+
 // --- GET / (list users) ---
 
 func TestUserHandler_List_Success(t *testing.T) {
@@ -58,15 +68,14 @@ func TestUserHandler_List_Success(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
 
-	var resp struct {
-		Total int           `json:"total"`
-		Items []models.User `json:"items"`
-	}
+	var resp jsonapi.CollectionDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, 2, resp.Total)
-	assert.Len(t, resp.Items, 2)
+	assert.Equal(t, float64(2), resp.Meta["total"])
+	assert.Len(t, resp.Data, 2)
+	assert.Equal(t, "users", resp.Data[0].Type)
 }
 
 func TestUserHandler_List_Empty(t *testing.T) {
@@ -85,14 +94,11 @@ func TestUserHandler_List_Empty(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp struct {
-		Total int           `json:"total"`
-		Items []models.User `json:"items"`
-	}
+	var resp jsonapi.CollectionDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, 0, resp.Total)
-	assert.Empty(t, resp.Items)
+	assert.Equal(t, float64(0), resp.Meta["total"])
+	assert.Empty(t, resp.Data)
 }
 
 func TestUserHandler_List_DBError(t *testing.T) {
@@ -137,12 +143,13 @@ func TestUserHandler_GetByID_Success(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
 
-	var resp models.User
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, userID, resp.ID)
-	assert.Equal(t, "admin", resp.Username)
+	assert.Equal(t, "users", resp.Data.Type)
+	assert.Equal(t, userID.String(), resp.Data.ID)
 }
 
 func TestUserHandler_GetByID_NotFound(t *testing.T) {
@@ -201,22 +208,22 @@ func TestUserHandler_Create_Success(t *testing.T) {
 		},
 	}
 
-	body := `{"username":"newuser","password":"password123","role":"admin"}`
+	body := jsonapiBody("users", map[string]string{"username": "newuser", "password": "password123", "role": "admin"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusCreated, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
 
-	var resp models.User
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "newuser", resp.Username)
-	assert.Equal(t, models.RoleAdmin, resp.Role)
-	assert.NotEqual(t, uuid.Nil, resp.ID)
+	assert.Equal(t, "users", resp.Data.Type)
+	assert.NotEmpty(t, resp.Data.ID)
 }
 
 func TestUserHandler_Create_InvalidJSON(t *testing.T) {
@@ -224,7 +231,7 @@ func TestUserHandler_Create_InvalidJSON(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{broken`)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -247,9 +254,9 @@ func TestUserHandler_Create_DuplicateUsername(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"existing","password":"password123","role":"admin"}`
+	body := jsonapiBody("users", map[string]string{"username": "existing", "password": "password123", "role": "admin"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -268,9 +275,9 @@ func TestUserHandler_Create_MissingFields(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"onlyuser"}`
+	body := jsonapiBody("users", map[string]string{"username": "onlyuser"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -283,9 +290,9 @@ func TestUserHandler_Create_InvalidRole(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"user","password":"password123","role":"superadmin"}`
+	body := jsonapiBody("users", map[string]string{"username": "user", "password": "password123", "role": "superadmin"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -316,9 +323,9 @@ func TestUserHandler_Update_Success(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"newname"}`
+	body := jsonapiBody("users", map[string]string{"username": "newname"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -335,9 +342,9 @@ func TestUserHandler_Update_NotFound(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"newname"}`
+	body := jsonapiBody("users", map[string]string{"username": "newname"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -356,7 +363,7 @@ func TestUserHandler_Update_InvalidJSON(t *testing.T) {
 	hasher := &mocks.MockPasswordHasher{}
 
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(`{bad`)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -469,9 +476,9 @@ func TestUserHandler_Create_PasswordTooShort(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"user","password":"short","role":"admin"}`
+	body := jsonapiBody("users", map[string]string{"username": "user", "password": "short", "role": "admin"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -492,9 +499,9 @@ func TestUserHandler_Create_HashError(t *testing.T) {
 		},
 	}
 
-	body := `{"username":"user","password":"password123","role":"admin"}`
+	body := jsonapiBody("users", map[string]string{"username": "user", "password": "password123", "role": "admin"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -518,9 +525,9 @@ func TestUserHandler_Create_DBError(t *testing.T) {
 		},
 	}
 
-	body := `{"username":"user","password":"password123","role":"admin"}`
+	body := jsonapiBody("users", map[string]string{"username": "user", "password": "password123", "role": "admin"})
 	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -533,9 +540,9 @@ func TestUserHandler_Update_InvalidUUID(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"newname"}`
+	body := jsonapiBody("users", map[string]string{"username": "newname"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -552,9 +559,9 @@ func TestUserHandler_Update_ErrNotFound(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"newname"}`
+	body := jsonapiBody("users", map[string]string{"username": "newname"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -571,9 +578,9 @@ func TestUserHandler_Update_GetByIDDBError(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"newname"}`
+	body := jsonapiBody("users", map[string]string{"username": "newname"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -599,9 +606,9 @@ func TestUserHandler_Update_WithPassword(t *testing.T) {
 		},
 	}
 
-	body := `{"password":"newpassword1"}`
+	body := jsonapiBody("users", map[string]string{"password": "newpassword1"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -623,9 +630,9 @@ func TestUserHandler_Update_PasswordHashError(t *testing.T) {
 		},
 	}
 
-	body := `{"password":"newpassword1"}`
+	body := jsonapiBody("users", map[string]string{"password": "newpassword1"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -647,9 +654,9 @@ func TestUserHandler_Update_WithRole(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"role":"morning_user"}`
+	body := jsonapiBody("users", map[string]string{"role": "morning_user"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)
@@ -670,9 +677,9 @@ func TestUserHandler_Update_DBError(t *testing.T) {
 	}
 	hasher := &mocks.MockPasswordHasher{}
 
-	body := `{"username":"newname"}`
+	body := jsonapiBody("users", map[string]string{"username": "newname"})
 	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newUserRouter(userRepo, hasher)

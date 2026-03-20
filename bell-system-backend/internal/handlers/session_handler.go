@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -23,13 +23,13 @@ func NewSessionHandler(sessions SessionRepository) *SessionHandler {
 	return &SessionHandler{Sessions: sessions}
 }
 
-type sessionCreateRequest struct {
+type sessionCreateAttributes struct {
 	Name      string `json:"name"`
 	StartTime string `json:"startTime"`
 	EndTime   string `json:"endTime"`
 }
 
-type sessionUpdateRequest struct {
+type sessionUpdateAttributes struct {
 	Name      string `json:"name,omitempty"`
 	StartTime string `json:"startTime,omitempty"`
 	EndTime   string `json:"endTime,omitempty"`
@@ -42,7 +42,17 @@ func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list sessions")
 		return
 	}
-	writeJSON(w, http.StatusOK, models.ListResponse{Total: len(sessions), Items: sessions})
+
+	resources := make([]jsonapi.Resource, len(sessions))
+	for i, s := range sessions {
+		resources[i] = jsonapi.MarshalSession(s)
+	}
+
+	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
+		Data:  resources,
+		Meta:  map[string]any{"total": len(sessions)},
+		Links: map[string]any{"self": "/api/v1/sessions"},
+	})
 }
 
 // GetByID handles GET /{id}.
@@ -67,7 +77,7 @@ func (h *SessionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, session)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalSession(session))})
 }
 
 // GetCurrent handles GET /current.
@@ -86,29 +96,35 @@ func (h *SessionHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, session)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalSession(session))})
 }
 
 // Create handles POST /.
 func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req sessionCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "sessions")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if req.Name == "" || req.StartTime == "" || req.EndTime == "" {
+	var attrs sessionCreateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
+	}
+
+	if attrs.Name == "" || attrs.StartTime == "" || attrs.EndTime == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "name, startTime, and endTime are required")
 		return
 	}
 
-	startTime, err := time.Parse("15:04", req.StartTime)
+	startTime, err := time.Parse("15:04", attrs.StartTime)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid startTime format, use HH:MM")
 		return
 	}
 
-	endTime, err := time.Parse("15:04", req.EndTime)
+	endTime, err := time.Parse("15:04", attrs.EndTime)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid endTime format, use HH:MM")
 		return
@@ -116,7 +132,7 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	session := &models.Session{
 		ID:        uuid.New(),
-		Name:      req.Name,
+		Name:      attrs.Name,
 		StartTime: startTime,
 		EndTime:   endTime,
 	}
@@ -126,7 +142,7 @@ func (h *SessionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, session)
+	writeJSONAPI(w, http.StatusCreated, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalSession(session))})
 }
 
 // Update handles PUT /{id}.
@@ -151,25 +167,31 @@ func (h *SessionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req sessionUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "sessions")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if req.Name != "" {
-		existing.Name = req.Name
+	var attrs sessionUpdateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
 	}
-	if req.StartTime != "" {
-		t, err := time.Parse("15:04", req.StartTime)
+
+	if attrs.Name != "" {
+		existing.Name = attrs.Name
+	}
+	if attrs.StartTime != "" {
+		t, err := time.Parse("15:04", attrs.StartTime)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_request", "invalid startTime format")
 			return
 		}
 		existing.StartTime = t
 	}
-	if req.EndTime != "" {
-		t, err := time.Parse("15:04", req.EndTime)
+	if attrs.EndTime != "" {
+		t, err := time.Parse("15:04", attrs.EndTime)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_request", "invalid endTime format")
 			return
@@ -182,7 +204,7 @@ func (h *SessionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, existing)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalSession(existing))})
 }
 
 // Delete handles DELETE /{id}.
