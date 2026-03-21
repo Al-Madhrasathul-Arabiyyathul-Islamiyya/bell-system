@@ -21,6 +21,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	"arabiyya.edu.mv/bell-system-backend/internal/services"
 	ws "arabiyya.edu.mv/bell-system-backend/internal/websocket"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
 	scalargo "github.com/bdpiprava/scalar-go"
@@ -369,19 +370,52 @@ func adminToken(t *testing.T) string {
 	return loginAs(t, username, password)
 }
 
+// doJSONAPIRequest builds and executes an HTTP request with JSON:API content type.
+func doJSONAPIRequest(t *testing.T, method, path string, body io.Reader, token string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(method, testServer.URL+path, body)
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
+// readDocument decodes a JSON:API single-resource response.
+func readDocument(t *testing.T, resp *http.Response) jsonapi.Document {
+	t.Helper()
+	defer resp.Body.Close()
+	var doc jsonapi.Document
+	err := json.NewDecoder(resp.Body).Decode(&doc)
+	require.NoError(t, err)
+	return doc
+}
+
+// readCollection decodes a JSON:API collection response.
+func readCollection(t *testing.T, resp *http.Response) jsonapi.CollectionDocument {
+	t.Helper()
+	defer resp.Body.Close()
+	var doc jsonapi.CollectionDocument
+	err := json.NewDecoder(resp.Body).Decode(&doc)
+	require.NoError(t, err)
+	return doc
+}
+
 // createTestUser creates a user via the API and returns the user ID.
 func createTestUser(t *testing.T, username, password, role string) string {
 	t.Helper()
 
 	token := adminToken(t)
-	body := fmt.Sprintf(`{"username":%q,"password":%q,"role":%q}`, username, password, role)
-	resp := doRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
+	body := fmt.Sprintf(`{"data":{"type":"users","attributes":{"username":%q,"password":%q,"role":%q}}}`, username, password, role)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/users", bytes.NewBufferString(body), token)
 	require.Equal(t, http.StatusCreated, resp.StatusCode, "failed to create test user %s", username)
 
-	var result map[string]any
-	readJSON(t, resp, &result)
-
-	id, ok := result["id"].(string)
-	require.True(t, ok)
-	return id
+	doc := readDocument(t, resp)
+	return doc.Data.ID
 }

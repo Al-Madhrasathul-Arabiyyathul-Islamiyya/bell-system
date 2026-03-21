@@ -113,13 +113,16 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 	return result, nil
 }
 
-// List gets all sessions
-func (r *SessionRepository) List(ctx context.Context) ([]*models.Session, error) {
-	query := `
+// List gets all sessions with optional sorting.
+func (r *SessionRepository) List(ctx context.Context, sortSQL string) ([]*models.Session, error) {
+	if sortSQL == "" {
+		sortSQL = "ORDER BY StartTime"
+	}
+	query := fmt.Sprintf(`
         SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
         FROM Sessions
-        ORDER BY StartTime
-    `
+        %s
+    `, sortSQL)
 	rows, err := r.DB.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)

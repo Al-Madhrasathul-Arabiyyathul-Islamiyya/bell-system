@@ -15,6 +15,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
@@ -71,11 +72,15 @@ func TestAudioHandler_Upload_WithFileStorage(t *testing.T) {
 	assert.Equal(t, ".wav", savedExt)
 	assert.Equal(t, "real audio data", string(savedData))
 
-	var resp models.SystemAudioFile
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "abc123checksum", resp.Checksum)
-	assert.Contains(t, resp.FilePath, ".wav")
+	assert.Equal(t, "audio-files", resp.Data.Type)
+
+	attrs, ok := resp.Data.Attributes.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "abc123checksum", attrs["checksum"])
+	assert.Contains(t, attrs["filePath"], ".wav")
 }
 
 func TestAudioHandler_Upload_FileStorageSaveError(t *testing.T) {
@@ -105,9 +110,9 @@ func TestAudioHandler_Upload_FileStorageSaveError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
-// --- GetByID with FileStorage (streams binary) ---
+// --- GetContent with FileStorage (streams binary) ---
 
-func TestAudioHandler_GetByID_StreamsFile(t *testing.T) {
+func TestAudioHandler_GetContent_StreamsFile(t *testing.T) {
 	fileID := uuid.New()
 	fileContent := "fake audio binary content"
 
@@ -129,7 +134,7 @@ func TestAudioHandler_GetByID_StreamsFile(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouterWithStorage(repo, fs)
@@ -140,7 +145,7 @@ func TestAudioHandler_GetByID_StreamsFile(t *testing.T) {
 	assert.Contains(t, rr.Header().Get("Content-Disposition"), "bell.wav")
 }
 
-func TestAudioHandler_GetByID_UnknownExtension_FallsBackToOctetStream(t *testing.T) {
+func TestAudioHandler_GetContent_UnknownExtension_FallsBackToOctetStream(t *testing.T) {
 	fileID := uuid.New()
 	fileContent := "binary data"
 
@@ -161,7 +166,7 @@ func TestAudioHandler_GetByID_UnknownExtension_FallsBackToOctetStream(t *testing
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouterWithStorage(repo, fs)
@@ -172,7 +177,7 @@ func TestAudioHandler_GetByID_UnknownExtension_FallsBackToOctetStream(t *testing
 	assert.Equal(t, fileContent, rr.Body.String())
 }
 
-func TestAudioHandler_GetByID_FileOpenError(t *testing.T) {
+func TestAudioHandler_GetContent_FileOpenError(t *testing.T) {
 	fileID := uuid.New()
 
 	repo := &mocks.MockSystemAudioFileRepo{
@@ -192,7 +197,7 @@ func TestAudioHandler_GetByID_FileOpenError(t *testing.T) {
 		},
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
 	rr := httptest.NewRecorder()
 
 	r := newAudioRouterWithStorage(repo, fs)
@@ -201,7 +206,7 @@ func TestAudioHandler_GetByID_FileOpenError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
-func TestAudioHandler_GetByID_MetadataOnly(t *testing.T) {
+func TestAudioHandler_GetContent_NoFilePath_Returns404(t *testing.T) {
 	fileID := uuid.New()
 
 	repo := &mocks.MockSystemAudioFileRepo{
@@ -217,6 +222,31 @@ func TestAudioHandler_GetByID_MetadataOnly(t *testing.T) {
 
 	fs := &mocks.MockFileStorage{}
 
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_GetByID_ReturnsMetadata(t *testing.T) {
+	fileID := uuid.New()
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
+			return &models.SystemAudioFile{
+				ID:       fileID,
+				Name:     "bell",
+				FilePath: "/audio/" + fileID.String() + ".wav",
+				FileType: models.FileTypeBell,
+			}, nil
+		},
+	}
+
+	fs := &mocks.MockFileStorage{}
+
 	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String(), nil)
 	rr := httptest.NewRecorder()
 
@@ -224,7 +254,13 @@ func TestAudioHandler_GetByID_MetadataOnly(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
-	assert.Contains(t, rr.Header().Get("Content-Type"), "application/json")
+	assert.Contains(t, rr.Header().Get("Content-Type"), jsonapi.ContentType)
+
+	var resp jsonapi.Document
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, "audio-files", resp.Data.Type)
+	assert.Equal(t, fileID.String(), resp.Data.ID)
 }
 
 // --- Delete with FileStorage ---
@@ -271,8 +307,8 @@ func TestAudioHandler_ListChecksums_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
-			return files, nil
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			return files, len(files), nil
 		},
 	}
 
@@ -284,22 +320,17 @@ func TestAudioHandler_ListChecksums_Success(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp []struct {
-		ID       uuid.UUID `json:"id"`
-		Type     string    `json:"type"`
-		Checksum string    `json:"checksum"`
-	}
+	var resp jsonapi.CollectionDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Len(t, resp, 2)
-	assert.Equal(t, "aaa", resp[0].Checksum)
-	assert.Equal(t, "bbb", resp[1].Checksum)
+	assert.Len(t, resp.Data, 2)
+	assert.Equal(t, "audio-files", resp.Data[0].Type)
 }
 
 func TestAudioHandler_ListChecksums_DBError(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
-			return nil, errors.New("database error")
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			return nil, 0, errors.New("database error")
 		},
 	}
 
@@ -314,8 +345,8 @@ func TestAudioHandler_ListChecksums_DBError(t *testing.T) {
 
 func TestAudioHandler_ListChecksums_Empty(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context) ([]*models.SystemAudioFile, error) {
-			return []*models.SystemAudioFile{}, nil
+		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+			return []*models.SystemAudioFile{}, 0, nil
 		},
 	}
 

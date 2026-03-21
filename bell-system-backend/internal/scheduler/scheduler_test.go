@@ -29,7 +29,7 @@ func (m *mockSessionRepo) GetByID(context.Context, uuid.UUID) (*models.Session, 
 func (m *mockSessionRepo) GetSessionsByIDs(context.Context, []uuid.UUID) (map[uuid.UUID]*models.Session, error) {
 	return nil, nil
 }
-func (m *mockSessionRepo) List(context.Context) ([]*models.Session, error) { return nil, nil }
+func (m *mockSessionRepo) List(context.Context, string) ([]*models.Session, error) { return nil, nil }
 func (m *mockSessionRepo) GetCurrentSession(_ context.Context) (*models.Session, error) {
 	return m.session, m.err
 }
@@ -45,7 +45,9 @@ func (m *mockItemRepo) Create(context.Context, *models.ScheduleItem) error { ret
 func (m *mockItemRepo) GetByID(context.Context, uuid.UUID) (*models.ScheduleItem, error) {
 	return nil, nil
 }
-func (m *mockItemRepo) List(context.Context) ([]*models.ScheduleItem, error) { return nil, nil }
+func (m *mockItemRepo) List(context.Context, string, int, string) ([]*models.ScheduleItem, error) {
+	return nil, nil
+}
 func (m *mockItemRepo) GetCurrentSessionSchedules(_ context.Context, _ uuid.UUID) ([]*models.ScheduleItem, error) {
 	return m.items, m.err
 }

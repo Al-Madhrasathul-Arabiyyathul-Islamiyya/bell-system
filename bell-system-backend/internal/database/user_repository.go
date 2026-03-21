@@ -80,16 +80,36 @@ func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*m
 	return &user, nil
 }
 
-// List gets all users
-func (r *UserRepository) List(ctx context.Context) ([]*models.User, error) {
-	query := `
+// List gets users with pagination, optional role filter, and sorting.
+func (r *UserRepository) List(ctx context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error) {
+	where := ""
+	var args []any
+	if filterRole != "" {
+		where = " WHERE Role = @p1"
+		args = append(args, sql.Named("p1", filterRole))
+	}
+
+	// Count total matching rows
+	countQuery := "SELECT COUNT(*) FROM Users" + where
+	var total int
+	if err := r.DB.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count users: %w", err)
+	}
+
+	// Fetch page
+	offset := (page - 1) * size
+	query := fmt.Sprintf(`
         SELECT CONVERT(NVARCHAR(36), Id) AS Id, Username, PasswordHash, Role, CreatedAt
         FROM Users
-        ORDER BY Username
-    `
-	rows, err := r.DB.QueryContext(ctx, query)
+        %s
+        %s
+        OFFSET @offset ROWS FETCH NEXT @size ROWS ONLY
+    `, where, sortSQL)
+
+	fetchArgs := append(args, sql.Named("offset", offset), sql.Named("size", size))
+	rows, err := r.DB.QueryContext(ctx, query, fetchArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list users: %w", err)
+		return nil, 0, fmt.Errorf("failed to list users: %w", err)
 	}
 	defer rows.Close()
 
@@ -97,16 +117,16 @@ func (r *UserRepository) List(ctx context.Context) ([]*models.User, error) {
 	for rows.Next() {
 		var user models.User
 		if err := rows.Scan(&user.ID, &user.Username, &user.PasswordHash, &user.Role, &user.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan user: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan user: %w", err)
 		}
 		users = append(users, &user)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating user rows: %w", err)
+		return nil, 0, fmt.Errorf("error iterating user rows: %w", err)
 	}
 
-	return users, nil
+	return users, total, nil
 }
 
 // Update updates a user

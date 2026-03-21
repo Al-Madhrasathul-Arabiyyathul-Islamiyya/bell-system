@@ -17,7 +17,7 @@ type MockUserRepo struct {
 	CreateFunc        func(ctx context.Context, user *models.User) error
 	GetByIDFunc       func(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetByUsernameFunc func(ctx context.Context, username string) (*models.User, error)
-	ListFunc          func(ctx context.Context) ([]*models.User, error)
+	ListFunc          func(ctx context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error)
 	UpdateFunc        func(ctx context.Context, user *models.User) error
 	DeleteFunc        func(ctx context.Context, id uuid.UUID) error
 }
@@ -45,11 +45,11 @@ func (m *MockUserRepo) GetByUsername(ctx context.Context, username string) (*mod
 	return m.GetByUsernameFunc(ctx, username)
 }
 
-func (m *MockUserRepo) List(ctx context.Context) ([]*models.User, error) {
+func (m *MockUserRepo) List(ctx context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error) {
 	if m.ListFunc == nil {
 		panic("MockUserRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, page, size, filterRole, sortSQL)
 }
 
 func (m *MockUserRepo) Update(ctx context.Context, user *models.User) error {
@@ -71,7 +71,7 @@ type MockSessionRepo struct {
 	CreateFunc            func(ctx context.Context, session *models.Session) error
 	GetByIDFunc           func(ctx context.Context, id uuid.UUID) (*models.Session, error)
 	GetSessionsByIDsFunc  func(ctx context.Context, sessionIDs []uuid.UUID) (map[uuid.UUID]*models.Session, error)
-	ListFunc              func(ctx context.Context) ([]*models.Session, error)
+	ListFunc              func(ctx context.Context, sortSQL string) ([]*models.Session, error)
 	GetCurrentSessionFunc func(ctx context.Context) (*models.Session, error)
 	UpdateFunc            func(ctx context.Context, session *models.Session) error
 	DeleteFunc            func(ctx context.Context, id uuid.UUID) error
@@ -100,11 +100,11 @@ func (m *MockSessionRepo) GetSessionsByIDs(ctx context.Context, sessionIDs []uui
 	return m.GetSessionsByIDsFunc(ctx, sessionIDs)
 }
 
-func (m *MockSessionRepo) List(ctx context.Context) ([]*models.Session, error) {
+func (m *MockSessionRepo) List(ctx context.Context, sortSQL string) ([]*models.Session, error) {
 	if m.ListFunc == nil {
 		panic("MockSessionRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, sortSQL)
 }
 
 func (m *MockSessionRepo) GetCurrentSession(ctx context.Context) (*models.Session, error) {
@@ -132,7 +132,7 @@ func (m *MockSessionRepo) Delete(ctx context.Context, id uuid.UUID) error {
 type MockScheduleItemRepo struct {
 	CreateFunc                     func(ctx context.Context, item *models.ScheduleItem) error
 	GetByIDFunc                    func(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error)
-	ListFunc                       func(ctx context.Context) ([]*models.ScheduleItem, error)
+	ListFunc                       func(ctx context.Context, filterSessionID string, filterDay int, sortSQL string) ([]*models.ScheduleItem, error)
 	GetCurrentSessionSchedulesFunc func(ctx context.Context, sessionID uuid.UUID) ([]*models.ScheduleItem, error)
 	UpdateFunc                     func(ctx context.Context, item *models.ScheduleItem) error
 	DeleteFunc                     func(ctx context.Context, id uuid.UUID) error
@@ -154,11 +154,11 @@ func (m *MockScheduleItemRepo) GetByID(ctx context.Context, id uuid.UUID) (*mode
 	return m.GetByIDFunc(ctx, id)
 }
 
-func (m *MockScheduleItemRepo) List(ctx context.Context) ([]*models.ScheduleItem, error) {
+func (m *MockScheduleItemRepo) List(ctx context.Context, filterSessionID string, filterDay int, sortSQL string) ([]*models.ScheduleItem, error) {
 	if m.ListFunc == nil {
 		panic("MockScheduleItemRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, filterSessionID, filterDay, sortSQL)
 }
 
 func (m *MockScheduleItemRepo) GetCurrentSessionSchedules(ctx context.Context, sessionID uuid.UUID) ([]*models.ScheduleItem, error) {
@@ -225,7 +225,7 @@ type MockSystemAudioFileRepo struct {
 	CreateFunc         func(ctx context.Context, audio *models.SystemAudioFile) error
 	GetByIDFunc        func(ctx context.Context, id uuid.UUID) (*models.SystemAudioFile, error)
 	GetSoundsByIDsFunc func(ctx context.Context, soundIDs []uuid.UUID) (map[uuid.UUID]*models.SystemAudioFile, error)
-	ListFunc           func(ctx context.Context) ([]*models.SystemAudioFile, error)
+	ListFunc           func(ctx context.Context, page, size int, filterFileType, sortSQL string) ([]*models.SystemAudioFile, int, error)
 	UpdateFunc         func(ctx context.Context, audio *models.SystemAudioFile) error
 	DeleteFunc         func(ctx context.Context, id uuid.UUID) error
 }
@@ -253,11 +253,11 @@ func (m *MockSystemAudioFileRepo) GetSoundsByIDs(ctx context.Context, soundIDs [
 	return m.GetSoundsByIDsFunc(ctx, soundIDs)
 }
 
-func (m *MockSystemAudioFileRepo) List(ctx context.Context) ([]*models.SystemAudioFile, error) {
+func (m *MockSystemAudioFileRepo) List(ctx context.Context, page, size int, filterFileType, sortSQL string) ([]*models.SystemAudioFile, int, error) {
 	if m.ListFunc == nil {
 		panic("MockSystemAudioFileRepo.ListFunc not set")
 	}
-	return m.ListFunc(ctx)
+	return m.ListFunc(ctx, page, size, filterFileType, sortSQL)
 }
 
 func (m *MockSystemAudioFileRepo) Update(ctx context.Context, audio *models.SystemAudioFile) error {

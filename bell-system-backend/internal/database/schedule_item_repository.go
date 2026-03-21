@@ -163,9 +163,33 @@ func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*mo
 	return &scheduleItem, nil
 }
 
-// List gets all schedule items with their associations
-func (r *ScheduleItemRepository) List(ctx context.Context) ([]*models.ScheduleItem, error) {
-	query := `
+// List gets all schedule items with their associations, with optional filters and sorting.
+func (r *ScheduleItemRepository) List(ctx context.Context, filterSessionID string, filterDay int, sortSQL string) ([]*models.ScheduleItem, error) {
+	if sortSQL == "" {
+		sortSQL = "ORDER BY Time"
+	}
+
+	where := ""
+	var args []any
+	paramIdx := 1
+
+	if filterSessionID != "" {
+		where += fmt.Sprintf(" WHERE SessionId = @p%d", paramIdx)
+		args = append(args, sql.Named(fmt.Sprintf("p%d", paramIdx), filterSessionID))
+		paramIdx++
+	}
+
+	if filterDay > 0 {
+		if where == "" {
+			where += " WHERE"
+		} else {
+			where += " AND"
+		}
+		where += fmt.Sprintf(" Id IN (SELECT ScheduleItemId FROM ScheduleDays WHERE DayOfWeek = @p%d)", paramIdx)
+		args = append(args, sql.Named(fmt.Sprintf("p%d", paramIdx), filterDay))
+	}
+
+	query := fmt.Sprintf(`
 		SELECT
 			CONVERT(NVARCHAR(36), Id) AS Id,
 			CONVERT(NVARCHAR(36), SessionId) AS SessionId,
@@ -175,10 +199,11 @@ func (r *ScheduleItemRepository) List(ctx context.Context) ([]*models.ScheduleIt
 			CreatedAt,
 			UpdatedAt
 		FROM ScheduleItems
-		ORDER BY Time
-	`
+		%s
+		%s
+	`, where, sortSQL)
 
-	rows, err := r.DB.QueryContext(ctx, query)
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list schedule items: %w", err)
 	}

@@ -27,8 +27,10 @@ func TestLogin_Success(t *testing.T) {
 
 	user, ok := result["user"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "testadmin", user["username"])
-	assert.Equal(t, "admin", user["role"])
+	attrs, ok := user["attributes"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "testadmin", attrs["username"])
+	assert.Equal(t, "admin", attrs["role"])
 	assert.NotEmpty(t, user["id"])
 }
 
@@ -74,7 +76,7 @@ func TestChangePassword_Success(t *testing.T) {
 		bytes.NewBufferString(`{"oldPassword":"securepass123","newPassword":"newpass12345"}`), token)
 	defer resp.Body.Close()
 
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	require.Equal(t, http.StatusNoContent, resp.StatusCode)
 
 	// Login with new password should succeed
 	resp2 := doRequest(t, http.MethodPost, "/api/v1/auth/login",
@@ -100,7 +102,7 @@ func TestLogout(t *testing.T) {
 	resp := doRequest(t, http.MethodPost, "/api/v1/auth/logout", nil, token)
 	defer resp.Body.Close()
 
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, http.StatusNoContent, resp.StatusCode)
 }
 
 func TestProtectedEndpoint_NoToken(t *testing.T) {

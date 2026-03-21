@@ -1,13 +1,15 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
+	"strconv"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -28,6 +30,7 @@ func NewScheduleHandler(items ScheduleItemRepository, days ScheduleDayRepository
 }
 
 // GetCurrent handles GET /current — returns today's schedule for the active session.
+// This endpoint uses plain JSON (documented exception to JSON:API).
 func (h *ScheduleHandler) GetCurrent(w http.ResponseWriter, r *http.Request) {
 	session, err := h.Sessions.GetCurrentSession(r.Context())
 	if err != nil {
@@ -89,14 +92,43 @@ func validateDays(days []int) bool {
 	return true
 }
 
+var scheduleSortColumns = map[string]string{
+	"name": "Name",
+	"time": "Time",
+}
+
 // List handles GET /.
 func (h *ScheduleHandler) List(w http.ResponseWriter, r *http.Request) {
-	items, err := h.Items.List(r.Context())
+	filters := jsonapi.ParseFilter(r, []string{"sessionId", "day"})
+	sortSQL := jsonapi.SortToSQL(jsonapi.ParseSort(r), scheduleSortColumns, "ORDER BY Time")
+
+	filterDay := 0
+	if d := filters["day"]; d != "" {
+		if v, err := strconv.Atoi(d); err == nil && v >= 1 && v <= 7 {
+			filterDay = v
+		}
+	}
+
+	items, err := h.Items.List(r.Context(), filters["sessionId"], filterDay, sortSQL)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list schedule items")
 		return
 	}
-	writeJSON(w, http.StatusOK, models.ListResponse{Total: len(items), Items: items})
+
+	resources := make([]jsonapi.Resource, len(items))
+	for i, item := range items {
+		resources[i] = jsonapi.MarshalScheduleItem(item)
+	}
+
+	includes := jsonapi.ParseInclude(r)
+	included := collectIncluded(items, includes)
+
+	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
+		Data:     resources,
+		Included: included,
+		Meta:     map[string]any{"total": len(items)},
+		Links:    map[string]any{"self": "/api/v1/schedule"},
+	})
 }
 
 // GetByID handles GET /{id}.
@@ -121,40 +153,101 @@ func (h *ScheduleHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, item)
+	includes := jsonapi.ParseInclude(r)
+	included := collectIncluded([]*models.ScheduleItem{item}, includes)
+
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{
+		Data:     resourcePtr(jsonapi.MarshalScheduleItem(item)),
+		Included: included,
+	})
+}
+
+// collectIncluded builds a deduplicated list of included resources from schedule items.
+func collectIncluded(items []*models.ScheduleItem, includes []string) []jsonapi.Resource {
+	includeSession := slices.Contains(includes, "session")
+	includeSound := slices.Contains(includes, "sound")
+
+	if !includeSession && !includeSound {
+		return nil
+	}
+
+	var included []jsonapi.Resource
+	seenSessions := map[uuid.UUID]bool{}
+	seenSounds := map[uuid.UUID]bool{}
+
+	for _, item := range items {
+		if includeSession && item.Session != nil && !seenSessions[item.Session.ID] {
+			included = append(included, jsonapi.MarshalSession(item.Session))
+			seenSessions[item.Session.ID] = true
+		}
+		if includeSound && item.Sound != nil && !seenSounds[item.Sound.ID] {
+			included = append(included, jsonapi.MarshalAudioFile(item.Sound))
+			seenSounds[item.Sound.ID] = true
+		}
+	}
+
+	return included
+}
+
+type scheduleCreateAttributes struct {
+	Name string `json:"name"`
+	Time string `json:"time"`
+	Days []int  `json:"days"`
 }
 
 // Create handles POST /.
 func (h *ScheduleHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req models.ScheduleItemCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "schedule-items")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if req.Name == "" || req.Time == "" || req.SoundID == uuid.Nil || len(req.Days) == 0 {
+	var attrs scheduleCreateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
+	}
+
+	soundIDStr := doc.RelationshipID("sound")
+	soundID, err := uuid.Parse(soundIDStr)
+	if err != nil || soundID == uuid.Nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "name, time, soundId, and days are required")
 		return
 	}
 
-	if !validateDays(req.Days) {
+	if attrs.Name == "" || attrs.Time == "" || len(attrs.Days) == 0 {
+		writeError(w, http.StatusBadRequest, "invalid_request", "name, time, soundId, and days are required")
+		return
+	}
+
+	if !validateDays(attrs.Days) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "days must be between 1 (Sunday) and 7 (Saturday)")
 		return
 	}
 
-	parsedTime, err := time.Parse("15:04", req.Time)
+	parsedTime, err := time.Parse("15:04", attrs.Time)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid time format, use HH:MM")
 		return
 	}
 
+	var sessionID *uuid.UUID
+	sessionIDStr := doc.RelationshipID("session")
+	if sessionIDStr != "" {
+		sid, err := uuid.Parse(sessionIDStr)
+		if err == nil {
+			sessionID = &sid
+		}
+	}
+
 	item := &models.ScheduleItem{
 		ID:        uuid.New(),
-		SessionID: req.SessionID,
-		Name:      req.Name,
+		SessionID: sessionID,
+		Name:      attrs.Name,
 		Time:      parsedTime,
-		SoundID:   req.SoundID,
-		Days:      req.Days,
+		SoundID:   soundID,
+		Days:      attrs.Days,
 		CreatedAt: time.Now(),
 	}
 
@@ -165,17 +258,23 @@ func (h *ScheduleHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	created, err := h.Items.GetByID(r.Context(), item.ID)
 	if err != nil || created == nil {
-		writeJSON(w, http.StatusCreated, item)
+		writeJSONAPI(w, http.StatusCreated, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalScheduleItem(item))})
 		if h.Notifier != nil {
 			h.Notifier.NotifySchedulesUpdated()
 		}
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, created)
+	writeJSONAPI(w, http.StatusCreated, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalScheduleItem(created))})
 	if h.Notifier != nil {
 		h.Notifier.NotifySchedulesUpdated()
 	}
+}
+
+type scheduleUpdateAttributes struct {
+	Name string `json:"name,omitempty"`
+	Time string `json:"time,omitempty"`
+	Days []int  `json:"days,omitempty"`
 }
 
 // Update handles PUT /{id}.
@@ -200,36 +299,53 @@ func (h *ScheduleHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.ScheduleItemUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "schedule-items")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if len(req.Days) > 0 && !validateDays(req.Days) {
+	var attrs scheduleUpdateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
+	}
+
+	if len(attrs.Days) > 0 && !validateDays(attrs.Days) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "days must be between 1 (Sunday) and 7 (Saturday)")
 		return
 	}
 
-	if req.Name != "" {
-		existing.Name = req.Name
+	if attrs.Name != "" {
+		existing.Name = attrs.Name
 	}
-	if req.Time != "" {
-		t, err := time.Parse("15:04", req.Time)
+	if attrs.Time != "" {
+		t, err := time.Parse("15:04", attrs.Time)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid_request", "invalid time format")
 			return
 		}
 		existing.Time = t
 	}
-	if req.SoundID != uuid.Nil {
-		existing.SoundID = req.SoundID
+
+	soundIDStr := doc.RelationshipID("sound")
+	if soundIDStr != "" {
+		sid, err := uuid.Parse(soundIDStr)
+		if err == nil && sid != uuid.Nil {
+			existing.SoundID = sid
+		}
 	}
-	if req.SessionID != nil {
-		existing.SessionID = req.SessionID
+
+	sessionIDStr := doc.RelationshipID("session")
+	if sessionIDStr != "" {
+		sid, err := uuid.Parse(sessionIDStr)
+		if err == nil {
+			existing.SessionID = &sid
+		}
 	}
-	if len(req.Days) > 0 {
-		existing.Days = req.Days
+
+	if len(attrs.Days) > 0 {
+		existing.Days = attrs.Days
 	}
 
 	if err := h.Items.Update(r.Context(), existing); err != nil {
@@ -237,7 +353,7 @@ func (h *ScheduleHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, existing)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalScheduleItem(existing))})
 	if h.Notifier != nil {
 		h.Notifier.NotifySchedulesUpdated()
 	}
