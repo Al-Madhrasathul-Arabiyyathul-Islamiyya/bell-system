@@ -1,5 +1,7 @@
 package jsonapi
 
+import "encoding/json"
+
 // Resource represents a JSON:API resource object.
 type Resource struct {
 	Type          string              `json:"type"`
@@ -58,4 +60,35 @@ type Error struct {
 type ErrorSource struct {
 	Pointer   string `json:"pointer,omitempty"`
 	Parameter string `json:"parameter,omitempty"`
+}
+
+// ApplySparseFieldset filters a Resource's attributes to only include the specified fields.
+// Does nothing if fields is nil or empty.
+func ApplySparseFieldset(r *Resource, fields []string) {
+	if len(fields) == 0 {
+		return
+	}
+
+	data, err := json.Marshal(r.Attributes)
+	if err != nil {
+		return
+	}
+
+	var all map[string]any
+	if err := json.Unmarshal(data, &all); err != nil {
+		return
+	}
+
+	allowed := make(map[string]bool, len(fields))
+	for _, f := range fields {
+		allowed[f] = true
+	}
+
+	filtered := make(map[string]any, len(fields))
+	for k, v := range all {
+		if allowed[k] {
+			filtered[k] = v
+		}
+	}
+	r.Attributes = filtered
 }

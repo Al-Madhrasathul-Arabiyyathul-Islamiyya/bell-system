@@ -567,6 +567,62 @@ func TestMarshalAudioChecksum(t *testing.T) {
 	assert.Contains(t, string(data), "abc123")
 }
 
+// --- ParseFields ---
+
+func TestParseFields_Empty(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	fields := jsonapi.ParseFields(r, "audio-files")
+	assert.Nil(t, fields)
+}
+
+func TestParseFields_SingleField(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/?fields[audio-files]=name", nil)
+	fields := jsonapi.ParseFields(r, "audio-files")
+	require.Len(t, fields, 1)
+	assert.Equal(t, "name", fields[0])
+}
+
+func TestParseFields_MultipleFields(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/?fields[audio-files]=name,checksum", nil)
+	fields := jsonapi.ParseFields(r, "audio-files")
+	require.Len(t, fields, 2)
+	assert.Equal(t, "name", fields[0])
+	assert.Equal(t, "checksum", fields[1])
+}
+
+func TestParseFields_WrongType(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/?fields[users]=username", nil)
+	fields := jsonapi.ParseFields(r, "audio-files")
+	assert.Nil(t, fields)
+}
+
+// --- ApplySparseFieldset ---
+
+func TestApplySparseFieldset(t *testing.T) {
+	r := jsonapi.Resource{
+		Type:       "audio-files",
+		ID:         "123",
+		Attributes: map[string]any{"name": "bell.wav", "checksum": "abc", "fileType": "bell"},
+	}
+	jsonapi.ApplySparseFieldset(&r, []string{"name", "checksum"})
+	attrs := r.Attributes.(map[string]any)
+	assert.Equal(t, "bell.wav", attrs["name"])
+	assert.Equal(t, "abc", attrs["checksum"])
+	_, hasFileType := attrs["fileType"]
+	assert.False(t, hasFileType)
+}
+
+func TestApplySparseFieldset_NilFields(t *testing.T) {
+	r := jsonapi.Resource{
+		Type:       "audio-files",
+		ID:         "123",
+		Attributes: map[string]any{"name": "bell.wav", "checksum": "abc"},
+	}
+	jsonapi.ApplySparseFieldset(&r, nil)
+	attrs := r.Attributes.(map[string]any)
+	assert.Len(t, attrs, 2)
+}
+
 func TestMarshalSystemState(t *testing.T) {
 	now := time.Now()
 	r := jsonapi.MarshalSystemState("active", now)
