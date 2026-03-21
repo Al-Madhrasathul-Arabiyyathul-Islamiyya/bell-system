@@ -46,7 +46,7 @@ func TestSystemState_SetStatePaused(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -61,12 +61,12 @@ func TestSystemState_SetStateActive(t *testing.T) {
 	token := adminToken(t)
 
 	// First pause
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Then activate
-	resp = doRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("active"), token)
+	resp = doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("active"), token)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -80,7 +80,7 @@ func TestSystemState_SetStateInvalid(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("invalid"), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("invalid"), token)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -90,7 +90,7 @@ func TestSystemState_SetStatePersists(t *testing.T) {
 	token := adminToken(t)
 
 	// Set to paused
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 

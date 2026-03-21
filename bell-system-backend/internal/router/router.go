@@ -49,6 +49,7 @@ func UserRoutes(h *handlers.UserHandler, tokenSvc handlers.TokenService) chi.Rou
 	r := chi.NewRouter()
 	r.Use(handlers.AuthMiddleware(tokenSvc))
 	r.Use(handlers.RequireRole(models.RoleAdmin))
+	r.Use(handlers.RequireJSONAPI())
 	r.Get("/", h.List)
 	r.Post("/", h.Create)
 	r.Get("/{id}", h.GetByID)
@@ -64,6 +65,7 @@ func SessionRoutes(h *handlers.SessionHandler, tokenSvc handlers.TokenService) c
 	r.Get("/current", h.GetCurrent)
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(tokenSvc))
+		r.Use(handlers.RequireJSONAPI())
 		r.Get("/", h.List)
 		r.Post("/", h.Create)
 		r.Get("/{id}", h.GetByID)
@@ -80,6 +82,7 @@ func ScheduleRoutes(h *handlers.ScheduleHandler, tokenSvc handlers.TokenService)
 	r.Get("/current", h.GetCurrent)
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(tokenSvc))
+		r.Use(handlers.RequireJSONAPI())
 		r.Get("/", h.List)
 		r.Post("/", h.Create)
 		r.Get("/{id}", h.GetByID)
@@ -96,6 +99,7 @@ func SystemRoutes(h *handlers.SystemHandler, tokenSvc handlers.TokenService) chi
 	r.Get("/state", h.GetState)
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(tokenSvc))
+		r.Use(handlers.RequireJSONAPI())
 		r.Post("/state", h.SetState)
 		r.Post("/cancel-next-bell", h.CancelNextBell)
 	})
@@ -112,8 +116,11 @@ func AudioRoutes(h *handlers.AudioHandler, tokenSvc handlers.TokenService) chi.R
 	r.Group(func(r chi.Router) {
 		r.Use(handlers.AuthMiddleware(tokenSvc))
 		r.Get("/", h.List)
-		r.Post("/", h.Upload)
-		r.Put("/{id}", h.Update)
+		r.Post("/", h.Upload) // multipart/form-data, no JSON:API validation
+		r.Group(func(r chi.Router) {
+			r.Use(handlers.RequireJSONAPI())
+			r.Put("/{id}", h.Update)
+		})
 		r.Delete("/{id}", h.Delete)
 	})
 	return r

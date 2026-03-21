@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
@@ -32,6 +33,9 @@ func newAudioRouter(audioRepo handlers.SystemAudioFileRepository) http.Handler {
 
 func authAudioReq(req *http.Request) *http.Request {
 	testutil.SetAuthHeader(req)
+	if req.Method == http.MethodPut {
+		req.Header.Set("Content-Type", "application/vnd.api+json")
+	}
 	return req
 }
 
@@ -945,4 +949,34 @@ func TestAudioHandler_List_WithSort(t *testing.T) {
 	require.Len(t, capturedSorts, 1)
 	assert.Equal(t, "createdAt", capturedSorts[0].Field)
 	assert.True(t, capturedSorts[0].Desc)
+}
+
+func TestAudioHandler_List_WithSparseFieldset(t *testing.T) {
+	now := time.Now()
+	repo := &mocks.MockSystemAudioFileRepo{
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
+			return []*models.SystemAudioFile{
+				{ID: uuid.New(), Name: "bell.wav", FileType: "bell", Checksum: "abc123", CreatedAt: now, UpdatedAt: now},
+			}, 1, nil
+		},
+	}
+
+	req := authReq(httptest.NewRequest(http.MethodGet, "/?fields[audio-files]=name,checksum", nil))
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+
+	var resp jsonapi.CollectionDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp.Data, 1)
+
+	attrs := resp.Data[0].Attributes.(map[string]any)
+	assert.Equal(t, "bell.wav", attrs["name"])
+	assert.Equal(t, "abc123", attrs["checksum"])
+	_, hasFileType := attrs["fileType"]
+	assert.False(t, hasFileType, "fileType should be filtered out by sparse fieldset")
 }

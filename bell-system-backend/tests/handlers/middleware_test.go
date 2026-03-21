@@ -1,6 +1,7 @@
 package handlers_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -234,6 +235,96 @@ func TestRequireRole_NoClaims(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
+}
+
+// --- RequireJSONAPI middleware ---
+
+func TestRequireJSONAPI_ValidContentType(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.Header.Set("Content-Type", "application/vnd.api+json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestRequireJSONAPI_ValidContentTypeWithCharset(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodPut, "/", nil)
+	req.Header.Set("Content-Type", "application/vnd.api+json; charset=utf-8")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestRequireJSONAPI_MissingContentType(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{}`))
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusUnsupportedMediaType, rr.Code)
+
+	var resp jsonapi.ErrorDocument
+	err := json.NewDecoder(rr.Body).Decode(&resp)
+	require.NoError(t, err)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "unsupported_media_type", resp.Errors[0].Code)
+}
+
+func TestRequireJSONAPI_WrongContentType(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusUnsupportedMediaType, rr.Code)
+}
+
+func TestRequireJSONAPI_GETPassesWithoutCheck(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	// No Content-Type header
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestRequireJSONAPI_DELETEPassesWithoutCheck(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodDelete, "/", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
+}
+
+func TestRequireJSONAPI_POSTWithoutBodyPasses(t *testing.T) {
+	handler := handlers.RequireJSONAPI()(dummyHandler())
+
+	req := httptest.NewRequest(http.MethodPost, "/", nil)
+	req.ContentLength = 0
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusOK, rr.Code)
 }
 
 // --- CORS ---
