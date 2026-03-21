@@ -44,7 +44,7 @@ func TestAudioHandler_List_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			return files, len(files), nil
 		},
 	}
@@ -68,7 +68,7 @@ func TestAudioHandler_List_Success(t *testing.T) {
 
 func TestAudioHandler_List_Empty(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			return []*models.SystemAudioFile{}, 0, nil
 		},
 	}
@@ -84,7 +84,7 @@ func TestAudioHandler_List_Empty(t *testing.T) {
 
 func TestAudioHandler_List_DBError(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			return nil, 0, errors.New("database error")
 		},
 	}
@@ -884,7 +884,7 @@ func TestAudioHandler_FileTypes_AllValid(t *testing.T) {
 
 func TestAudioHandler_List_WithPagination(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, page, size int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, page, size int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			assert.Equal(t, 2, page)
 			assert.Equal(t, 5, size)
 			return []*models.SystemAudioFile{
@@ -910,7 +910,7 @@ func TestAudioHandler_List_WithPagination(t *testing.T) {
 
 func TestAudioHandler_List_WithFilter(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, filterFileType, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, filterFileType string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			assert.Equal(t, "bell", filterFileType)
 			return []*models.SystemAudioFile{}, 0, nil
 		},
@@ -926,9 +926,10 @@ func TestAudioHandler_List_WithFilter(t *testing.T) {
 }
 
 func TestAudioHandler_List_WithSort(t *testing.T) {
+	var capturedSorts []jsonapi.SortField
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, sortSQL string) ([]*models.SystemAudioFile, int, error) {
-			assert.Equal(t, "ORDER BY CreatedAt DESC", sortSQL)
+		ListFunc: func(_ context.Context, _, _ int, _ string, sorts []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
+			capturedSorts = sorts
 			return []*models.SystemAudioFile{}, 0, nil
 		},
 	}
@@ -940,4 +941,7 @@ func TestAudioHandler_List_WithSort(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	require.Len(t, capturedSorts, 1)
+	assert.Equal(t, "createdAt", capturedSorts[0].Field)
+	assert.True(t, capturedSorts[0].Desc)
 }

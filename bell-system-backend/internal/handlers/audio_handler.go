@@ -36,19 +36,12 @@ var validFileTypes = map[models.FileType]bool{
 	models.FileTypeOther:      true,
 }
 
-var audioSortColumns = map[string]string{
-	"name":      "Name",
-	"fileType":  "FileType",
-	"createdAt": "CreatedAt",
-}
-
 // List handles GET /.
 func (h *AudioHandler) List(w http.ResponseWriter, r *http.Request) {
 	p := jsonapi.ParsePagination(r)
 	filters := jsonapi.ParseFilter(r, []string{"fileType"})
-	sortSQL := jsonapi.SortToSQL(jsonapi.ParseSort(r), audioSortColumns, "ORDER BY Name")
 
-	files, total, err := h.AudioFiles.List(r.Context(), p.Page, p.Size, filters["fileType"], sortSQL)
+	files, total, err := h.AudioFiles.List(r.Context(), p.Page, p.Size, filters["fileType"], jsonapi.ParseSort(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list audio files")
 		return
@@ -284,7 +277,7 @@ func (h *AudioHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // ListChecksums handles GET /checksums.
 func (h *AudioHandler) ListChecksums(w http.ResponseWriter, r *http.Request) {
-	files, _, err := h.AudioFiles.List(r.Context(), 1, 10000, "", "ORDER BY Name")
+	files, _, err := h.AudioFiles.List(r.Context(), 1, 10000, "", nil)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list checksums")
 		return

@@ -159,7 +159,7 @@ func TestUserRepository_List_MultipleUsers(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Username")
+	users, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, 3, total)
 	assert.Len(t, users, 3)
@@ -179,7 +179,7 @@ func TestUserRepository_List_Empty(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Username")
+	users, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.NoError(t, err)
 	assert.Equal(t, 0, total)
 	assert.Empty(t, users)
@@ -192,7 +192,7 @@ func TestUserRepository_List_DBError(t *testing.T) {
 	mock.ExpectQuery("SELECT COUNT").
 		WillReturnError(errors.New("query failed"))
 
-	users, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Username")
+	users, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Equal(t, 0, total)
 	assert.Nil(t, users)
@@ -289,7 +289,7 @@ func TestUserRepository_List_ScanError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, _, err := repo.List(ctx, 1, 20, "", "ORDER BY Username")
+	users, _, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, users)
 	assert.Contains(t, err.Error(), "failed to scan user")
@@ -308,7 +308,7 @@ func TestUserRepository_List_RowsError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, _, err := repo.List(ctx, 1, 20, "", "ORDER BY Username")
+	users, _, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, users)
 	assert.Contains(t, err.Error(), "error iterating user rows")

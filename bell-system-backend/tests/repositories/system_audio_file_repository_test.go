@@ -112,7 +112,7 @@ func TestSystemAudioFileRepository_List_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
+	audios, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.NoError(t, err)
 	assert.Len(t, audios, 3)
 	assert.Equal(t, 3, total)
@@ -129,7 +129,7 @@ func TestSystemAudioFileRepository_List_Empty(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
+	audios, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.NoError(t, err)
 	assert.Empty(t, audios)
 	assert.Equal(t, 0, total)
@@ -227,7 +227,7 @@ func TestSystemAudioFileRepository_List_DBError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnError(errors.New("query failed"))
 
-	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
+	audios, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, audios)
 	assert.Equal(t, 0, total)
@@ -245,7 +245,7 @@ func TestSystemAudioFileRepository_List_ScanError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
+	audios, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, audios)
 	assert.Equal(t, 0, total)
@@ -264,7 +264,7 @@ func TestSystemAudioFileRepository_List_RowsError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles").
 		WillReturnRows(rows)
 
-	audios, total, err := repo.List(ctx, 1, 20, "", "ORDER BY Name")
+	audios, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, audios)
 	assert.Equal(t, 0, total)

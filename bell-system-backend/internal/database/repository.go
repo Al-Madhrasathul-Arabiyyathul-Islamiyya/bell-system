@@ -6,7 +6,22 @@ import (
 	"fmt"
 
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
+
+	sq "github.com/Masterminds/squirrel"
 )
+
+// qb is the package-level statement builder configured for SQL Server (@p1, @p2 placeholders).
+var qb = sq.StatementBuilder.PlaceholderFormat(sq.AtP)
+
+// buildQuery calls ToSql on a Sqlizer and wraps any build error.
+// With well-formed static builders this cannot fail; the error return is a safety net.
+func buildQuery(b sq.Sqlizer) (string, []interface{}, error) {
+	q, a, err := b.ToSql()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	return q, a, nil
+}
 
 // Repository provides common database operations
 type Repository struct {

@@ -127,7 +127,7 @@ func TestSessionRepository_List_OrderedByStartTime(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
 		WillReturnRows(rows)
 
-	sessions, err := repo.List(ctx, "ORDER BY StartTime")
+	sessions, err := repo.List(ctx, nil)
 	require.NoError(t, err)
 	require.Len(t, sessions, 2)
 	assert.Equal(t, "Morning Session", sessions[0].Name)
@@ -142,7 +142,7 @@ func TestSessionRepository_List_Empty(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
 		WillReturnRows(rows)
 
-	sessions, err := repo.List(ctx, "ORDER BY StartTime")
+	sessions, err := repo.List(ctx, nil)
 	require.NoError(t, err)
 	assert.Empty(t, sessions)
 }
@@ -262,7 +262,7 @@ func TestSessionRepository_List_DBError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
 		WillReturnError(errors.New("query failed"))
 
-	sessions, err := repo.List(ctx, "ORDER BY StartTime")
+	sessions, err := repo.List(ctx, nil)
 	require.Error(t, err)
 	assert.Nil(t, sessions)
 	assert.Contains(t, err.Error(), "failed to list sessions")
@@ -277,7 +277,7 @@ func TestSessionRepository_List_ScanError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
 		WillReturnRows(rows)
 
-	sessions, err := repo.List(ctx, "ORDER BY StartTime")
+	sessions, err := repo.List(ctx, nil)
 	require.Error(t, err)
 	assert.Nil(t, sessions)
 	assert.Contains(t, err.Error(), "failed to scan session")
@@ -293,7 +293,7 @@ func TestSessionRepository_List_RowsError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions ORDER BY StartTime").
 		WillReturnRows(rows)
 
-	sessions, err := repo.List(ctx, "ORDER BY StartTime")
+	sessions, err := repo.List(ctx, nil)
 	require.Error(t, err)
 	assert.Nil(t, sessions)
 	assert.Contains(t, err.Error(), "error iterating session rows")
