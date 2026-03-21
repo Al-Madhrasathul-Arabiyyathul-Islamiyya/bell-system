@@ -55,7 +55,7 @@ func TestUserHandler_List_Success(t *testing.T) {
 	}
 
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context, page, size int, filterRole, sortSQL string) ([]*models.User, int, error) {
+		ListFunc: func(_ context.Context, page, size int, filterRole string, sorts []jsonapi.SortField) ([]*models.User, int, error) {
 			return users, len(users), nil
 		},
 	}
@@ -80,7 +80,7 @@ func TestUserHandler_List_Success(t *testing.T) {
 
 func TestUserHandler_List_Empty(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.User, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.User, int, error) {
 			return []*models.User{}, 0, nil
 		},
 	}
@@ -103,7 +103,7 @@ func TestUserHandler_List_Empty(t *testing.T) {
 
 func TestUserHandler_List_DBError(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.User, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.User, int, error) {
 			return nil, 0, errors.New("database error")
 		},
 	}
@@ -774,7 +774,7 @@ func TestUserHandler_Delete_GetByIDDBError(t *testing.T) {
 
 func TestUserHandler_List_WithPagination(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context, page, size int, _, _ string) ([]*models.User, int, error) {
+		ListFunc: func(_ context.Context, page, size int, _ string, _ []jsonapi.SortField) ([]*models.User, int, error) {
 			assert.Equal(t, 2, page)
 			assert.Equal(t, 5, size)
 			return []*models.User{
@@ -804,7 +804,7 @@ func TestUserHandler_List_WithPagination(t *testing.T) {
 
 func TestUserHandler_List_WithFilter(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context, _, _ int, filterRole, _ string) ([]*models.User, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, filterRole string, _ []jsonapi.SortField) ([]*models.User, int, error) {
 			assert.Equal(t, "admin", filterRole)
 			return []*models.User{
 				{ID: uuid.New(), Username: "admin", Role: models.RoleAdmin, CreatedAt: time.Now()},
@@ -828,9 +828,10 @@ func TestUserHandler_List_WithFilter(t *testing.T) {
 }
 
 func TestUserHandler_List_WithSort(t *testing.T) {
+	var capturedSorts []jsonapi.SortField
 	userRepo := &mocks.MockUserRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, sortSQL string) ([]*models.User, int, error) {
-			assert.Equal(t, "ORDER BY CreatedAt DESC", sortSQL)
+		ListFunc: func(_ context.Context, _, _ int, _ string, sorts []jsonapi.SortField) ([]*models.User, int, error) {
+			capturedSorts = sorts
 			return []*models.User{}, 0, nil
 		},
 	}
@@ -843,4 +844,7 @@ func TestUserHandler_List_WithSort(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	require.Len(t, capturedSorts, 1)
+	assert.Equal(t, "createdAt", capturedSorts[0].Field)
+	assert.True(t, capturedSorts[0].Desc)
 }
