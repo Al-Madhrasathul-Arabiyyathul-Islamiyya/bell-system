@@ -55,7 +55,7 @@ type SystemAudioFileRepository interface {
 	Create(ctx context.Context, audio *models.SystemAudioFile) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.SystemAudioFile, error)
 	GetSoundsByIDs(ctx context.Context, soundIDs []uuid.UUID) (map[uuid.UUID]*models.SystemAudioFile, error)
-	List(ctx context.Context, page, size int, filterFileType, sortSQL string) ([]*models.SystemAudioFile, int, error)
+	List(ctx context.Context, page, size int, filterFileType string, sorts []jsonapi.SortField) ([]*models.SystemAudioFile, int, error)
 	Update(ctx context.Context, audio *models.SystemAudioFile) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

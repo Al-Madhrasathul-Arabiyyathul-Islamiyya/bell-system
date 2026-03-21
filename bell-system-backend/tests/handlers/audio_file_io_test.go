@@ -307,7 +307,7 @@ func TestAudioHandler_ListChecksums_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			return files, len(files), nil
 		},
 	}
@@ -329,7 +329,7 @@ func TestAudioHandler_ListChecksums_Success(t *testing.T) {
 
 func TestAudioHandler_ListChecksums_DBError(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			return nil, 0, errors.New("database error")
 		},
 	}
@@ -345,7 +345,7 @@ func TestAudioHandler_ListChecksums_DBError(t *testing.T) {
 
 func TestAudioHandler_ListChecksums_Empty(t *testing.T) {
 	repo := &mocks.MockSystemAudioFileRepo{
-		ListFunc: func(_ context.Context, _, _ int, _, _ string) ([]*models.SystemAudioFile, int, error) {
+		ListFunc: func(_ context.Context, _, _ int, _ string, _ []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
 			return []*models.SystemAudioFile{}, 0, nil
 		},
 	}
