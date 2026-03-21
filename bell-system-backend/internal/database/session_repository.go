@@ -5,12 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 )
 
@@ -29,16 +30,13 @@ func NewSessionRepository(db *sql.DB, logger *logger.Logger) *SessionRepository 
 
 // Create creates a new session
 func (r *SessionRepository) Create(ctx context.Context, session *models.Session) error {
-	query := `
-        INSERT INTO Sessions (Id, Name, StartTime, EndTime)
-        VALUES (@p1, @p2, @p3, @p4)
-    `
-	_, err := r.DB.ExecContext(
-		ctx, query,
-		session.ID, session.Name,
-		session.StartTime.Format("15:04"),
-		session.EndTime.Format("15:04"),
-	)
+	query, args, err := buildQuery(qb.Insert("Sessions").
+		Columns("Id", "Name", "StartTime", "EndTime").
+		Values(session.ID, session.Name, session.StartTime.Format("15:04"), session.EndTime.Format("15:04")))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create session: %w", err)
 	}
@@ -47,13 +45,14 @@ func (r *SessionRepository) Create(ctx context.Context, session *models.Session)
 
 // GetByID gets a session by ID
 func (r *SessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Session, error) {
-	query := `
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
-        FROM Sessions
-        WHERE Id = @p1
-    `
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+		From("Sessions").
+		Where(sq.Eq{"Id": id}))
+	if err != nil {
+		return nil, err
+	}
 	var session models.Session
-	err := r.DB.QueryRowContext(ctx, query, id).Scan(
+	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
 		&session.ID, &session.Name, &session.StartTime, &session.EndTime,
 	)
 	if err != nil {
@@ -71,19 +70,14 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 		return make(map[uuid.UUID]*models.Session), nil
 	}
 
-	// Convert UUIDs to strings for the query
-	idStrings := make([]string, len(sessionIDs))
-	for i, id := range sessionIDs {
-		idStrings[i] = "'" + id.String() + "'"
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+		From("Sessions").
+		Where(sq.Eq{"Id": sessionIDs}))
+	if err != nil {
+		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-		SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
-		FROM Sessions
-		WHERE Id IN (%s)
-	`, strings.Join(idStrings, ", "))
-
-	rows, err := r.DB.QueryContext(ctx, query)
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sessions: %w", err)
 	}
@@ -113,14 +107,27 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 	return result, nil
 }
 
-// List gets all sessions
-func (r *SessionRepository) List(ctx context.Context) ([]*models.Session, error) {
-	query := `
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
-        FROM Sessions
-        ORDER BY StartTime
-    `
-	rows, err := r.DB.QueryContext(ctx, query)
+// sessionSortColumns maps JSON:API sort field names to SQL column names.
+var sessionSortColumns = map[string]string{
+	"name":      "Name",
+	"startTime": "StartTime",
+	"endTime":   "EndTime",
+}
+
+// List gets all sessions with optional sorting.
+func (r *SessionRepository) List(ctx context.Context, sorts []jsonapi.SortField) ([]*models.Session, error) {
+	sb := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+		From("Sessions")
+
+	orderBy := jsonapi.SortToSQL(sorts, sessionSortColumns, "ORDER BY StartTime")
+	sb = sb.Suffix(orderBy)
+
+	query, args, err := buildQuery(sb)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
@@ -151,13 +158,14 @@ func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Sess
 	now := nowFn()
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 
-	query := `
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
-        FROM Sessions
-        WHERE CAST(@p1 AS TIME) BETWEEN StartTime AND EndTime
-    `
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+		From("Sessions").
+		Where("CAST(? AS TIME) BETWEEN StartTime AND EndTime", currentTime))
+	if err != nil {
+		return nil, err
+	}
 	var session models.Session
-	err := r.DB.QueryRowContext(ctx, query, currentTime).Scan(
+	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
 		&session.ID, &session.Name, &session.StartTime, &session.EndTime,
 	)
 	if err != nil {
@@ -171,18 +179,15 @@ func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Sess
 
 // Update updates a session
 func (r *SessionRepository) Update(ctx context.Context, session *models.Session) error {
-	query := `
-        UPDATE Sessions
-        SET Name = @p1, StartTime = @p2, EndTime = @p3
-        WHERE Id = @p4
-    `
-	_, err := r.DB.ExecContext(
-		ctx, query,
-		session.Name,
-		session.StartTime.Format("15:04"),
-		session.EndTime.Format("15:04"),
-		session.ID,
-	)
+	query, args, err := buildQuery(qb.Update("Sessions").
+		Set("Name", session.Name).
+		Set("StartTime", session.StartTime.Format("15:04")).
+		Set("EndTime", session.EndTime.Format("15:04")).
+		Where(sq.Eq{"Id": session.ID}))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
 	}
@@ -191,8 +196,12 @@ func (r *SessionRepository) Update(ctx context.Context, session *models.Session)
 
 // Delete deletes a session
 func (r *SessionRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := "DELETE FROM Sessions WHERE Id = @p1"
-	_, err := r.DB.ExecContext(ctx, query, id)
+	query, args, err := buildQuery(qb.Delete("Sessions").
+		Where(sq.Eq{"Id": id}))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete session: %w", err)
 	}

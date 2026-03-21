@@ -152,6 +152,27 @@ func TestTokenService_ValidateToken_NonUUIDSubject(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid user ID")
 }
 
+func TestTokenService_ValidateToken_NonStringSubject(t *testing.T) {
+	secret := "test-secret"
+
+	// Craft a token with a non-string "sub" claim (integer instead of string).
+	// jwt.MapClaims.GetSubject() returns an error when "sub" is not a string.
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":      12345, // integer, not string
+		"username": "admin",
+		"role":     "admin",
+		"exp":      time.Now().Add(time.Hour).Unix(),
+	})
+	tokenStr, err := token.SignedString([]byte(secret))
+	require.NoError(t, err)
+
+	svc := services.NewTokenService(secret, 60)
+	claims, err := svc.ValidateToken(tokenStr)
+	require.Error(t, err)
+	assert.Nil(t, claims)
+	assert.Contains(t, err.Error(), "subject")
+}
+
 func TestTokenService_RoundTrip_AllRoles(t *testing.T) {
 	svc := services.NewTokenService("test-secret", 60)
 

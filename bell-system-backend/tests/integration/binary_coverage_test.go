@@ -59,7 +59,7 @@ maxMessageSize = 512
 
 [scheduler]
 checkInterval = 60
-enabled = false
+enabled = true
 timezone = "UTC"
 `, port, testDBHost, testDBPort, saPassword, testDBName, testJWTSecret, audioDir)
 
@@ -94,6 +94,13 @@ func TestBinaryCoverage_Server(t *testing.T) {
 	build.Dir = projectRoot
 	out, err := build.CombinedOutput()
 	require.NoError(t, err, "build failed: %s", string(out))
+
+	// Copy OpenAPI spec so Scalar can find it at api/openapi.yaml
+	apiDir := filepath.Join(tmpDir, "api")
+	require.NoError(t, os.MkdirAll(apiDir, 0o755))
+	specSrc, err := os.ReadFile(filepath.Join(projectRoot, "api", "openapi.yaml"))
+	require.NoError(t, err, "could not read OpenAPI spec")
+	require.NoError(t, os.WriteFile(filepath.Join(apiDir, "openapi.yaml"), specSrc, 0o644))
 
 	// Write config with a free port
 	port := findFreePort(t)
@@ -144,18 +151,39 @@ func TestBinaryCoverage_Server(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, entries, "expected coverage data files in %s", coverDir)
 
-	// Convert to text format
+	// Convert to text format and write to the project's coverage directory
+	// so that scripts/coverage.sh can merge it into the final profile.
 	textOut := filepath.Join(tmpDir, "server.out")
 	convert := exec.Command("go", "tool", "covdata", "textfmt", "-i="+coverDir, "-o="+textOut)
 	out, err = convert.CombinedOutput()
-	if err == nil {
-		info, statErr := os.Stat(textOut)
-		if statErr == nil {
-			t.Logf("server binary coverage profile: %d bytes", info.Size())
-		}
-	} else {
+	if err != nil {
 		t.Logf("covdata convert: %s", string(out))
+		return
 	}
+
+	info, statErr := os.Stat(textOut)
+	if statErr != nil {
+		return
+	}
+	t.Logf("server binary coverage profile: %d bytes", info.Size())
+
+	// Copy profile to coverage/binary.out for merging by coverage.sh
+	destDir := filepath.Join(projectRoot, "coverage")
+	if mkErr := os.MkdirAll(destDir, 0o755); mkErr != nil {
+		t.Logf("could not create coverage dir: %v", mkErr)
+		return
+	}
+	src, readErr := os.ReadFile(textOut)
+	if readErr != nil {
+		t.Logf("could not read text profile: %v", readErr)
+		return
+	}
+	destPath := filepath.Join(destDir, "binary.out")
+	if writeErr := os.WriteFile(destPath, src, 0o644); writeErr != nil {
+		t.Logf("could not write binary.out: %v", writeErr)
+		return
+	}
+	t.Logf("binary coverage profile written to %s", destPath)
 }
 
 // findFreePort returns an available TCP port.

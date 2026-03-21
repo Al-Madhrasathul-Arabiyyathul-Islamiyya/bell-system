@@ -80,6 +80,7 @@ func TestRouterNew_AllRoutesRegistered(t *testing.T) {
 		"GET /api/v1/audio/checksums",
 		"POST /api/v1/audio/",
 		"GET /api/v1/audio/{id}",
+		"GET /api/v1/audio/{id}/content",
 		"PUT /api/v1/audio/{id}",
 		"DELETE /api/v1/audio/{id}",
 		"GET /api/v1/system/state",

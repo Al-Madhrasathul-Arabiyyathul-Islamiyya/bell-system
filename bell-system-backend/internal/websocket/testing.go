@@ -48,6 +48,11 @@ func (c *Client) DrainSend() {
 	}
 }
 
+// CloseConn closes the underlying WebSocket connection (for testing write-error paths).
+func (c *Client) CloseConn() {
+	c.conn.CloseNow()
+}
+
 // TestWSConfig returns a WebSocketConfig with short intervals suitable for tests.
 func TestWSConfig() config.WebSocketConfig {
 	return config.WebSocketConfig{

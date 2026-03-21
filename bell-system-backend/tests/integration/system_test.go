@@ -8,11 +8,21 @@ import (
 	"net/http"
 	"testing"
 
-	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func systemStateBody(state string) *bytes.Buffer {
+	body, _ := json.Marshal(map[string]any{
+		"data": map[string]any{
+			"type":       "system-state",
+			"attributes": map[string]any{"state": state},
+		},
+	})
+	return bytes.NewBuffer(body)
+}
 
 // --- GET /api/v1/system/state ---
 
@@ -23,10 +33,11 @@ func TestSystemState_GetState(t *testing.T) {
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var state models.SystemStateResponse
-	readJSON(t, resp, &state)
-	assert.Equal(t, "active", state.State)
-	assert.False(t, state.LastUpdated.IsZero())
+	var doc jsonapi.Document
+	readJSON(t, resp, &doc)
+	assert.Equal(t, "system-state", doc.Data.Type)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "active", attrs["state"])
 }
 
 // --- POST /api/v1/system/state ---
@@ -35,14 +46,14 @@ func TestSystemState_SetStatePaused(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
-	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var state models.SystemStateResponse
-	readJSON(t, resp, &state)
-	assert.Equal(t, "paused", state.State)
+	var doc jsonapi.Document
+	readJSON(t, resp, &doc)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "paused", attrs["state"])
 }
 
 func TestSystemState_SetStateActive(t *testing.T) {
@@ -50,28 +61,26 @@ func TestSystemState_SetStateActive(t *testing.T) {
 	token := adminToken(t)
 
 	// First pause
-	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Then activate
-	body, _ = json.Marshal(models.SystemStateRequest{State: "active"})
-	resp = doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
+	resp = doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("active"), token)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var state models.SystemStateResponse
-	readJSON(t, resp, &state)
-	assert.Equal(t, "active", state.State)
+	var doc jsonapi.Document
+	readJSON(t, resp, &doc)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "active", attrs["state"])
 }
 
 func TestSystemState_SetStateInvalid(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
-	body, _ := json.Marshal(map[string]string{"state": "invalid"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("invalid"), token)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -81,8 +90,7 @@ func TestSystemState_SetStatePersists(t *testing.T) {
 	token := adminToken(t)
 
 	// Set to paused
-	body, _ := json.Marshal(models.SystemStateRequest{State: "paused"})
-	resp := doRequest(t, http.MethodPost, "/api/v1/system/state", bytes.NewReader(body), token)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/system/state", systemStateBody("paused"), token)
 	resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -91,9 +99,10 @@ func TestSystemState_SetStatePersists(t *testing.T) {
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	var state models.SystemStateResponse
-	readJSON(t, resp, &state)
-	assert.Equal(t, "paused", state.State)
+	var doc jsonapi.Document
+	readJSON(t, resp, &doc)
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "paused", attrs["state"])
 }
 
 // --- POST /api/v1/system/cancel-next-bell ---

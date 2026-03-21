@@ -211,7 +211,7 @@ When you receive `audio_files_updated`:
 
 1. Fetch checksums: `GET /api/v1/audio/checksums`
 2. Compare with locally cached checksums
-3. Download changed files: `GET /api/v1/audio/{id}` (returns the file binary)
+3. Download changed files: `GET /api/v1/audio/{id}/content` (returns the file binary)
 4. Cache the new checksum
 
 This ensures clients always have the latest audio files without downloading everything on every update.

@@ -287,6 +287,67 @@ func TestClient_HandleRegister_SendsConnectionAcknowledged(t *testing.T) {
 	assert.NotEmpty(t, ackPayload.ConnectionID)
 }
 
+func TestClient_WritePump_ExitsOnWriteError(t *testing.T) {
+	log, err := logger.New("test")
+	require.NoError(t, err)
+
+	hub := ws.NewHub(log)
+	done := make(chan struct{})
+	go hub.Run(done)
+	t.Cleanup(func() {
+		close(done)
+		<-hub.Done()
+	})
+
+	// Use a long ping interval so WritePump doesn't exit via ping before our message
+	cfg := ws.TestWSConfig()
+	cfg.PingInterval = 60
+
+	var client *ws.Client
+	clientReady := make(chan struct{})
+	writePumpDone := make(chan struct{})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		client = ws.NewClient(conn, hub, log, cfg, r.RemoteAddr, "client", "WriteErrClient", [16]byte{})
+		hub.RegisterClient(client)
+		close(clientReady)
+
+		// Only run WritePump — no ReadPump, so send channel stays open
+		client.WritePump(r.Context())
+		close(writePumpDone)
+	}))
+	t.Cleanup(srv.Close)
+
+	wsURL := strings.Replace(srv.URL, "http://", "ws://", 1)
+	ctx := context.Background()
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	require.NoError(t, err)
+
+	<-clientReady
+
+	// Close the server-side connection so the next Write call will fail
+	client.CloseConn()
+	time.Sleep(50 * time.Millisecond)
+
+	// Queue a message — WritePump will try to write to the closed connection
+	client.SendMessage([]byte(`{"type":"test"}`))
+
+	// Also close client side to avoid leaking
+	conn.CloseNow()
+
+	// WritePump should exit due to write error
+	select {
+	case <-writePumpDone:
+		// success: WritePump hit the write error path and returned
+	case <-time.After(3 * time.Second):
+		t.Fatal("WritePump did not exit after write error")
+	}
+}
+
 func TestClient_ReadPump_InvalidJSON(t *testing.T) {
 	conn, _, _ := setupWSTest(t)
 

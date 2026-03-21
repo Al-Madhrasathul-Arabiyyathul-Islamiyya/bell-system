@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -29,12 +29,25 @@ func NewUserHandler(users UserRepository, passwords PasswordHasher) *UserHandler
 
 // List handles GET /.
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
-	users, err := h.Users.List(r.Context())
+	p := jsonapi.ParsePagination(r)
+	filters := jsonapi.ParseFilter(r, []string{"role"})
+
+	users, total, err := h.Users.List(r.Context(), p.Page, p.Size, filters["role"], jsonapi.ParseSort(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list users")
 		return
 	}
-	writeJSON(w, http.StatusOK, models.ListResponse{Total: len(users), Items: users})
+
+	resources := make([]jsonapi.Resource, len(users))
+	for i, u := range users {
+		resources[i] = jsonapi.MarshalUser(u)
+	}
+
+	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
+		Data:  resources,
+		Meta:  jsonapi.PaginationMeta(total, p.Page, p.Size),
+		Links: jsonapi.PaginationLinks("/api/v1/users", p, total),
+	})
 }
 
 // GetByID handles GET /{id}.
@@ -59,39 +72,58 @@ func (h *UserHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, user)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalUser(user))})
+}
+
+type userCreateAttributes struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
+
+type userUpdateAttributes struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+	Role     string `json:"role,omitempty"`
 }
 
 // Create handles POST /.
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var req models.UserCreateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "users")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if req.Username == "" || req.Password == "" || req.Role == "" {
+	var attrs userCreateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
+	}
+
+	if attrs.Username == "" || attrs.Password == "" || attrs.Role == "" {
 		writeError(w, http.StatusBadRequest, "invalid_request", "username, password, and role are required")
 		return
 	}
 
-	if len(req.Password) < 8 {
+	if len(attrs.Password) < 8 {
 		writeError(w, http.StatusBadRequest, "invalid_request", "password must be at least 8 characters")
 		return
 	}
 
-	if req.Role != models.RoleAdmin && req.Role != models.RoleMorningUser && req.Role != models.RoleAfternoonUser {
+	role := models.Role(attrs.Role)
+	if role != models.RoleAdmin && role != models.RoleMorningUser && role != models.RoleAfternoonUser {
 		writeError(w, http.StatusBadRequest, "invalid_request", "invalid role")
 		return
 	}
 
-	existing, _ := h.Users.GetByUsername(r.Context(), req.Username)
+	existing, _ := h.Users.GetByUsername(r.Context(), attrs.Username)
 	if existing != nil {
 		writeError(w, http.StatusConflict, "conflict", "username already exists")
 		return
 	}
 
-	hash, err := h.Passwords.Hash(req.Password)
+	hash, err := h.Passwords.Hash(attrs.Password)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to hash password")
 		return
@@ -99,9 +131,9 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	user := &models.User{
 		ID:           uuid.New(),
-		Username:     req.Username,
+		Username:     attrs.Username,
 		PasswordHash: hash,
-		Role:         req.Role,
+		Role:         role,
 		CreatedAt:    time.Now(),
 	}
 
@@ -110,7 +142,7 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, user)
+	writeJSONAPI(w, http.StatusCreated, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalUser(user))})
 }
 
 // Update handles PUT /{id}.
@@ -135,20 +167,27 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req models.UserUpdateRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "invalid JSON body")
+	doc, err := jsonapi.ParseRequest(r, "users")
+	if err != nil {
+		// Fall back to flat JSON for backwards compat during migration
+		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
 	}
 
-	if req.Username != "" {
-		existing.Username = req.Username
+	var attrs userUpdateAttributes
+	if err := doc.UnmarshalAttributes(&attrs); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "invalid attributes")
+		return
 	}
-	if req.Role != "" {
-		existing.Role = req.Role
+
+	if attrs.Username != "" {
+		existing.Username = attrs.Username
 	}
-	if req.Password != "" {
-		hash, err := h.Passwords.Hash(req.Password)
+	if attrs.Role != "" {
+		existing.Role = models.Role(attrs.Role)
+	}
+	if attrs.Password != "" {
+		hash, err := h.Passwords.Hash(attrs.Password)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "internal_error", "failed to hash password")
 			return
@@ -161,7 +200,7 @@ func (h *UserHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, existing)
+	writeJSONAPI(w, http.StatusOK, jsonapi.Document{Data: resourcePtr(jsonapi.MarshalUser(existing))})
 }
 
 // Delete handles DELETE /{id}.
@@ -192,4 +231,9 @@ func (h *UserHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// resourcePtr returns a pointer to the given resource.
+func resourcePtr(v jsonapi.Resource) *jsonapi.Resource {
+	return &v
 }

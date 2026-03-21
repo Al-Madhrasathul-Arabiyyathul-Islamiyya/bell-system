@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -302,92 +303,13 @@ func TestLoginRequest_JSON(t *testing.T) {
 	assert.Equal(t, "admin123", req.Password)
 }
 
-func TestUserCreateRequest_JSON(t *testing.T) {
-	body := `{"username":"newuser","password":"password123","role":"morning_user"}`
-	var req models.UserCreateRequest
-	require.NoError(t, json.Unmarshal([]byte(body), &req))
-	assert.Equal(t, "newuser", req.Username)
-	assert.Equal(t, "password123", req.Password)
-	assert.Equal(t, models.RoleMorningUser, req.Role)
-}
-
-func TestScheduleItemCreateRequest_JSON_WithOptionalSessionID(t *testing.T) {
-	sessionID := uuid.New()
-	body, _ := json.Marshal(models.ScheduleItemCreateRequest{
-		SessionID: &sessionID,
-		Name:      "First Bell",
-		Time:      "07:45",
-		SoundID:   uuid.New(),
-		Days:      []int{2, 3, 4, 5, 6},
-	})
-
-	var req models.ScheduleItemCreateRequest
-	require.NoError(t, json.Unmarshal(body, &req))
-	require.NotNil(t, req.SessionID)
-	assert.Equal(t, sessionID, *req.SessionID)
-	assert.Equal(t, []int{2, 3, 4, 5, 6}, req.Days)
-}
-
-func TestScheduleItemCreateRequest_JSON_WithoutSessionID(t *testing.T) {
-	body := `{"name":"School Opening","time":"06:45","soundId":"` + uuid.New().String() + `","days":[2,3,4,5,6]}`
-	var req models.ScheduleItemCreateRequest
-	require.NoError(t, json.Unmarshal([]byte(body), &req))
-	assert.Nil(t, req.SessionID, "sessionId should be nil when not provided")
-}
-
-func TestSystemStateRequest_JSON(t *testing.T) {
-	tests := []struct {
-		body  string
-		state string
-	}{
-		{`{"state":"active"}`, "active"},
-		{`{"state":"paused"}`, "paused"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.state, func(t *testing.T) {
-			var req models.SystemStateRequest
-			require.NoError(t, json.Unmarshal([]byte(tt.body), &req))
-			assert.Equal(t, tt.state, req.State)
-		})
-	}
-}
-
 // --- Response models ---
 
 func TestErrorResponse_JSON(t *testing.T) {
-	resp := models.ErrorResponse{}
-	resp.Error.Code = "NOT_FOUND"
-	resp.Error.Message = "User not found"
-
-	data, err := json.Marshal(resp)
-	require.NoError(t, err)
-
-	var result map[string]any
-	require.NoError(t, json.Unmarshal(data, &result))
-
-	errObj, ok := result["error"].(map[string]any)
-	require.True(t, ok)
-	assert.Equal(t, "NOT_FOUND", errObj["code"])
-	assert.Equal(t, "User not found", errObj["message"])
-}
-
-func TestSuccessResponse_JSON_MessageOmittedWhenEmpty(t *testing.T) {
-	resp := models.SuccessResponse{Success: true}
-
-	data, err := json.Marshal(resp)
-	require.NoError(t, err)
-
-	var result map[string]any
-	require.NoError(t, json.Unmarshal(data, &result))
-
-	assert.Equal(t, true, result["success"])
-	assert.NotContains(t, result, "message")
-}
-
-func TestListResponse_JSON(t *testing.T) {
-	resp := models.ListResponse{
-		Total: 2,
-		Items: []string{"a", "b"},
+	resp := jsonapi.ErrorDocument{
+		Errors: []jsonapi.Error{
+			{Status: "404", Code: "not_found", Title: "Not Found", Detail: "User not found"},
+		},
 	}
 
 	data, err := json.Marshal(resp)
@@ -396,10 +318,14 @@ func TestListResponse_JSON(t *testing.T) {
 	var result map[string]any
 	require.NoError(t, json.Unmarshal(data, &result))
 
-	assert.Equal(t, float64(2), result["total"])
-	items, ok := result["items"].([]any)
+	errArr, ok := result["errors"].([]any)
 	require.True(t, ok)
-	assert.Len(t, items, 2)
+	require.Len(t, errArr, 1)
+
+	errObj, ok := errArr[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "not_found", errObj["code"])
+	assert.Equal(t, "User not found", errObj["detail"])
 }
 
 func TestCurrentScheduleItem_StatusValues(t *testing.T) {

@@ -1,0 +1,162 @@
+# Session management paths (unpaginated)
+
+collection:
+  get:
+    operationId: listSessions
+    tags: [Sessions]
+    summary: List all sessions
+    description: Returns an unpaginated collection of all sessions.
+    security:
+      - BearerAuth: []
+    parameters:
+      - $ref: '../parameters.yaml#/Sort'
+    responses:
+      '200':
+        description: Session collection (unpaginated)
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SessionCollectionDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  post:
+    operationId: createSession
+    tags: [Sessions]
+    summary: Create session
+    description: Creates a new session (e.g. Morning, Afternoon).
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/SessionCreateRequest'
+    responses:
+      '201':
+        description: Session created
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SessionDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '409':
+        $ref: '../responses.yaml#/Conflict'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+current:
+  get:
+    operationId: getCurrentSession
+    tags: [Sessions]
+    summary: Get current session
+    description: |
+      Public endpoint. Returns the session that is active based on
+      the current time of day.
+    security: []
+    responses:
+      '200':
+        description: Current session
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SessionDocument'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+item:
+  parameters:
+    - in: path
+      name: id
+      required: true
+      description: Session UUID
+      schema:
+        type: string
+        format: uuid
+
+  get:
+    operationId: getSessionById
+    tags: [Sessions]
+    summary: Get session by ID
+    description: Returns a single session resource.
+    security:
+      - BearerAuth: []
+    responses:
+      '200':
+        description: Session resource
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SessionDocument'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  put:
+    operationId: updateSession
+    tags: [Sessions]
+    summary: Update session
+    description: Updates an existing session.
+    security:
+      - BearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/vnd.api+json:
+          schema:
+            $ref: '../schemas/requests.yaml#/SessionUpdateRequest'
+    responses:
+      '200':
+        description: Session updated
+        content:
+          application/vnd.api+json:
+            schema:
+              $ref: '../schemas/resources.yaml#/SessionDocument'
+      '400':
+        $ref: '../responses.yaml#/BadRequest'
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '409':
+        $ref: '../responses.yaml#/Conflict'
+      '422':
+        $ref: '../responses.yaml#/UnprocessableEntity'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'
+
+  delete:
+    operationId: deleteSession
+    tags: [Sessions]
+    summary: Delete session
+    description: Permanently removes a session.
+    security:
+      - BearerAuth: []
+    responses:
+      '204':
+        description: Session deleted
+      '401':
+        $ref: '../responses.yaml#/Unauthorized'
+      '403':
+        $ref: '../responses.yaml#/Forbidden'
+      '404':
+        $ref: '../responses.yaml#/NotFound'
+      '500':
+        $ref: '../responses.yaml#/InternalServerError'

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 
 	"github.com/google/uuid"
 )
@@ -15,7 +16,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *models.User) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
-	List(ctx context.Context) ([]*models.User, error)
+	List(ctx context.Context, page, size int, filterRole string, sorts []jsonapi.SortField) ([]*models.User, int, error)
 	Update(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -25,7 +26,7 @@ type SessionRepository interface {
 	Create(ctx context.Context, session *models.Session) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Session, error)
 	GetSessionsByIDs(ctx context.Context, sessionIDs []uuid.UUID) (map[uuid.UUID]*models.Session, error)
-	List(ctx context.Context) ([]*models.Session, error)
+	List(ctx context.Context, sorts []jsonapi.SortField) ([]*models.Session, error)
 	GetCurrentSession(ctx context.Context) (*models.Session, error)
 	Update(ctx context.Context, session *models.Session) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -35,7 +36,7 @@ type SessionRepository interface {
 type ScheduleItemRepository interface {
 	Create(ctx context.Context, item *models.ScheduleItem) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error)
-	List(ctx context.Context) ([]*models.ScheduleItem, error)
+	List(ctx context.Context, filterSessionID string, filterDay int, sorts []jsonapi.SortField) ([]*models.ScheduleItem, error)
 	GetCurrentSessionSchedules(ctx context.Context, sessionID uuid.UUID) ([]*models.ScheduleItem, error)
 	Update(ctx context.Context, item *models.ScheduleItem) error
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -54,7 +55,7 @@ type SystemAudioFileRepository interface {
 	Create(ctx context.Context, audio *models.SystemAudioFile) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.SystemAudioFile, error)
 	GetSoundsByIDs(ctx context.Context, soundIDs []uuid.UUID) (map[uuid.UUID]*models.SystemAudioFile, error)
-	List(ctx context.Context) ([]*models.SystemAudioFile, error)
+	List(ctx context.Context, page, size int, filterFileType string, sorts []jsonapi.SortField) ([]*models.SystemAudioFile, int, error)
 	Update(ctx context.Context, audio *models.SystemAudioFile) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }

@@ -14,6 +14,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
 	pkgerrors "arabiyya.edu.mv/bell-system-backend/pkg/errors"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 	"arabiyya.edu.mv/bell-system-backend/tests/testutil"
 
@@ -30,6 +31,9 @@ func newSessionRouter(sessionRepo handlers.SessionRepository) http.Handler {
 
 func authSessionReq(req *http.Request) *http.Request {
 	testutil.SetAuthHeader(req)
+	if req.Method == http.MethodPost || req.Method == http.MethodPut {
+		req.Header.Set("Content-Type", "application/vnd.api+json")
+	}
 	return req
 }
 
@@ -43,7 +47,7 @@ func TestSessionHandler_List_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ []jsonapi.SortField) ([]*models.Session, error) {
 			return sessions, nil
 		},
 	}
@@ -55,20 +59,45 @@ func TestSessionHandler_List_Success(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, jsonapi.ContentType, rr.Header().Get("Content-Type"))
 
-	var resp struct {
-		Total int              `json:"total"`
-		Items []models.Session `json:"items"`
-	}
+	var resp jsonapi.CollectionDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, 2, resp.Total)
-	assert.Len(t, resp.Items, 2)
+	assert.Equal(t, float64(2), resp.Meta["total"])
+	assert.Len(t, resp.Data, 2)
+	assert.Equal(t, "sessions", resp.Data[0].Type)
+}
+
+func TestSessionHandler_List_WithSort(t *testing.T) {
+	var capturedSorts []jsonapi.SortField
+	sessions := []*models.Session{
+		{ID: uuid.New(), Name: "Afternoon"},
+		{ID: uuid.New(), Name: "Morning"},
+	}
+
+	repo := &mocks.MockSessionRepo{
+		ListFunc: func(_ context.Context, sorts []jsonapi.SortField) ([]*models.Session, error) {
+			capturedSorts = sorts
+			return sessions, nil
+		},
+	}
+
+	req := authSessionReq(httptest.NewRequest(http.MethodGet, "/?sort=-name", nil))
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.Len(t, capturedSorts, 1)
+	assert.Equal(t, "name", capturedSorts[0].Field)
+	assert.True(t, capturedSorts[0].Desc)
 }
 
 func TestSessionHandler_List_Empty(t *testing.T) {
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ []jsonapi.SortField) ([]*models.Session, error) {
 			return []*models.Session{}, nil
 		},
 	}
@@ -108,11 +137,11 @@ func TestSessionHandler_GetByID_Success(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.Session
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, sessionID, resp.ID)
-	assert.Equal(t, "Morning", resp.Name)
+	assert.Equal(t, "sessions", resp.Data.Type)
+	assert.Equal(t, sessionID.String(), resp.Data.ID)
 }
 
 func TestSessionHandler_GetByID_NotFound(t *testing.T) {
@@ -167,10 +196,10 @@ func TestSessionHandler_GetCurrent_Success(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.Session
+	var resp jsonapi.Document
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "Morning", resp.Name)
+	assert.Equal(t, "sessions", resp.Data.Type)
 }
 
 func TestSessionHandler_GetCurrent_NoActiveSession(t *testing.T) {
@@ -199,9 +228,9 @@ func TestSessionHandler_Create_Success(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Evening","startTime":"17:00","endTime":"20:00"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Evening", "startTime": "17:00", "endTime": "20:00"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -214,7 +243,7 @@ func TestSessionHandler_Create_InvalidJSON(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
 	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(`{bad`)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -230,9 +259,9 @@ func TestSessionHandler_Create_OverlappingTimes(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Overlap","startTime":"07:00","endTime":"13:00"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Overlap", "startTime": "07:00", "endTime": "13:00"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -256,9 +285,9 @@ func TestSessionHandler_Update_Success(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Updated"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Updated"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -274,9 +303,9 @@ func TestSessionHandler_Update_NotFound(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Updated"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Updated"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -329,7 +358,7 @@ func TestSessionHandler_Delete_NotFound(t *testing.T) {
 
 func TestSessionHandler_List_DBError(t *testing.T) {
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ []jsonapi.SortField) ([]*models.Session, error) {
 			return nil, errors.New("database error")
 		},
 	}
@@ -410,9 +439,9 @@ func TestSessionHandler_GetByID_DBError(t *testing.T) {
 func TestSessionHandler_Update_InvalidUUID(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	body := `{"name":"Updated"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Updated"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/not-a-uuid", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -428,9 +457,9 @@ func TestSessionHandler_Update_ErrNotFound(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Updated"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Updated"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -446,9 +475,9 @@ func TestSessionHandler_Update_GetByIDDBError(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Updated"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Updated"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -465,7 +494,7 @@ func TestSessionHandler_Update_InvalidJSON(t *testing.T) {
 	}
 
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(`{bad`)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -481,9 +510,9 @@ func TestSessionHandler_Update_InvalidStartTime(t *testing.T) {
 		},
 	}
 
-	body := `{"startTime":"not-a-time"}`
+	body := jsonapiBody("sessions", map[string]string{"startTime": "not-a-time"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -499,9 +528,9 @@ func TestSessionHandler_Update_InvalidEndTime(t *testing.T) {
 		},
 	}
 
-	body := `{"endTime":"not-a-time"}`
+	body := jsonapiBody("sessions", map[string]string{"endTime": "not-a-time"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -520,9 +549,9 @@ func TestSessionHandler_Update_DBError(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Updated"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Updated"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+uuid.New().String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -594,12 +623,45 @@ func TestSessionHandler_Delete_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestSessionHandler_Create_InvalidAttributes(t *testing.T) {
+	sessionRepo := &mocks.MockSessionRepo{}
+
+	body := `{"data":{"type":"sessions","attributes":"not-an-object"}}`
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(sessionRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Update_InvalidAttributes(t *testing.T) {
+	sessionID := uuid.New()
+	sessionRepo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: sessionID, Name: "Test"}, nil
+		},
+	}
+
+	body := `{"data":{"type":"sessions","attributes":"not-an-object"}}`
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(sessionRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
 func TestSessionHandler_Create_InvalidStartTime(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	body := `{"name":"Test","startTime":"not-time","endTime":"18:00"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Test", "startTime": "not-time", "endTime": "18:00"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -611,9 +673,9 @@ func TestSessionHandler_Create_InvalidStartTime(t *testing.T) {
 func TestSessionHandler_Create_InvalidEndTime(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	body := `{"name":"Test","startTime":"07:00","endTime":"not-time"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Test", "startTime": "07:00", "endTime": "not-time"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -642,9 +704,9 @@ func TestSessionHandler_Update_UpdateTimes(t *testing.T) {
 		},
 	}
 
-	body := `{"name":"Morning Updated","startTime":"08:00","endTime":"13:00"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "Morning Updated", "startTime": "08:00", "endTime": "13:00"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)
@@ -656,9 +718,9 @@ func TestSessionHandler_Update_UpdateTimes(t *testing.T) {
 func TestSessionHandler_Create_MissingFields(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
-	body := `{"name":"OnlyName"}`
+	body := jsonapiBody("sessions", map[string]string{"name": "OnlyName"})
 	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", jsonapi.ContentType)
 	rr := httptest.NewRecorder()
 
 	r := newSessionRouter(repo)

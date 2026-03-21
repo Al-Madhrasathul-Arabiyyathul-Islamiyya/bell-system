@@ -23,6 +23,7 @@ func TestSystemStateRepository_GetState_Success(t *testing.T) {
 		AddRow("active", now)
 
 	mock.ExpectQuery("SELECT .+ FROM SystemState WHERE").
+		WithArgs("system_state").
 		WillReturnRows(rows)
 
 	state, updatedAt, err := repo.GetState(ctx)
@@ -37,6 +38,7 @@ func TestSystemStateRepository_GetState_NoRows(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectQuery("SELECT .+ FROM SystemState WHERE").
+		WithArgs("system_state").
 		WillReturnError(sql.ErrNoRows)
 
 	state, updatedAt, err := repo.GetState(ctx)
@@ -51,6 +53,7 @@ func TestSystemStateRepository_GetState_DBError(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectQuery("SELECT .+ FROM SystemState WHERE").
+		WithArgs("system_state").
 		WillReturnError(errors.New("connection lost"))
 
 	state, updatedAt, err := repo.GetState(ctx)
@@ -69,6 +72,7 @@ func TestSystemStateRepository_GetState_ScanError(t *testing.T) {
 		AddRow("active")
 
 	mock.ExpectQuery("SELECT .+ FROM SystemState WHERE").
+		WithArgs("system_state").
 		WillReturnRows(rows)
 
 	_, _, err := repo.GetState(ctx)
@@ -81,7 +85,7 @@ func TestSystemStateRepository_SetState_Success(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectExec("UPDATE SystemState SET").
-		WithArgs("paused").
+		WithArgs("paused", "system_state").
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
 	err := repo.SetState(ctx, "paused")
@@ -94,7 +98,7 @@ func TestSystemStateRepository_SetState_DBError(t *testing.T) {
 	ctx := context.Background()
 
 	mock.ExpectExec("UPDATE SystemState SET").
-		WithArgs("active").
+		WithArgs("active", "system_state").
 		WillReturnError(errors.New("constraint violation"))
 
 	err := repo.SetState(ctx, "active")

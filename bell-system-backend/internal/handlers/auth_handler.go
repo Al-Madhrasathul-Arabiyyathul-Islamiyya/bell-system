@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 )
 
 // AuthHandler handles authentication-related HTTP requests.
@@ -26,6 +27,12 @@ func NewAuthHandler(users UserRepository, tokens TokenService, passwords Passwor
 type changePasswordRequest struct {
 	OldPassword string `json:"oldPassword"`
 	NewPassword string `json:"newPassword"`
+}
+
+// loginResponse is the login endpoint response — plain JSON with a JSON:API user resource.
+type loginResponse struct {
+	Token string           `json:"token"`
+	User  jsonapi.Resource `json:"user"`
 }
 
 // Login handles POST /login.
@@ -62,9 +69,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, models.LoginResponse{
+	writeJSON(w, http.StatusOK, loginResponse{
 		Token: token,
-		User:  *user,
+		User:  jsonapi.MarshalUser(user),
 	})
 }
 
@@ -103,7 +110,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Passwords.Compare(user.PasswordHash, req.OldPassword); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "incorrect old password")
+		writeError(w, http.StatusUnprocessableEntity, "unprocessable_entity", "incorrect old password")
 		return
 	}
 
@@ -119,10 +126,10 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, models.SuccessResponse{Success: true, Message: "password changed successfully"})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // Logout handles POST /logout.
 func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, models.SuccessResponse{Success: true, Message: "logged out successfully"})
+	w.WriteHeader(http.StatusNoContent)
 }

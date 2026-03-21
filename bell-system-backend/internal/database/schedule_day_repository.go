@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 )
 
@@ -26,14 +26,13 @@ func NewScheduleDayRepository(db *sql.DB, logger *logger.Logger) *ScheduleDayRep
 
 // Create creates a new schedule day
 func (r *ScheduleDayRepository) Create(ctx context.Context, scheduleDay *models.ScheduleDay) error {
-	query := `
-        INSERT INTO ScheduleDays (ScheduleItemID, DayOfWeek)
-        VALUES (@p1, @p2)
-    `
-	_, err := r.DB.ExecContext(
-		ctx, query,
-		scheduleDay.ScheduleItemID, scheduleDay.DayOfWeek,
-	)
+	query, args, err := buildQuery(qb.Insert("ScheduleDays").
+		Columns("ScheduleItemID", "DayOfWeek").
+		Values(scheduleDay.ScheduleItemID, scheduleDay.DayOfWeek))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create schedule day: %w", err)
 	}
@@ -46,20 +45,14 @@ func (r *ScheduleDayRepository) GetDaysForScheduleItems(ctx context.Context, ite
 		return make(map[uuid.UUID][]int), nil
 	}
 
-	// Convert UUIDs to strings for the query
-	idStrings := make([]string, len(itemIDs))
-	for i, id := range itemIDs {
-		idStrings[i] = "'" + id.String() + "'"
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), ScheduleItemId) AS ScheduleItemId", "DayOfWeek").
+		From("ScheduleDays").
+		Where(sq.Eq{"ScheduleItemId": itemIDs}))
+	if err != nil {
+		return nil, err
 	}
 
-	// Build query with the IDs directly in the SQL
-	query := fmt.Sprintf(`
-        SELECT CONVERT(NVARCHAR(36), ScheduleItemId) AS ScheduleItemId, DayOfWeek
-        FROM ScheduleDays
-        WHERE ScheduleItemId IN (%s)
-    `, strings.Join(idStrings, ", "))
-
-	rows, err := r.DB.QueryContext(ctx, query)
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get days for schedule items: %w", err)
 	}
@@ -87,15 +80,13 @@ func (r *ScheduleDayRepository) GetDaysForScheduleItems(ctx context.Context, ite
 
 // Update updates a schedule day
 func (r *ScheduleDayRepository) Update(ctx context.Context, scheduleDay *models.ScheduleDay) error {
-	query := `
-        UPDATE ScheduleDays
-        SET DayOfWeek = @p1
-        WHERE ScheduleItemId = @p2
-    `
-	_, err := r.DB.ExecContext(
-		ctx, query,
-		scheduleDay.DayOfWeek, scheduleDay.ScheduleItemID,
-	)
+	query, args, err := buildQuery(qb.Update("ScheduleDays").
+		Set("DayOfWeek", scheduleDay.DayOfWeek).
+		Where(sq.Eq{"ScheduleItemId": scheduleDay.ScheduleItemID}))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update schedule day: %w", err)
 	}
@@ -104,8 +95,12 @@ func (r *ScheduleDayRepository) Update(ctx context.Context, scheduleDay *models.
 
 // Delete deletes a schedule day
 func (r *ScheduleDayRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := "DELETE FROM ScheduleDays WHERE ScheduleItemId = @p1"
-	_, err := r.DB.ExecContext(ctx, query, id)
+	query, args, err := buildQuery(qb.Delete("ScheduleDays").
+		Where(sq.Eq{"ScheduleItemId": id}))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete schedule day: %w", err)
 	}

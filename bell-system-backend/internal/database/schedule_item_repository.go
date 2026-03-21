@@ -9,9 +9,11 @@ import (
 
 	"arabiyya.edu.mv/bell-system-backend/internal/helpers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 	"go.uber.org/zap"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 )
 
@@ -46,12 +48,6 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 		zap.String("operation", "ScheduleItemRepository.Create"))
 
 	return r.WithTx(ctx, func(tx *sql.Tx) error {
-		// Insert the schedule item
-		query := `
-            INSERT INTO ScheduleItems (Id, SessionId, Name, Time, SoundId, CreatedAt, UpdatedAt)
-            VALUES (@p1, @p2, @p3, @p4, @p5, @p6, @p7)
-        `
-
 		now := time.Now()
 		if item.ID == uuid.Nil {
 			item.ID = uuid.New()
@@ -59,30 +55,28 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 		item.CreatedAt = now
 		item.UpdatedAt = now
 
-		_, err := tx.ExecContext(
-			ctx, query,
-			item.ID,
-			item.SessionID,
-			item.Name,
-			item.Time,
-			item.SoundID,
-			item.CreatedAt,
-			item.UpdatedAt,
-		)
+		query, args, err := buildQuery(qb.Insert("ScheduleItems").
+			Columns("Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt").
+			Values(item.ID, item.SessionID, item.Name, item.Time, item.SoundID, item.CreatedAt, item.UpdatedAt))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return fmt.Errorf("failed to insert schedule item: %w", err)
 		}
 
-		if len(item.Days) > 0 {
-			for _, day := range item.Days {
-				dayQuery := `
-                    INSERT INTO ScheduleDays (ScheduleItemId, DayOfWeek)
-                    VALUES (@p1, @p2)
-                `
-				_, err := tx.ExecContext(ctx, dayQuery, item.ID, day)
-				if err != nil {
-					return fmt.Errorf("failed to insert schedule day: %w", err)
-				}
+		for _, day := range item.Days {
+			dayQuery, dayArgs, err := buildQuery(qb.Insert("ScheduleDays").
+				Columns("ScheduleItemId", "DayOfWeek").
+				Values(item.ID, day))
+			if err != nil {
+				return err
+			}
+			_, err = tx.ExecContext(ctx, dayQuery, dayArgs...)
+			if err != nil {
+				return fmt.Errorf("failed to insert schedule day: %w", err)
 			}
 		}
 
@@ -92,23 +86,22 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 
 // GetByID gets a schedule item by ID with related sound, session, and days
 func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
-	query := `
-        SELECT
-            CONVERT(NVARCHAR(36), Id) AS Id,
-            CONVERT(NVARCHAR(36), SessionId) AS SessionId,
-            Name,
-            Time,
-            CONVERT(NVARCHAR(36), SoundId) AS SoundId,
-            CreatedAt,
-            UpdatedAt
-        FROM ScheduleItems
-        WHERE Id = @id
-    `
+	query, args, err := buildQuery(qb.Select(
+		"CONVERT(NVARCHAR(36), Id) AS Id",
+		"CONVERT(NVARCHAR(36), SessionId) AS SessionId",
+		"Name", "Time",
+		"CONVERT(NVARCHAR(36), SoundId) AS SoundId",
+		"CreatedAt", "UpdatedAt",
+	).From("ScheduleItems").
+		Where(sq.Eq{"Id": id}))
+	if err != nil {
+		return nil, err
+	}
 
 	var scheduleItem models.ScheduleItem
 	var sessionID *uuid.UUID
 
-	err := r.DB.QueryRowContext(ctx, query, sql.Named("id", id)).Scan(
+	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
 		&scheduleItem.ID,
 		&sessionID,
 		&scheduleItem.Name,
@@ -163,22 +156,39 @@ func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*mo
 	return &scheduleItem, nil
 }
 
-// List gets all schedule items with their associations
-func (r *ScheduleItemRepository) List(ctx context.Context) ([]*models.ScheduleItem, error) {
-	query := `
-		SELECT
-			CONVERT(NVARCHAR(36), Id) AS Id,
-			CONVERT(NVARCHAR(36), SessionId) AS SessionId,
-			Name,
-			Time,
-			CONVERT(NVARCHAR(36), SoundId) AS SoundId,
-			CreatedAt,
-			UpdatedAt
-		FROM ScheduleItems
-		ORDER BY Time
-	`
+// scheduleSortColumns maps JSON:API sort field names to SQL column names.
+var scheduleSortColumns = map[string]string{
+	"name": "Name",
+	"time": "Time",
+}
 
-	rows, err := r.DB.QueryContext(ctx, query)
+// List gets all schedule items with their associations, with optional filters and sorting.
+func (r *ScheduleItemRepository) List(ctx context.Context, filterSessionID string, filterDay int, sorts []jsonapi.SortField) ([]*models.ScheduleItem, error) {
+	sb := qb.Select(
+		"CONVERT(NVARCHAR(36), Id) AS Id",
+		"CONVERT(NVARCHAR(36), SessionId) AS SessionId",
+		"Name", "Time",
+		"CONVERT(NVARCHAR(36), SoundId) AS SoundId",
+		"CreatedAt", "UpdatedAt",
+	).From("ScheduleItems")
+
+	if filterSessionID != "" {
+		sb = sb.Where(sq.Eq{"SessionId": filterSessionID})
+	}
+
+	if filterDay > 0 {
+		sb = sb.Where("Id IN (SELECT ScheduleItemId FROM ScheduleDays WHERE DayOfWeek = ?)", filterDay)
+	}
+
+	orderBy := jsonapi.SortToSQL(sorts, scheduleSortColumns, "ORDER BY Time")
+	sb = sb.Suffix(orderBy)
+
+	query, args, err := buildQuery(sb)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list schedule items: %w", err)
 	}
@@ -273,26 +283,22 @@ func (r *ScheduleItemRepository) GetCurrentSessionSchedules(ctx context.Context,
 	currentTime := time.Now()
 	currentDayOfWeek := int(currentTime.Weekday()) + 1 // Adding 1 for Sunday = 1
 
-	query := `
-        SELECT
-            CONVERT(NVARCHAR(36), si.Id) AS Id,
-            CONVERT(NVARCHAR(36), si.SessionId) AS SessionId,
-            si.Name,
-            si.Time,
-            CONVERT(NVARCHAR(36), si.SoundId) AS SoundId,
-            si.CreatedAt,
-            si.UpdatedAt
-        FROM ScheduleItems si
-        INNER JOIN ScheduleDays sd ON si.Id = sd.ScheduleItemId
-        WHERE si.SessionId = @sessionId
-        AND sd.DayOfWeek = @dayOfWeek
-        ORDER BY si.Time
-    `
+	query, args, err := buildQuery(qb.Select(
+		"CONVERT(NVARCHAR(36), si.Id) AS Id",
+		"CONVERT(NVARCHAR(36), si.SessionId) AS SessionId",
+		"si.Name", "si.Time",
+		"CONVERT(NVARCHAR(36), si.SoundId) AS SoundId",
+		"si.CreatedAt", "si.UpdatedAt",
+	).From("ScheduleItems si").
+		Join("ScheduleDays sd ON si.Id = sd.ScheduleItemId").
+		Where(sq.Eq{"si.SessionId": sessionID}).
+		Where(sq.Eq{"sd.DayOfWeek": currentDayOfWeek}).
+		Suffix("ORDER BY si.Time"))
+	if err != nil {
+		return nil, err
+	}
 
-	rows, err := r.DB.QueryContext(ctx, query,
-		sql.Named("sessionId", sessionID),
-		sql.Named("dayOfWeek", currentDayOfWeek),
-	)
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current session schedules: %w", err)
 	}
@@ -379,43 +385,44 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 		zap.String("operation", "ScheduleItemRepository.Update"))
 
 	return r.WithTx(ctx, func(tx *sql.Tx) error {
-		query := `
-            UPDATE ScheduleItems
-            SET SessionId = @p1, Name = @p2, Time = @p3, SoundId = @p4, UpdatedAt = @p5
-            WHERE Id = @p6
-        `
-
 		item.UpdatedAt = time.Now()
 
-		_, err := tx.ExecContext(
-			ctx, query,
-			item.SessionID,
-			item.Name,
-			item.Time,
-			item.SoundID,
-			item.UpdatedAt,
-			item.ID,
-		)
+		query, args, err := buildQuery(qb.Update("ScheduleItems").
+			Set("SessionId", item.SessionID).
+			Set("Name", item.Name).
+			Set("Time", item.Time).
+			Set("SoundId", item.SoundID).
+			Set("UpdatedAt", item.UpdatedAt).
+			Where(sq.Eq{"Id": item.ID}))
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.ExecContext(ctx, query, args...)
 		if err != nil {
 			return fmt.Errorf("failed to update schedule item: %w", err)
 		}
 
-		deleteQuery := `DELETE FROM ScheduleDays WHERE ScheduleItemId = @p1`
-		_, err = tx.ExecContext(ctx, deleteQuery, item.ID)
+		delQuery, delArgs, err := buildQuery(qb.Delete("ScheduleDays").
+			Where(sq.Eq{"ScheduleItemId": item.ID}))
+		if err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, delQuery, delArgs...)
 		if err != nil {
 			return fmt.Errorf("failed to delete existing schedule days: %w", err)
 		}
 
-		if len(item.Days) > 0 {
-			for _, day := range item.Days {
-				dayQuery := `
-                    INSERT INTO ScheduleDays (ScheduleItemId, DayOfWeek)
-                    VALUES (@p1, @p2)
-                `
-				_, err := tx.ExecContext(ctx, dayQuery, item.ID, day)
-				if err != nil {
-					return fmt.Errorf("failed to insert schedule day: %w", err)
-				}
+		for _, day := range item.Days {
+			dayQuery, dayArgs, err := buildQuery(qb.Insert("ScheduleDays").
+				Columns("ScheduleItemId", "DayOfWeek").
+				Values(item.ID, day))
+			if err != nil {
+				return err
+			}
+			_, err = tx.ExecContext(ctx, dayQuery, dayArgs...)
+			if err != nil {
+				return fmt.Errorf("failed to insert schedule day: %w", err)
 			}
 		}
 
@@ -427,10 +434,21 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 func (r *ScheduleItemRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.WithTx(ctx, func(tx *sql.Tx) error {
 		// Delete associated days first (FK constraint)
-		if _, err := tx.ExecContext(ctx, "DELETE FROM ScheduleDays WHERE ScheduleItemId = @p1", id); err != nil {
+		daysQuery, daysArgs, err := buildQuery(qb.Delete("ScheduleDays").
+			Where(sq.Eq{"ScheduleItemId": id}))
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, daysQuery, daysArgs...); err != nil {
 			return fmt.Errorf("failed to delete schedule days: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx, "DELETE FROM ScheduleItems WHERE Id = @p1", id); err != nil {
+
+		itemQuery, itemArgs, err := buildQuery(qb.Delete("ScheduleItems").
+			Where(sq.Eq{"Id": id}))
+		if err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, itemQuery, itemArgs...); err != nil {
 			return fmt.Errorf("failed to delete the schedule item: %w", err)
 		}
 		return nil

@@ -13,6 +13,7 @@ import (
 	"arabiyya.edu.mv/bell-system-backend/internal/handlers"
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
 	"arabiyya.edu.mv/bell-system-backend/internal/router"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/tests/mocks"
 
 	"github.com/google/uuid"
@@ -68,12 +69,17 @@ func TestAuthHandler_Login_Success(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rr.Code)
 
-	var resp models.LoginResponse
+	var resp struct {
+		Token string           `json:"token"`
+		User  jsonapi.Resource `json:"user"`
+	}
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, "jwt-token-here", resp.Token)
-	assert.Equal(t, userID, resp.User.ID)
-	assert.Equal(t, "admin", resp.User.Username)
+	assert.Equal(t, "users", resp.User.Type)
+	assert.Equal(t, userID.String(), resp.User.ID)
+	attrs := resp.User.Attributes.(map[string]any)
+	assert.Equal(t, "admin", attrs["username"])
 }
 
 func TestAuthHandler_Login_InvalidJSON(t *testing.T) {
@@ -90,10 +96,11 @@ func TestAuthHandler_Login_InvalidJSON(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 
-	var resp models.ErrorResponse
+	var resp jsonapi.ErrorDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "invalid_request", resp.Error.Code)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "invalid_request", resp.Errors[0].Code)
 }
 
 func TestAuthHandler_Login_MissingUsername(t *testing.T) {
@@ -147,10 +154,11 @@ func TestAuthHandler_Login_UserNotFound(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, rr.Code)
 
-	var resp models.ErrorResponse
+	var resp jsonapi.ErrorDocument
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
-	assert.Equal(t, "unauthorized", resp.Error.Code)
+	require.Len(t, resp.Errors, 1)
+	assert.Equal(t, "unauthorized", resp.Errors[0].Code)
 }
 
 func TestAuthHandler_Login_WrongPassword(t *testing.T) {
@@ -292,7 +300,7 @@ func TestAuthHandler_ChangePassword_Success(t *testing.T) {
 	r := newAuthRouter(userRepo, tokenSvc, hasher)
 	r.ServeHTTP(rr, req)
 
-	require.Equal(t, http.StatusOK, rr.Code)
+	require.Equal(t, http.StatusNoContent, rr.Code)
 }
 
 func TestAuthHandler_ChangePassword_Unauthorized(t *testing.T) {
@@ -349,7 +357,7 @@ func TestAuthHandler_ChangePassword_WrongOldPassword(t *testing.T) {
 	r := newAuthRouter(userRepo, tokenSvc, hasher)
 	r.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, rr.Code)
 }
 
 func TestAuthHandler_ChangePassword_SamePassword(t *testing.T) {
@@ -599,10 +607,5 @@ func TestAuthHandler_Logout_Success(t *testing.T) {
 	r := newAuthRouter(userRepo, tokenSvc, hasher)
 	r.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	var resp models.SuccessResponse
-	err := json.NewDecoder(rr.Body).Decode(&resp)
-	require.NoError(t, err)
-	assert.True(t, resp.Success)
+	assert.Equal(t, http.StatusNoContent, rr.Code)
 }

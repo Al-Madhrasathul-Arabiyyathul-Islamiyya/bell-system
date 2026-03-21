@@ -61,6 +61,30 @@ func TestLogger_Close_DoesNotPanic(t *testing.T) {
 	})
 }
 
+func TestLogger_Fatal_LogsAndExits(t *testing.T) {
+	log, err := logger.New("test")
+	require.NoError(t, err)
+	defer log.Close()
+
+	var exitCode int
+	log.SetExitFunc(func(code int) { exitCode = code })
+
+	log.Fatal("fatal error", assert.AnError, zap.String("context", "test"))
+	assert.Equal(t, 1, exitCode)
+}
+
+func TestLogger_Fatal_NilError(t *testing.T) {
+	log, err := logger.New("test")
+	require.NoError(t, err)
+	defer log.Close()
+
+	var exitCode int
+	log.SetExitFunc(func(code int) { exitCode = code })
+
+	log.Fatal("fatal with nil", nil)
+	assert.Equal(t, 1, exitCode)
+}
+
 func TestLogger_Info_WithNoFields(t *testing.T) {
 	log, err := logger.New("test")
 	require.NoError(t, err)

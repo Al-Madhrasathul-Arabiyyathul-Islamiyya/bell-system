@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 )
 
@@ -27,14 +28,13 @@ func NewSystemAudioFileRepository(db *sql.DB, logger *logger.Logger) *SystemAudi
 
 // Create creates a new system audio file
 func (r *SystemAudioFileRepository) Create(ctx context.Context, audio *models.SystemAudioFile) error {
-	query := `
-        INSERT INTO SystemAudioFiles (Id, Name, FilePath, FileType, Checksum)
-        VALUES (@p1, @p2, @p3, @p4, @p5)
-    `
-	_, err := r.DB.ExecContext(
-		ctx, query,
-		audio.ID, audio.Name, audio.FilePath, audio.FileType, audio.Checksum,
-	)
+	query, args, err := buildQuery(qb.Insert("SystemAudioFiles").
+		Columns("Id", "Name", "FilePath", "FileType", "Checksum").
+		Values(audio.ID, audio.Name, audio.FilePath, audio.FileType, audio.Checksum))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to create system audio file: %w", err)
 	}
@@ -43,13 +43,14 @@ func (r *SystemAudioFileRepository) Create(ctx context.Context, audio *models.Sy
 
 // GetByID gets a system audio file by ID
 func (r *SystemAudioFileRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
-	query := `
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum
-        FROM SystemAudioFiles
-        WHERE Id = @p1
-    `
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum").
+		From("SystemAudioFiles").
+		Where(sq.Eq{"Id": id}))
+	if err != nil {
+		return nil, err
+	}
 	var audio models.SystemAudioFile
-	err := r.DB.QueryRowContext(ctx, query, id).Scan(
+	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
 		&audio.ID, &audio.Name, &audio.FilePath, &audio.FileType, &audio.Checksum,
 	)
 	if err != nil {
@@ -67,19 +68,14 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 		return make(map[uuid.UUID]*models.SystemAudioFile), nil
 	}
 
-	// Convert UUIDs to strings for the query
-	idStrings := make([]string, len(soundIDs))
-	for i, id := range soundIDs {
-		idStrings[i] = "'" + id.String() + "'"
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt").
+		From("SystemAudioFiles").
+		Where(sq.Eq{"Id": soundIDs}))
+	if err != nil {
+		return nil, err
 	}
 
-	query := fmt.Sprintf(`
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum, CreatedAt, UpdatedAt
-        FROM SystemAudioFiles
-        WHERE Id IN (%s)
-    `, strings.Join(idStrings, ", "))
-
-	rows, err := r.DB.QueryContext(ctx, query)
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sound files: %w", err)
 	}
@@ -117,15 +113,48 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 	return result, nil
 }
 
-// List gets all system audio file
-func (r *SystemAudioFileRepository) List(ctx context.Context) ([]*models.SystemAudioFile, error) {
-	query := `
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, FilePath, FileType, Checksum
-        FROM SystemAudioFiles
-`
-	rows, err := r.DB.QueryContext(ctx, query)
+// audioSortColumns maps JSON:API sort field names to SQL column names.
+var audioSortColumns = map[string]string{
+	"name":      "Name",
+	"fileType":  "FileType",
+	"createdAt": "CreatedAt",
+}
+
+// List gets audio files with pagination, optional file type filter, and sorting.
+func (r *SystemAudioFileRepository) List(ctx context.Context, page, size int, filterFileType string, sorts []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
+	countQB := qb.Select("COUNT(*)").From("SystemAudioFiles")
+	if filterFileType != "" {
+		countQB = countQB.Where(sq.Eq{"FileType": filterFileType})
+	}
+
+	countQuery, countArgs, err := buildQuery(countQB)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list sessions: %w", err)
+		return nil, 0, err
+	}
+
+	var total int
+	if err := r.DB.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("failed to count audio files: %w", err)
+	}
+
+	offset := (page - 1) * size
+	listQB := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum").
+		From("SystemAudioFiles")
+	if filterFileType != "" {
+		listQB = listQB.Where(sq.Eq{"FileType": filterFileType})
+	}
+
+	orderBy := jsonapi.SortToSQL(sorts, audioSortColumns, "ORDER BY Name")
+	listQB = listQB.Suffix(orderBy+" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY", offset, size)
+
+	query, args, err := buildQuery(listQB)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list audio files: %w", err)
 	}
 	defer rows.Close()
 
@@ -133,29 +162,30 @@ func (r *SystemAudioFileRepository) List(ctx context.Context) ([]*models.SystemA
 	for rows.Next() {
 		var audio models.SystemAudioFile
 		if err := rows.Scan(&audio.ID, &audio.Name, &audio.FilePath, &audio.FileType, &audio.Checksum); err != nil {
-			return nil, fmt.Errorf("failed to scan session: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan audio file: %w", err)
 		}
 		audios = append(audios, &audio)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating session rows: %w", err)
+		return nil, 0, fmt.Errorf("error iterating audio file rows: %w", err)
 	}
 
-	return audios, nil
+	return audios, total, nil
 }
 
 // Update updates a system audio file
 func (r *SystemAudioFileRepository) Update(ctx context.Context, audio *models.SystemAudioFile) error {
-	query := `
-        UPDATE SystemAudioFiles
-        SET Name = @p1, FilePath = @p2, FileType = @p3, Checksum = @p4
-        WHERE Id = @p5
-    `
-	_, err := r.DB.ExecContext(
-		ctx, query,
-		audio.Name, audio.FilePath, audio.FileType, audio.Checksum, audio.ID,
-	)
+	query, args, err := buildQuery(qb.Update("SystemAudioFiles").
+		Set("Name", audio.Name).
+		Set("FilePath", audio.FilePath).
+		Set("FileType", audio.FileType).
+		Set("Checksum", audio.Checksum).
+		Where(sq.Eq{"Id": audio.ID}))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update session: %w", err)
 	}
@@ -164,8 +194,12 @@ func (r *SystemAudioFileRepository) Update(ctx context.Context, audio *models.Sy
 
 // Delete deletes a system audio file
 func (r *SystemAudioFileRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := "DELETE FROM SystemAudioFiles WHERE Id = @p1"
-	_, err := r.DB.ExecContext(ctx, query, id)
+	query, args, err := buildQuery(qb.Delete("SystemAudioFiles").
+		Where(sq.Eq{"Id": id}))
+	if err != nil {
+		return err
+	}
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to delete system audio file: %w", err)
 	}

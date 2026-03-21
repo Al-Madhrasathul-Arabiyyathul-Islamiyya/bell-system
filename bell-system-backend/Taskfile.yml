@@ -1,0 +1,181 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+
+version: '3'
+
+vars:
+  APP_NAME: bell-system-server
+  MIGRATE_NAME: bell-system-migrate
+  BUILD_DIR: ./bin
+  VERSION: '{{default "dev" .VERSION}}'
+  COVERPKGS: "arabiyya.edu.mv/bell-system-backend/cmd/...,arabiyya.edu.mv/bell-system-backend/config,arabiyya.edu.mv/bell-system-backend/internal/...,arabiyya.edu.mv/bell-system-backend/pkg/..."
+  DOCKER_IMAGE: bell-system-backend
+
+tasks:
+  # ── Development ──────────────────────────────────────────────────
+  default:
+    desc: Start development server with live reload (air)
+    aliases: [dev]
+    cmds:
+      - air
+
+  run:
+    desc: Run server directly (no live reload)
+    cmds:
+      - go run ./cmd/server
+
+  # ── Build ────────────────────────────────────────────────────────
+  build:
+    desc: Build server binary
+    cmds:
+      - go build -ldflags="-s -w -X main.Version={{.VERSION}}" -o {{.BUILD_DIR}}/{{.APP_NAME}} ./cmd/server
+
+  build:migrate:
+    desc: Build migrate binary
+    cmds:
+      - go build -ldflags="-s -w" -o {{.BUILD_DIR}}/{{.MIGRATE_NAME}} ./cmd/migrate
+
+  build:all:
+    desc: Build server and migrate binaries
+    deps: [build, build:migrate]
+
+  build:linux:
+    desc: Cross-compile server for Linux (amd64)
+    env:
+      CGO_ENABLED: "0"
+      GOOS: linux
+      GOARCH: amd64
+    cmds:
+      - go build -ldflags="-s -w -X main.Version={{.VERSION}}" -o {{.BUILD_DIR}}/{{.APP_NAME}} ./cmd/server
+      - go build -ldflags="-s -w" -o {{.BUILD_DIR}}/{{.MIGRATE_NAME}} ./cmd/migrate
+
+  # ── Testing ──────────────────────────────────────────────────────
+  test:
+    desc: Run unit tests with coverage
+    cmds:
+      - go test ./... -v -count=1 -race -coverprofile=unit.out -coverpkg={{.COVERPKGS}}
+
+  test:integration:
+    desc: Run integration tests (requires Docker)
+    env:
+      GODEBUG: x509negativeserial=1
+    cmds:
+      - go test -tags integration -v -count=1 -timeout 300s -coverprofile=integration.out -coverpkg={{.COVERPKGS}} ./tests/integration/
+
+  test:coverage:
+    desc: Full coverage report (unit + integration via WSL)
+    cmds:
+      - wsl bash -c "cd $(wslpath -a '{{.ROOT_DIR}}') && bash scripts/coverage.sh"
+
+  test:coverage:html:
+    desc: Generate and open HTML coverage report
+    cmds:
+      - go tool cover -html=coverage/merged.out -o coverage/coverage.html
+
+  # ── Code Quality ─────────────────────────────────────────────────
+  fmt:
+    desc: Format all Go source files
+    cmds:
+      - gofmt -w .
+
+  fmt:check:
+    desc: Check formatting (list unformatted files)
+    cmds:
+      - cmd: |
+          UNFORMATTED=$(gofmt -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "Files need formatting:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
+  vet:
+    desc: Run go vet
+    cmds:
+      - go vet ./...
+
+  staticcheck:
+    desc: Run staticcheck
+    cmds:
+      - staticcheck ./...
+
+  lint:
+    desc: Run all linters (fmt, vet, staticcheck)
+    deps: [fmt:check, vet, staticcheck]
+
+  check:
+    desc: Full pre-push check (lint, tidy, test, build)
+    cmds:
+      - task: lint
+      - task: tidy
+      - task: test
+      - task: build
+
+  # ── Dependencies ─────────────────────────────────────────────────
+  tidy:
+    desc: Tidy go.mod and go.sum
+    cmds:
+      - go mod tidy
+
+  deps:
+    desc: Tidy and vendor dependencies
+    cmds:
+      - go mod tidy
+      - go mod vendor
+
+  # ── Database ─────────────────────────────────────────────────────
+  migrate:up:
+    desc: Run database migrations
+    cmds:
+      - go run ./cmd/migrate
+
+  migrate:down:
+    desc: Rollback database migrations
+    cmds:
+      - go run ./cmd/migrate down
+
+  # ── Docker ───────────────────────────────────────────────────────
+  docker:build:
+    desc: Build Docker image
+    cmds:
+      - cp ../adcs-ca.pem . 2>/dev/null || true
+      - docker build --build-arg VERSION={{.VERSION}} -t {{.DOCKER_IMAGE}}:{{.VERSION}} -t {{.DOCKER_IMAGE}}:latest .
+
+  docker:run:
+    desc: Run Docker container
+    cmds:
+      - docker run --rm -p 8080:8080 {{.DOCKER_IMAGE}}:latest
+
+  docker:push:
+    desc: Push Docker image to registry
+    cmds:
+      - docker push {{.DOCKER_IMAGE}}:{{.VERSION}}
+      - docker push {{.DOCKER_IMAGE}}:latest
+
+  # ── OpenAPI ──────────────────────────────────────────────────────
+  openapi:lint:
+    desc: Lint modular OpenAPI spec
+    cmds:
+      - npx @redocly/cli lint ../docs/api/openapi/openapi.yaml
+
+  openapi:bundle:
+    desc: Bundle modular spec into api/openapi.yaml (fully dereferenced)
+    cmds:
+      - npx @redocly/cli bundle -d --remove-unused-components -o api/openapi.yaml ../docs/api/openapi/openapi.yaml
+
+  openapi:validate:
+    desc: Bundle and validate the OpenAPI spec
+    deps: [openapi:bundle]
+    cmds:
+      - npx @redocly/cli lint api/openapi.yaml
+
+  # ── Cleanup ──────────────────────────────────────────────────────
+  clean:
+    desc: Remove build artifacts and temp files
+    cmds:
+      - rm -rf {{.BUILD_DIR}} ./tmp ./coverage unit.out integration.out
+
+  # ── Setup ────────────────────────────────────────────────────────
+  setup:hooks:
+    desc: Configure git hooks path
+    cmds:
+      - git config core.hooksPath scripts/hooks

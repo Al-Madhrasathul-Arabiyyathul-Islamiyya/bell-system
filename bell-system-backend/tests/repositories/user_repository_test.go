@@ -147,16 +147,21 @@ func TestUserRepository_List_MultipleUsers(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now()
+
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(3))
+
 	rows := sqlmock.NewRows([]string{"Id", "Username", "PasswordHash", "Role", "CreatedAt"}).
 		AddRow(uuid.New(), "admin", "hash1", "admin", now).
 		AddRow(uuid.New(), "afternoon_user", "hash2", "afternoon_user", now).
 		AddRow(uuid.New(), "morning_user", "hash3", "morning_user", now)
 
-	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, err := repo.List(ctx)
+	users, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.NoError(t, err)
+	assert.Equal(t, 3, total)
 	assert.Len(t, users, 3)
 	assert.Equal(t, "admin", users[0].Username)
 	assert.Equal(t, "afternoon_user", users[1].Username)
@@ -167,12 +172,16 @@ func TestUserRepository_List_Empty(t *testing.T) {
 	repo, mock := mocks.NewMockUserRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
 	rows := sqlmock.NewRows([]string{"Id", "Username", "PasswordHash", "Role", "CreatedAt"})
-	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, err := repo.List(ctx)
+	users, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.NoError(t, err)
+	assert.Equal(t, 0, total)
 	assert.Empty(t, users)
 }
 
@@ -180,11 +189,12 @@ func TestUserRepository_List_DBError(t *testing.T) {
 	repo, mock := mocks.NewMockUserRepo(t)
 	ctx := context.Background()
 
-	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+	mock.ExpectQuery("SELECT COUNT").
 		WillReturnError(errors.New("query failed"))
 
-	users, err := repo.List(ctx)
+	users, total, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
+	assert.Equal(t, 0, total)
 	assert.Nil(t, users)
 }
 
@@ -271,12 +281,15 @@ func TestUserRepository_List_ScanError(t *testing.T) {
 	repo, mock := mocks.NewMockUserRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
 	rows := sqlmock.NewRows([]string{"Id", "Username"}).
 		AddRow(uuid.New(), "Bad Row")
-	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, err := repo.List(ctx)
+	users, _, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, users)
 	assert.Contains(t, err.Error(), "failed to scan user")
@@ -286,13 +299,16 @@ func TestUserRepository_List_RowsError(t *testing.T) {
 	repo, mock := mocks.NewMockUserRepo(t)
 	ctx := context.Background()
 
+	mock.ExpectQuery("SELECT COUNT").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
+
 	rows := sqlmock.NewRows([]string{"Id", "Username", "PasswordHash", "Role", "CreatedAt"}).
 		AddRow(uuid.New(), "admin", "hash", "admin", time.Now()).
 		RowError(0, errors.New("row error"))
-	mock.ExpectQuery("SELECT .+ FROM Users ORDER BY Username").
+	mock.ExpectQuery("SELECT .+ FROM Users").
 		WillReturnRows(rows)
 
-	users, err := repo.List(ctx)
+	users, _, err := repo.List(ctx, 1, 20, "", nil)
 	require.Error(t, err)
 	assert.Nil(t, users)
 	assert.Contains(t, err.Error(), "error iterating user rows")

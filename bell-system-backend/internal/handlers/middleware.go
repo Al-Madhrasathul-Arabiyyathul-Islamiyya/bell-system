@@ -66,6 +66,24 @@ func RequireRole(roles ...models.Role) func(http.Handler) http.Handler {
 	}
 }
 
+// RequireJSONAPI returns middleware that validates the Content-Type header
+// is application/vnd.api+json on requests with bodies (POST, PUT, PATCH).
+func RequireJSONAPI() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if (r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch) && r.ContentLength != 0 {
+				ct := r.Header.Get("Content-Type")
+				if !strings.Contains(ct, "application/vnd.api+json") {
+					writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type",
+						"Content-Type must be application/vnd.api+json")
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 // GetUserClaims extracts the TokenClaims from the request context.
 func GetUserClaims(ctx context.Context) *TokenClaims {
 	claims, _ := ctx.Value(UserContextKey).(*TokenClaims)
