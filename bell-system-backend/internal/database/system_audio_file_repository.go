@@ -28,7 +28,7 @@ func NewSystemAudioFileRepository(db *sql.DB, logger *logger.Logger) *SystemAudi
 
 // Create creates a new system audio file
 func (r *SystemAudioFileRepository) Create(ctx context.Context, audio *models.SystemAudioFile) error {
-	query, args, err := sq.Insert("SystemAudioFiles").
+	query, args, err := qb.Insert("SystemAudioFiles").
 		Columns("Id", "Name", "FilePath", "FileType", "Checksum").
 		Values(audio.ID, audio.Name, audio.FilePath, audio.FileType, audio.Checksum).
 		ToSql()
@@ -44,7 +44,7 @@ func (r *SystemAudioFileRepository) Create(ctx context.Context, audio *models.Sy
 
 // GetByID gets a system audio file by ID
 func (r *SystemAudioFileRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
-	query, args, err := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum").
+	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum").
 		From("SystemAudioFiles").
 		Where(sq.Eq{"Id": id}).
 		ToSql()
@@ -70,7 +70,7 @@ func (r *SystemAudioFileRepository) GetSoundsByIDs(ctx context.Context, soundIDs
 		return make(map[uuid.UUID]*models.SystemAudioFile), nil
 	}
 
-	query, args, err := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt").
+	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt").
 		From("SystemAudioFiles").
 		Where(sq.Eq{"Id": soundIDs}).
 		ToSql()
@@ -125,7 +125,7 @@ var audioSortColumns = map[string]string{
 
 // List gets audio files with pagination, optional file type filter, and sorting.
 func (r *SystemAudioFileRepository) List(ctx context.Context, page, size int, filterFileType string, sorts []jsonapi.SortField) ([]*models.SystemAudioFile, int, error) {
-	countQB := sq.Select("COUNT(*)").From("SystemAudioFiles")
+	countQB := qb.Select("COUNT(*)").From("SystemAudioFiles")
 	if filterFileType != "" {
 		countQB = countQB.Where(sq.Eq{"FileType": filterFileType})
 	}
@@ -141,7 +141,7 @@ func (r *SystemAudioFileRepository) List(ctx context.Context, page, size int, fi
 	}
 
 	offset := (page - 1) * size
-	listQB := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum").
+	listQB := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "FilePath", "FileType", "Checksum").
 		From("SystemAudioFiles")
 	if filterFileType != "" {
 		listQB = listQB.Where(sq.Eq{"FileType": filterFileType})
@@ -179,7 +179,7 @@ func (r *SystemAudioFileRepository) List(ctx context.Context, page, size int, fi
 
 // Update updates a system audio file
 func (r *SystemAudioFileRepository) Update(ctx context.Context, audio *models.SystemAudioFile) error {
-	query, args, err := sq.Update("SystemAudioFiles").
+	query, args, err := qb.Update("SystemAudioFiles").
 		Set("Name", audio.Name).
 		Set("FilePath", audio.FilePath).
 		Set("FileType", audio.FileType).
@@ -198,7 +198,7 @@ func (r *SystemAudioFileRepository) Update(ctx context.Context, audio *models.Sy
 
 // Delete deletes a system audio file
 func (r *SystemAudioFileRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query, args, err := sq.Delete("SystemAudioFiles").
+	query, args, err := qb.Delete("SystemAudioFiles").
 		Where(sq.Eq{"Id": id}).
 		ToSql()
 	if err != nil {

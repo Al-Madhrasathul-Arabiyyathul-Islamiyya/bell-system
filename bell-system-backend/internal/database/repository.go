@@ -6,7 +6,12 @@ import (
 	"fmt"
 
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
+
+	sq "github.com/Masterminds/squirrel"
 )
+
+// qb is the package-level statement builder configured for SQL Server (@p1, @p2 placeholders).
+var qb = sq.StatementBuilder.PlaceholderFormat(sq.AtP)
 
 // Repository provides common database operations
 type Repository struct {

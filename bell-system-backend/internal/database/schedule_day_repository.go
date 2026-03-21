@@ -26,7 +26,7 @@ func NewScheduleDayRepository(db *sql.DB, logger *logger.Logger) *ScheduleDayRep
 
 // Create creates a new schedule day
 func (r *ScheduleDayRepository) Create(ctx context.Context, scheduleDay *models.ScheduleDay) error {
-	query, args, err := sq.Insert("ScheduleDays").
+	query, args, err := qb.Insert("ScheduleDays").
 		Columns("ScheduleItemID", "DayOfWeek").
 		Values(scheduleDay.ScheduleItemID, scheduleDay.DayOfWeek).
 		ToSql()
@@ -46,7 +46,7 @@ func (r *ScheduleDayRepository) GetDaysForScheduleItems(ctx context.Context, ite
 		return make(map[uuid.UUID][]int), nil
 	}
 
-	query, args, err := sq.Select("CONVERT(NVARCHAR(36), ScheduleItemId) AS ScheduleItemId", "DayOfWeek").
+	query, args, err := qb.Select("CONVERT(NVARCHAR(36), ScheduleItemId) AS ScheduleItemId", "DayOfWeek").
 		From("ScheduleDays").
 		Where(sq.Eq{"ScheduleItemId": itemIDs}).
 		ToSql()
@@ -82,7 +82,7 @@ func (r *ScheduleDayRepository) GetDaysForScheduleItems(ctx context.Context, ite
 
 // Update updates a schedule day
 func (r *ScheduleDayRepository) Update(ctx context.Context, scheduleDay *models.ScheduleDay) error {
-	query, args, err := sq.Update("ScheduleDays").
+	query, args, err := qb.Update("ScheduleDays").
 		Set("DayOfWeek", scheduleDay.DayOfWeek).
 		Where(sq.Eq{"ScheduleItemId": scheduleDay.ScheduleItemID}).
 		ToSql()
@@ -98,7 +98,7 @@ func (r *ScheduleDayRepository) Update(ctx context.Context, scheduleDay *models.
 
 // Delete deletes a schedule day
 func (r *ScheduleDayRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query, args, err := sq.Delete("ScheduleDays").
+	query, args, err := qb.Delete("ScheduleDays").
 		Where(sq.Eq{"ScheduleItemId": id}).
 		ToSql()
 	if err != nil {

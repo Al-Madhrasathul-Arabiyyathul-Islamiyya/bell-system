@@ -28,7 +28,7 @@ func NewUserRepository(db *sql.DB, logger *logger.Logger) *UserRepository {
 
 // Create creates a new user
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
-	query, args, err := sq.Insert("Users").
+	query, args, err := qb.Insert("Users").
 		Columns("Id", "Username", "PasswordHash", "Role", "CreatedAt").
 		Values(user.ID, user.Username, user.PasswordHash, user.Role, user.CreatedAt).
 		ToSql()
@@ -44,7 +44,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 
 // GetByID gets a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
-	query, args, err := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
+	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
 		From("Users").
 		Where(sq.Eq{"Id": id}).
 		ToSql()
@@ -66,7 +66,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 
 // GetByUsername gets a user by username
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
-	query, args, err := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
+	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
 		From("Users").
 		Where(sq.Eq{"Username": username}).
 		ToSql()
@@ -96,7 +96,7 @@ var userSortColumns = map[string]string{
 // List gets users with pagination, optional role filter, and sorting.
 func (r *UserRepository) List(ctx context.Context, page, size int, filterRole string, sorts []jsonapi.SortField) ([]*models.User, int, error) {
 	// Build base WHERE condition
-	countQB := sq.Select("COUNT(*)").From("Users")
+	countQB := qb.Select("COUNT(*)").From("Users")
 	if filterRole != "" {
 		countQB = countQB.Where(sq.Eq{"Role": filterRole})
 	}
@@ -113,7 +113,7 @@ func (r *UserRepository) List(ctx context.Context, page, size int, filterRole st
 
 	// Fetch page
 	offset := (page - 1) * size
-	listQB := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
+	listQB := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
 		From("Users")
 	if filterRole != "" {
 		listQB = listQB.Where(sq.Eq{"Role": filterRole})
@@ -151,7 +151,7 @@ func (r *UserRepository) List(ctx context.Context, page, size int, filterRole st
 
 // Update updates a user
 func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
-	query, args, err := sq.Update("Users").
+	query, args, err := qb.Update("Users").
 		Set("Username", user.Username).
 		Set("PasswordHash", user.PasswordHash).
 		Set("Role", user.Role).
@@ -169,7 +169,7 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 
 // Delete deletes a user
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query, args, err := sq.Delete("Users").
+	query, args, err := qb.Delete("Users").
 		Where(sq.Eq{"Id": id}).
 		ToSql()
 	if err != nil {

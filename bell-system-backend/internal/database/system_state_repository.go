@@ -25,7 +25,7 @@ func NewSystemStateRepository(db *sql.DB, logger *logger.Logger) *SystemStateRep
 
 // GetState returns the current system state value and its last update time.
 func (r *SystemStateRepository) GetState(ctx context.Context) (string, time.Time, error) {
-	query, args, err := sq.Select("Value", "UpdatedAt").
+	query, args, err := qb.Select("Value", "UpdatedAt").
 		From("SystemState").
 		Where(sq.Eq{"[Key]": "system_state"}).
 		ToSql()
@@ -45,7 +45,7 @@ func (r *SystemStateRepository) GetState(ctx context.Context) (string, time.Time
 
 // SetState updates the system state value.
 func (r *SystemStateRepository) SetState(ctx context.Context, state string) error {
-	query, args, err := sq.Update("SystemState").
+	query, args, err := qb.Update("SystemState").
 		Set("Value", state).
 		Set("UpdatedAt", sq.Expr("GETDATE()")).
 		Where(sq.Eq{"[Key]": "system_state"}).
