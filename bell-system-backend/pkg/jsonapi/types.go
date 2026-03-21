@@ -69,14 +69,11 @@ func ApplySparseFieldset(r *Resource, fields []string) {
 		return
 	}
 
-	data, err := json.Marshal(r.Attributes)
-	if err != nil {
-		return
-	}
-
-	var all map[string]any
-	if err := json.Unmarshal(data, &all); err != nil {
-		return
+	all, ok := r.Attributes.(map[string]any)
+	if !ok {
+		data, _ := json.Marshal(r.Attributes)
+		all = make(map[string]any)
+		json.Unmarshal(data, &all)
 	}
 
 	allowed := make(map[string]bool, len(fields))

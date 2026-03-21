@@ -612,6 +612,23 @@ func TestApplySparseFieldset(t *testing.T) {
 	assert.False(t, hasFileType)
 }
 
+func TestApplySparseFieldset_TypedStruct(t *testing.T) {
+	type testAttrs struct {
+		Name     string `json:"name"`
+		FileType string `json:"fileType"`
+	}
+	r := jsonapi.Resource{
+		Type:       "audio-files",
+		ID:         "123",
+		Attributes: testAttrs{Name: "bell.wav", FileType: "bell"},
+	}
+	jsonapi.ApplySparseFieldset(&r, []string{"name"})
+	attrs := r.Attributes.(map[string]any)
+	assert.Equal(t, "bell.wav", attrs["name"])
+	_, hasFileType := attrs["fileType"]
+	assert.False(t, hasFileType)
+}
+
 func TestApplySparseFieldset_NilFields(t *testing.T) {
 	r := jsonapi.Resource{
 		Type:       "audio-files",
