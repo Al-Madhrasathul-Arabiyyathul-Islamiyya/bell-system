@@ -35,17 +35,9 @@ type sessionUpdateAttributes struct {
 	EndTime   string `json:"endTime,omitempty"`
 }
 
-var sessionSortColumns = map[string]string{
-	"name":      "Name",
-	"startTime": "StartTime",
-	"endTime":   "EndTime",
-}
-
 // List handles GET /.
 func (h *SessionHandler) List(w http.ResponseWriter, r *http.Request) {
-	sortSQL := jsonapi.SortToSQL(jsonapi.ParseSort(r), sessionSortColumns, "ORDER BY StartTime")
-
-	sessions, err := h.Sessions.List(r.Context(), sortSQL)
+	sessions, err := h.Sessions.List(r.Context(), jsonapi.ParseSort(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list sessions")
 		return

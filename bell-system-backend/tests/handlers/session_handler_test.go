@@ -44,7 +44,7 @@ func TestSessionHandler_List_Success(t *testing.T) {
 	}
 
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context, _ string) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ []jsonapi.SortField) ([]*models.Session, error) {
 			return sessions, nil
 		},
 	}
@@ -67,15 +67,15 @@ func TestSessionHandler_List_Success(t *testing.T) {
 }
 
 func TestSessionHandler_List_WithSort(t *testing.T) {
-	var capturedSort string
+	var capturedSorts []jsonapi.SortField
 	sessions := []*models.Session{
 		{ID: uuid.New(), Name: "Afternoon"},
 		{ID: uuid.New(), Name: "Morning"},
 	}
 
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context, sortSQL string) ([]*models.Session, error) {
-			capturedSort = sortSQL
+		ListFunc: func(_ context.Context, sorts []jsonapi.SortField) ([]*models.Session, error) {
+			capturedSorts = sorts
 			return sessions, nil
 		},
 	}
@@ -87,12 +87,14 @@ func TestSessionHandler_List_WithSort(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, "ORDER BY Name DESC", capturedSort)
+	require.Len(t, capturedSorts, 1)
+	assert.Equal(t, "name", capturedSorts[0].Field)
+	assert.True(t, capturedSorts[0].Desc)
 }
 
 func TestSessionHandler_List_Empty(t *testing.T) {
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context, _ string) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ []jsonapi.SortField) ([]*models.Session, error) {
 			return []*models.Session{}, nil
 		},
 	}
@@ -353,7 +355,7 @@ func TestSessionHandler_Delete_NotFound(t *testing.T) {
 
 func TestSessionHandler_List_DBError(t *testing.T) {
 	repo := &mocks.MockSessionRepo{
-		ListFunc: func(_ context.Context, _ string) ([]*models.Session, error) {
+		ListFunc: func(_ context.Context, _ []jsonapi.SortField) ([]*models.Session, error) {
 			return nil, errors.New("database error")
 		},
 	}

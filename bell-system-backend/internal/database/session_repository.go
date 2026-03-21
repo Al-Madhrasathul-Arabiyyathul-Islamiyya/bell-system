@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/internal/models"
+	"arabiyya.edu.mv/bell-system-backend/pkg/jsonapi"
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 )
 
@@ -113,17 +115,27 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 	return result, nil
 }
 
+// sessionSortColumns maps JSON:API sort field names to SQL column names.
+var sessionSortColumns = map[string]string{
+	"name":      "Name",
+	"startTime": "StartTime",
+	"endTime":   "EndTime",
+}
+
 // List gets all sessions with optional sorting.
-func (r *SessionRepository) List(ctx context.Context, sortSQL string) ([]*models.Session, error) {
-	if sortSQL == "" {
-		sortSQL = "ORDER BY StartTime"
+func (r *SessionRepository) List(ctx context.Context, sorts []jsonapi.SortField) ([]*models.Session, error) {
+	qb := sq.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+		From("Sessions")
+
+	orderBy := jsonapi.SortToSQL(sorts, sessionSortColumns, "ORDER BY StartTime")
+	qb = qb.Suffix(orderBy)
+
+	query, args, err := qb.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build session list query: %w", err)
 	}
-	query := fmt.Sprintf(`
-        SELECT CONVERT(NVARCHAR(36), Id) AS Id, Name, StartTime, EndTime
-        FROM Sessions
-        %s
-    `, sortSQL)
-	rows, err := r.DB.QueryContext(ctx, query)
+
+	rows, err := r.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list sessions: %w", err)
 	}
