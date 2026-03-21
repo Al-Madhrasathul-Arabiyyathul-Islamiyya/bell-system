@@ -91,3 +91,22 @@ func ParseInclude(r *http.Request) []string {
 	}
 	return includes
 }
+
+// ParseFields parses the `fields[type]` query parameter for sparse fieldsets.
+// Returns nil if no fields are requested for the given resource type.
+func ParseFields(r *http.Request, resourceType string) []string {
+	raw := r.URL.Query().Get("fields[" + resourceType + "]")
+	if raw == "" {
+		return nil
+	}
+
+	parts := strings.Split(raw, ",")
+	fields := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			fields = append(fields, p)
+		}
+	}
+	return fields
+}

@@ -27,6 +27,9 @@ func newSystemRouter(stateRepo handlers.SystemStateRepository, schedSvc handlers
 
 func authSystemReq(req *http.Request) *http.Request {
 	testutil.SetAuthHeader(req)
+	if req.Method == http.MethodPost || req.Method == http.MethodPut {
+		req.Header.Set("Content-Type", "application/vnd.api+json")
+	}
 	return req
 }
 

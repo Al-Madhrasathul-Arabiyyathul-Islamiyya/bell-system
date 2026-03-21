@@ -29,9 +29,12 @@ func newUserRouter(userRepo handlers.UserRepository, hasher handlers.PasswordHas
 	return router.UserRoutes(h, testutil.PermissiveTokenService)
 }
 
-// authReq adds a valid auth header to the request.
+// authReq adds a valid auth header and JSON:API Content-Type to the request.
 func authReq(req *http.Request) *http.Request {
 	testutil.SetAuthHeader(req)
+	if req.Method == http.MethodPost || req.Method == http.MethodPut {
+		req.Header.Set("Content-Type", "application/vnd.api+json")
+	}
 	return req
 }
 

@@ -47,9 +47,11 @@ func (h *AudioHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fields := jsonapi.ParseFields(r, "audio-files")
 	resources := make([]jsonapi.Resource, len(files))
 	for i, f := range files {
 		resources[i] = jsonapi.MarshalAudioFile(f)
+		jsonapi.ApplySparseFieldset(&resources[i], fields)
 	}
 
 	writeJSONAPI(w, http.StatusOK, jsonapi.CollectionDocument{
