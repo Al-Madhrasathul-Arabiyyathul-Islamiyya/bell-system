@@ -60,8 +60,8 @@ COVER_DIR="$PROJECT_DIR/coverage"
 rm -rf "$COVER_DIR"
 mkdir -p "$COVER_DIR"
 
-# Only measure coverage for production packages (exclude tests/ and mocks)
-COVERPKGS="arabiyya.edu.mv/bell-system-backend/cmd/...,arabiyya.edu.mv/bell-system-backend/config,arabiyya.edu.mv/bell-system-backend/internal/...,arabiyya.edu.mv/bell-system-backend/pkg/..."
+# Only measure coverage for production packages (exclude tests/, mocks, and cmd/migrate)
+COVERPKGS="arabiyya.edu.mv/bell-system-backend/cmd/server,arabiyya.edu.mv/bell-system-backend/config,arabiyya.edu.mv/bell-system-backend/internal/...,arabiyya.edu.mv/bell-system-backend/pkg/..."
 
 echo ""
 echo "=== Unit tests ==="

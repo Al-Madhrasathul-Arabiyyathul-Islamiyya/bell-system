@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -158,6 +159,211 @@ func TestAudioHandler_GetByID_InvalidUUID(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+// --- GET /{id}/content (stream audio content) ---
+
+func TestAudioHandler_GetContent_Success(t *testing.T) {
+	fileID := uuid.New()
+	file := &models.SystemAudioFile{
+		ID:       fileID,
+		Name:     "bell",
+		FilePath: "/audio/bell.mp3",
+		FileType: models.FileTypeBell,
+	}
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, id uuid.UUID) (*models.SystemAudioFile, error) {
+			assert.Equal(t, fileID, id)
+			return file, nil
+		},
+	}
+	fs := &mocks.MockFileStorage{
+		OpenFunc: func(path string) (io.ReadCloser, error) {
+			assert.Equal(t, "/audio/bell.mp3", path)
+			return io.NopCloser(bytes.NewReader([]byte("fake audio data"))), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "audio/mpeg", rr.Header().Get("Content-Type"))
+	assert.Contains(t, rr.Header().Get("Content-Disposition"), "bell.mp3")
+	assert.Equal(t, "fake audio data", rr.Body.String())
+}
+
+func TestAudioHandler_GetContent_InvalidUUID(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{}
+
+	req := httptest.NewRequest(http.MethodGet, "/not-valid/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestAudioHandler_GetContent_NotFound(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_GetContent_ErrNotFound(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, pkgerrors.ErrNotFound
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_GetContent_DBError(t *testing.T) {
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return nil, errors.New("db error")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+uuid.New().String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_GetContent_NoFileStorage(t *testing.T) {
+	fileID := uuid.New()
+	file := &models.SystemAudioFile{
+		ID:       fileID,
+		Name:     "bell",
+		FilePath: "/audio/bell.mp3",
+		FileType: models.FileTypeBell,
+	}
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return file, nil
+		},
+	}
+
+	// No FileStorage set (nil) — handler created via newAudioRouter which doesn't set FileStorage
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouter(repo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_GetContent_EmptyFilePath(t *testing.T) {
+	fileID := uuid.New()
+	file := &models.SystemAudioFile{
+		ID:       fileID,
+		Name:     "bell",
+		FilePath: "",
+		FileType: models.FileTypeBell,
+	}
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return file, nil
+		},
+	}
+	fs := &mocks.MockFileStorage{}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+func TestAudioHandler_GetContent_OpenError(t *testing.T) {
+	fileID := uuid.New()
+	file := &models.SystemAudioFile{
+		ID:       fileID,
+		Name:     "bell",
+		FilePath: "/audio/bell.mp3",
+		FileType: models.FileTypeBell,
+	}
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return file, nil
+		},
+	}
+	fs := &mocks.MockFileStorage{
+		OpenFunc: func(_ string) (io.ReadCloser, error) {
+			return nil, errors.New("file not found on disk")
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rr.Code)
+}
+
+func TestAudioHandler_GetContent_UnknownExtension(t *testing.T) {
+	fileID := uuid.New()
+	file := &models.SystemAudioFile{
+		ID:       fileID,
+		Name:     "sound",
+		FilePath: "/audio/sound.xyz",
+		FileType: models.FileTypeBell,
+	}
+
+	repo := &mocks.MockSystemAudioFileRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.SystemAudioFile, error) {
+			return file, nil
+		},
+	}
+	fs := &mocks.MockFileStorage{
+		OpenFunc: func(_ string) (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader([]byte("data"))), nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/"+fileID.String()+"/content", nil)
+	rr := httptest.NewRecorder()
+
+	r := newAudioRouterWithStorage(repo, fs)
+	r.ServeHTTP(rr, req)
+
+	require.Equal(t, http.StatusOK, rr.Code)
+	assert.Equal(t, "application/octet-stream", rr.Header().Get("Content-Type"))
 }
 
 // --- POST / (upload audio file, multipart) ---
