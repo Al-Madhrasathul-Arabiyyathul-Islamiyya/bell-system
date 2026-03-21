@@ -247,9 +247,10 @@ func TestPaginationParams_Offset(t *testing.T) {
 func TestPaginationMeta(t *testing.T) {
 	meta := jsonapi.PaginationMeta(55, 2, 20)
 	assert.Equal(t, 55, meta["total"])
-	assert.Equal(t, 2, meta["page"])
-	assert.Equal(t, 20, meta["pageSize"])
-	assert.Equal(t, 3, meta["totalPages"])
+	page := meta["page"].(map[string]any)
+	assert.Equal(t, 2, page["number"])
+	assert.Equal(t, 20, page["size"])
+	assert.Equal(t, 3, page["pages"])
 }
 
 func TestPaginationLinks(t *testing.T) {
@@ -572,7 +573,7 @@ func TestMarshalSystemState(t *testing.T) {
 
 	assert.Equal(t, "system-state", r.Type)
 	assert.Equal(t, "current", r.ID)
-	assert.Equal(t, "/api/v1/system/state", r.Links.Self)
+	assert.Nil(t, r.Links)
 
 	data, _ := json.Marshal(r.Attributes)
 	assert.Contains(t, string(data), `"active"`)

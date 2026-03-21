@@ -796,9 +796,10 @@ func TestUserHandler_List_WithPagination(t *testing.T) {
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, float64(11), resp.Meta["total"])
-	assert.Equal(t, float64(2), resp.Meta["page"])
-	assert.Equal(t, float64(5), resp.Meta["pageSize"])
-	assert.Equal(t, float64(3), resp.Meta["totalPages"])
+	page := resp.Meta["page"].(map[string]any)
+	assert.Equal(t, float64(2), page["number"])
+	assert.Equal(t, float64(5), page["size"])
+	assert.Equal(t, float64(3), page["pages"])
 	assert.Contains(t, resp.Links["self"], "page[number]=2")
 }
 

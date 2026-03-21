@@ -116,8 +116,9 @@ func TestUserList_Pagination(t *testing.T) {
 	col := readCollection(t, resp)
 	assert.Len(t, col.Data, 2)
 	assert.GreaterOrEqual(t, col.Meta["total"].(float64), float64(4))
-	assert.Equal(t, float64(2), col.Meta["pageSize"])
-	assert.Equal(t, float64(1), col.Meta["page"])
+	page := col.Meta["page"].(map[string]any)
+	assert.Equal(t, float64(2), page["size"])
+	assert.Equal(t, float64(1), page["number"])
 }
 
 func TestUserList_FilterByRole(t *testing.T) {

@@ -45,10 +45,12 @@ func ParsePagination(r *http.Request) PaginationParams {
 func PaginationMeta(total, page, size int) map[string]any {
 	totalPages := int(math.Ceil(float64(total) / float64(size)))
 	return map[string]any{
-		"total":      total,
-		"page":       page,
-		"pageSize":   size,
-		"totalPages": totalPages,
+		"total": total,
+		"page": map[string]any{
+			"number": page,
+			"size":   size,
+			"pages":  totalPages,
+		},
 	}
 }
 
