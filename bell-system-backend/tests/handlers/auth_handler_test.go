@@ -357,7 +357,7 @@ func TestAuthHandler_ChangePassword_WrongOldPassword(t *testing.T) {
 	r := newAuthRouter(userRepo, tokenSvc, hasher)
 	r.ServeHTTP(rr, req)
 
-	assert.Equal(t, http.StatusBadRequest, rr.Code)
+	assert.Equal(t, http.StatusUnprocessableEntity, rr.Code)
 }
 
 func TestAuthHandler_ChangePassword_SamePassword(t *testing.T) {
