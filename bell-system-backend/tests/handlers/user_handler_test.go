@@ -510,6 +510,41 @@ func TestUserHandler_Create_HashError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestUserHandler_Create_InvalidAttributes(t *testing.T) {
+	userRepo := &mocks.MockUserRepo{}
+	hasher := &mocks.MockPasswordHasher{}
+
+	body := `{"data":{"type":"users","attributes":"not-an-object"}}`
+	req := authReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newUserRouter(userRepo, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestUserHandler_Update_InvalidAttributes(t *testing.T) {
+	userID := uuid.New()
+	userRepo := &mocks.MockUserRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.User, error) {
+			return &models.User{ID: userID}, nil
+		},
+	}
+	hasher := &mocks.MockPasswordHasher{}
+
+	body := `{"data":{"type":"users","attributes":"not-an-object"}}`
+	req := authReq(httptest.NewRequest(http.MethodPut, "/"+userID.String(), bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newUserRouter(userRepo, hasher)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
 func TestUserHandler_Create_DBError(t *testing.T) {
 	userRepo := &mocks.MockUserRepo{
 		GetByUsernameFunc: func(_ context.Context, _ string) (*models.User, error) {

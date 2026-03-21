@@ -146,6 +146,20 @@ func TestSystemHandler_SetState_InvalidBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rr.Code)
 }
 
+func TestSystemHandler_SetState_InvalidAttributes(t *testing.T) {
+	stateRepo := &mocks.MockSystemStateRepo{}
+
+	body := `{"data":{"type":"system-state","attributes":"not-an-object"}}`
+	req := authSystemReq(httptest.NewRequest(http.MethodPost, "/state", bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newSystemRouter(stateRepo, nil, nil)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
 func TestSystemHandler_SetState_InvalidState(t *testing.T) {
 	repo := &mocks.MockSystemStateRepo{}
 

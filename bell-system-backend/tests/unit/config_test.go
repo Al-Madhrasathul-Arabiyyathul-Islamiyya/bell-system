@@ -121,6 +121,31 @@ port = 8080
 	assert.Equal(t, "", cfg.Storage.AudioDir)
 }
 
+func TestLoadConfig_UnmarshalError(t *testing.T) {
+	dir := t.TempDir()
+	// TOML maps allowedOrigins to a nested table instead of a string slice,
+	// which causes mapstructure to fail when decoding into []string.
+	content := `
+[server]
+port = 8080
+
+[cors]
+[cors.allowedOrigins]
+nested = "table"
+`
+	err := os.WriteFile(filepath.Join(dir, "config.toml"), []byte(content), 0644)
+	require.NoError(t, err)
+
+	origDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(dir))
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	cfg, err := config.LoadConfig()
+	assert.Error(t, err)
+	assert.Nil(t, cfg)
+	assert.Contains(t, err.Error(), "failed to unmarshal config")
+}
+
 func TestLoadConfig_CORSDefaults(t *testing.T) {
 	dir := t.TempDir()
 	content := `

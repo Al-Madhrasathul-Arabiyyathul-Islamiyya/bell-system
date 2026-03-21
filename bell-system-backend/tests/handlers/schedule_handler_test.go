@@ -760,6 +760,41 @@ func TestScheduleHandler_GetByID_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestScheduleHandler_Create_InvalidAttributes(t *testing.T) {
+	itemRepo := &mocks.MockScheduleItemRepo{}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"data":{"type":"schedule-items","attributes":"not-an-object"}}`
+	req := authScheduleReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestScheduleHandler_Update_InvalidAttributes(t *testing.T) {
+	itemID := uuid.New()
+	itemRepo := &mocks.MockScheduleItemRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.ScheduleItem, error) {
+			return &models.ScheduleItem{ID: itemID}, nil
+		},
+	}
+	dayRepo := &mocks.MockScheduleDayRepo{}
+
+	body := `{"data":{"type":"schedule-items","attributes":"not-an-object"}}`
+	req := authScheduleReq(httptest.NewRequest(http.MethodPut, "/"+itemID.String(), bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newScheduleRouter(itemRepo, dayRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
 func TestScheduleHandler_Create_InvalidTime(t *testing.T) {
 	soundID := uuid.New()
 	itemRepo := &mocks.MockScheduleItemRepo{}

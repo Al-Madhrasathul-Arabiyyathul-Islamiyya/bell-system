@@ -618,6 +618,39 @@ func TestSessionHandler_Delete_DBError(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, rr.Code)
 }
 
+func TestSessionHandler_Create_InvalidAttributes(t *testing.T) {
+	sessionRepo := &mocks.MockSessionRepo{}
+
+	body := `{"data":{"type":"sessions","attributes":"not-an-object"}}`
+	req := authSessionReq(httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(sessionRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func TestSessionHandler_Update_InvalidAttributes(t *testing.T) {
+	sessionID := uuid.New()
+	sessionRepo := &mocks.MockSessionRepo{
+		GetByIDFunc: func(_ context.Context, _ uuid.UUID) (*models.Session, error) {
+			return &models.Session{ID: sessionID, Name: "Test"}, nil
+		},
+	}
+
+	body := `{"data":{"type":"sessions","attributes":"not-an-object"}}`
+	req := authSessionReq(httptest.NewRequest(http.MethodPut, "/"+sessionID.String(), bytes.NewBufferString(body)))
+	req.Header.Set("Content-Type", jsonapi.ContentType)
+	rr := httptest.NewRecorder()
+
+	r := newSessionRouter(sessionRepo)
+	r.ServeHTTP(rr, req)
+
+	assert.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
 func TestSessionHandler_Create_InvalidStartTime(t *testing.T) {
 	repo := &mocks.MockSessionRepo{}
 
