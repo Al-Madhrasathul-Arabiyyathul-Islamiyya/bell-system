@@ -540,6 +540,37 @@ func TestScheduleItemRepository_List_Success(t *testing.T) {
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
+func TestScheduleItemRepository_List_FilterByDay(t *testing.T) {
+	repo, mock := mocks.NewMockScheduleItemRepo(t)
+	ctx := context.Background()
+
+	itemID := uuid.New()
+	soundID := uuid.New()
+	now := time.Now()
+
+	itemRows := sqlmock.NewRows([]string{"Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt"}).
+		AddRow(itemID, nil, "Bell 1", now, soundID, now, now)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleItems WHERE .+ IN .+ DayOfWeek .+ ORDER BY Time").
+		WithArgs(3).
+		WillReturnRows(itemRows)
+
+	dayRows := sqlmock.NewRows([]string{"ScheduleItemId", "DayOfWeek"}).
+		AddRow(itemID, 3)
+	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
+		WillReturnRows(dayRows)
+
+	soundRows := sqlmock.NewRows([]string{"Id", "Name", "FilePath", "FileType", "Checksum", "CreatedAt", "UpdatedAt"}).
+		AddRow(soundID, "bell.wav", "/audio/bell.wav", "bell", "hash1", now, now)
+	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
+		WillReturnRows(soundRows)
+
+	items, err := repo.List(ctx, "", 3, nil)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, itemID, items[0].ID)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestScheduleItemRepository_List_Empty(t *testing.T) {
 	repo, mock := mocks.NewMockScheduleItemRepo(t)
 	ctx := context.Background()
