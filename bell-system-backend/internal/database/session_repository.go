@@ -30,12 +30,11 @@ func NewSessionRepository(db *sql.DB, logger *logger.Logger) *SessionRepository 
 
 // Create creates a new session
 func (r *SessionRepository) Create(ctx context.Context, session *models.Session) error {
-	query, args, err := qb.Insert("Sessions").
+	query, args, err := buildQuery(qb.Insert("Sessions").
 		Columns("Id", "Name", "StartTime", "EndTime").
-		Values(session.ID, session.Name, session.StartTime.Format("15:04"), session.EndTime.Format("15:04")).
-		ToSql()
+		Values(session.ID, session.Name, session.StartTime.Format("15:04"), session.EndTime.Format("15:04")))
 	if err != nil {
-		return fmt.Errorf("failed to build session insert query: %w", err)
+		return err
 	}
 	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -46,12 +45,11 @@ func (r *SessionRepository) Create(ctx context.Context, session *models.Session)
 
 // GetByID gets a session by ID
 func (r *SessionRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Session, error) {
-	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
 		From("Sessions").
-		Where(sq.Eq{"Id": id}).
-		ToSql()
+		Where(sq.Eq{"Id": id}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build session get query: %w", err)
+		return nil, err
 	}
 	var session models.Session
 	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
@@ -72,12 +70,11 @@ func (r *SessionRepository) GetSessionsByIDs(ctx context.Context, sessionIDs []u
 		return make(map[uuid.UUID]*models.Session), nil
 	}
 
-	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
 		From("Sessions").
-		Where(sq.Eq{"Id": sessionIDs}).
-		ToSql()
+		Where(sq.Eq{"Id": sessionIDs}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build sessions by IDs query: %w", err)
+		return nil, err
 	}
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
@@ -125,9 +122,9 @@ func (r *SessionRepository) List(ctx context.Context, sorts []jsonapi.SortField)
 	orderBy := jsonapi.SortToSQL(sorts, sessionSortColumns, "ORDER BY StartTime")
 	sb = sb.Suffix(orderBy)
 
-	query, args, err := sb.ToSql()
+	query, args, err := buildQuery(sb)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build session list query: %w", err)
+		return nil, err
 	}
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
@@ -161,12 +158,11 @@ func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Sess
 	now := nowFn()
 	currentTime := fmt.Sprintf("%02d:%02d", now.Hour(), now.Minute())
 
-	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Name", "StartTime", "EndTime").
 		From("Sessions").
-		Where("CAST(? AS TIME) BETWEEN StartTime AND EndTime", currentTime).
-		ToSql()
+		Where("CAST(? AS TIME) BETWEEN StartTime AND EndTime", currentTime))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build current session query: %w", err)
+		return nil, err
 	}
 	var session models.Session
 	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
@@ -183,14 +179,13 @@ func (r *SessionRepository) GetCurrentSession(ctx context.Context) (*models.Sess
 
 // Update updates a session
 func (r *SessionRepository) Update(ctx context.Context, session *models.Session) error {
-	query, args, err := qb.Update("Sessions").
+	query, args, err := buildQuery(qb.Update("Sessions").
 		Set("Name", session.Name).
 		Set("StartTime", session.StartTime.Format("15:04")).
 		Set("EndTime", session.EndTime.Format("15:04")).
-		Where(sq.Eq{"Id": session.ID}).
-		ToSql()
+		Where(sq.Eq{"Id": session.ID}))
 	if err != nil {
-		return fmt.Errorf("failed to build session update query: %w", err)
+		return err
 	}
 	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -201,11 +196,10 @@ func (r *SessionRepository) Update(ctx context.Context, session *models.Session)
 
 // Delete deletes a session
 func (r *SessionRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query, args, err := qb.Delete("Sessions").
-		Where(sq.Eq{"Id": id}).
-		ToSql()
+	query, args, err := buildQuery(qb.Delete("Sessions").
+		Where(sq.Eq{"Id": id}))
 	if err != nil {
-		return fmt.Errorf("failed to build session delete query: %w", err)
+		return err
 	}
 	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {

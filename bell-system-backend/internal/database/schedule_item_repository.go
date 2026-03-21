@@ -55,12 +55,11 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 		item.CreatedAt = now
 		item.UpdatedAt = now
 
-		query, args, err := qb.Insert("ScheduleItems").
+		query, args, err := buildQuery(qb.Insert("ScheduleItems").
 			Columns("Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt").
-			Values(item.ID, item.SessionID, item.Name, item.Time, item.SoundID, item.CreatedAt, item.UpdatedAt).
-			ToSql()
+			Values(item.ID, item.SessionID, item.Name, item.Time, item.SoundID, item.CreatedAt, item.UpdatedAt))
 		if err != nil {
-			return fmt.Errorf("failed to build schedule item insert query: %w", err)
+			return err
 		}
 
 		_, err = tx.ExecContext(ctx, query, args...)
@@ -69,12 +68,11 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 		}
 
 		for _, day := range item.Days {
-			dayQuery, dayArgs, err := qb.Insert("ScheduleDays").
+			dayQuery, dayArgs, err := buildQuery(qb.Insert("ScheduleDays").
 				Columns("ScheduleItemId", "DayOfWeek").
-				Values(item.ID, day).
-				ToSql()
+				Values(item.ID, day))
 			if err != nil {
-				return fmt.Errorf("failed to build schedule day insert query: %w", err)
+				return err
 			}
 			_, err = tx.ExecContext(ctx, dayQuery, dayArgs...)
 			if err != nil {
@@ -88,17 +86,16 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 
 // GetByID gets a schedule item by ID with related sound, session, and days
 func (r *ScheduleItemRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error) {
-	query, args, err := qb.Select(
+	query, args, err := buildQuery(qb.Select(
 		"CONVERT(NVARCHAR(36), Id) AS Id",
 		"CONVERT(NVARCHAR(36), SessionId) AS SessionId",
 		"Name", "Time",
 		"CONVERT(NVARCHAR(36), SoundId) AS SoundId",
 		"CreatedAt", "UpdatedAt",
 	).From("ScheduleItems").
-		Where(sq.Eq{"Id": id}).
-		ToSql()
+		Where(sq.Eq{"Id": id}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build schedule item get query: %w", err)
+		return nil, err
 	}
 
 	var scheduleItem models.ScheduleItem
@@ -186,9 +183,9 @@ func (r *ScheduleItemRepository) List(ctx context.Context, filterSessionID strin
 	orderBy := jsonapi.SortToSQL(sorts, scheduleSortColumns, "ORDER BY Time")
 	sb = sb.Suffix(orderBy)
 
-	query, args, err := sb.ToSql()
+	query, args, err := buildQuery(sb)
 	if err != nil {
-		return nil, fmt.Errorf("failed to build schedule item list query: %w", err)
+		return nil, err
 	}
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
@@ -286,7 +283,7 @@ func (r *ScheduleItemRepository) GetCurrentSessionSchedules(ctx context.Context,
 	currentTime := time.Now()
 	currentDayOfWeek := int(currentTime.Weekday()) + 1 // Adding 1 for Sunday = 1
 
-	query, args, err := qb.Select(
+	query, args, err := buildQuery(qb.Select(
 		"CONVERT(NVARCHAR(36), si.Id) AS Id",
 		"CONVERT(NVARCHAR(36), si.SessionId) AS SessionId",
 		"si.Name", "si.Time",
@@ -296,10 +293,9 @@ func (r *ScheduleItemRepository) GetCurrentSessionSchedules(ctx context.Context,
 		Join("ScheduleDays sd ON si.Id = sd.ScheduleItemId").
 		Where(sq.Eq{"si.SessionId": sessionID}).
 		Where(sq.Eq{"sd.DayOfWeek": currentDayOfWeek}).
-		Suffix("ORDER BY si.Time").
-		ToSql()
+		Suffix("ORDER BY si.Time"))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build current session schedules query: %w", err)
+		return nil, err
 	}
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
@@ -391,16 +387,15 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 	return r.WithTx(ctx, func(tx *sql.Tx) error {
 		item.UpdatedAt = time.Now()
 
-		query, args, err := qb.Update("ScheduleItems").
+		query, args, err := buildQuery(qb.Update("ScheduleItems").
 			Set("SessionId", item.SessionID).
 			Set("Name", item.Name).
 			Set("Time", item.Time).
 			Set("SoundId", item.SoundID).
 			Set("UpdatedAt", item.UpdatedAt).
-			Where(sq.Eq{"Id": item.ID}).
-			ToSql()
+			Where(sq.Eq{"Id": item.ID}))
 		if err != nil {
-			return fmt.Errorf("failed to build schedule item update query: %w", err)
+			return err
 		}
 
 		_, err = tx.ExecContext(ctx, query, args...)
@@ -408,11 +403,10 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 			return fmt.Errorf("failed to update schedule item: %w", err)
 		}
 
-		delQuery, delArgs, err := qb.Delete("ScheduleDays").
-			Where(sq.Eq{"ScheduleItemId": item.ID}).
-			ToSql()
+		delQuery, delArgs, err := buildQuery(qb.Delete("ScheduleDays").
+			Where(sq.Eq{"ScheduleItemId": item.ID}))
 		if err != nil {
-			return fmt.Errorf("failed to build schedule days delete query: %w", err)
+			return err
 		}
 		_, err = tx.ExecContext(ctx, delQuery, delArgs...)
 		if err != nil {
@@ -420,12 +414,11 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 		}
 
 		for _, day := range item.Days {
-			dayQuery, dayArgs, err := qb.Insert("ScheduleDays").
+			dayQuery, dayArgs, err := buildQuery(qb.Insert("ScheduleDays").
 				Columns("ScheduleItemId", "DayOfWeek").
-				Values(item.ID, day).
-				ToSql()
+				Values(item.ID, day))
 			if err != nil {
-				return fmt.Errorf("failed to build schedule day insert query: %w", err)
+				return err
 			}
 			_, err = tx.ExecContext(ctx, dayQuery, dayArgs...)
 			if err != nil {
@@ -441,21 +434,19 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 func (r *ScheduleItemRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.WithTx(ctx, func(tx *sql.Tx) error {
 		// Delete associated days first (FK constraint)
-		daysQuery, daysArgs, err := qb.Delete("ScheduleDays").
-			Where(sq.Eq{"ScheduleItemId": id}).
-			ToSql()
+		daysQuery, daysArgs, err := buildQuery(qb.Delete("ScheduleDays").
+			Where(sq.Eq{"ScheduleItemId": id}))
 		if err != nil {
-			return fmt.Errorf("failed to build schedule days delete query: %w", err)
+			return err
 		}
 		if _, err := tx.ExecContext(ctx, daysQuery, daysArgs...); err != nil {
 			return fmt.Errorf("failed to delete schedule days: %w", err)
 		}
 
-		itemQuery, itemArgs, err := qb.Delete("ScheduleItems").
-			Where(sq.Eq{"Id": id}).
-			ToSql()
+		itemQuery, itemArgs, err := buildQuery(qb.Delete("ScheduleItems").
+			Where(sq.Eq{"Id": id}))
 		if err != nil {
-			return fmt.Errorf("failed to build schedule item delete query: %w", err)
+			return err
 		}
 		if _, err := tx.ExecContext(ctx, itemQuery, itemArgs...); err != nil {
 			return fmt.Errorf("failed to delete the schedule item: %w", err)

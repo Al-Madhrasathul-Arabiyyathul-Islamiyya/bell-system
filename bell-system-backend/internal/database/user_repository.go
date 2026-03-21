@@ -28,12 +28,11 @@ func NewUserRepository(db *sql.DB, logger *logger.Logger) *UserRepository {
 
 // Create creates a new user
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
-	query, args, err := qb.Insert("Users").
+	query, args, err := buildQuery(qb.Insert("Users").
 		Columns("Id", "Username", "PasswordHash", "Role", "CreatedAt").
-		Values(user.ID, user.Username, user.PasswordHash, user.Role, user.CreatedAt).
-		ToSql()
+		Values(user.ID, user.Username, user.PasswordHash, user.Role, user.CreatedAt))
 	if err != nil {
-		return fmt.Errorf("failed to build user insert query: %w", err)
+		return err
 	}
 	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -44,12 +43,11 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 
 // GetByID gets a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
-	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
 		From("Users").
-		Where(sq.Eq{"Id": id}).
-		ToSql()
+		Where(sq.Eq{"Id": id}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build user get query: %w", err)
+		return nil, err
 	}
 	var user models.User
 	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
@@ -66,12 +64,11 @@ func (r *UserRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Use
 
 // GetByUsername gets a user by username
 func (r *UserRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
-	query, args, err := qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
+	query, args, err := buildQuery(qb.Select("CONVERT(NVARCHAR(36), Id) AS Id", "Username", "PasswordHash", "Role", "CreatedAt").
 		From("Users").
-		Where(sq.Eq{"Username": username}).
-		ToSql()
+		Where(sq.Eq{"Username": username}))
 	if err != nil {
-		return nil, fmt.Errorf("failed to build user get by username query: %w", err)
+		return nil, err
 	}
 	var user models.User
 	err = r.DB.QueryRowContext(ctx, query, args...).Scan(
@@ -101,9 +98,9 @@ func (r *UserRepository) List(ctx context.Context, page, size int, filterRole st
 		countQB = countQB.Where(sq.Eq{"Role": filterRole})
 	}
 
-	countQuery, countArgs, err := countQB.ToSql()
+	countQuery, countArgs, err := buildQuery(countQB)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to build user count query: %w", err)
+		return nil, 0, err
 	}
 
 	var total int
@@ -122,9 +119,9 @@ func (r *UserRepository) List(ctx context.Context, page, size int, filterRole st
 	orderBy := jsonapi.SortToSQL(sorts, userSortColumns, "ORDER BY Username")
 	listQB = listQB.Suffix(orderBy+" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY", offset, size)
 
-	query, args, err := listQB.ToSql()
+	query, args, err := buildQuery(listQB)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to build user list query: %w", err)
+		return nil, 0, err
 	}
 
 	rows, err := r.DB.QueryContext(ctx, query, args...)
@@ -151,14 +148,13 @@ func (r *UserRepository) List(ctx context.Context, page, size int, filterRole st
 
 // Update updates a user
 func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
-	query, args, err := qb.Update("Users").
+	query, args, err := buildQuery(qb.Update("Users").
 		Set("Username", user.Username).
 		Set("PasswordHash", user.PasswordHash).
 		Set("Role", user.Role).
-		Where(sq.Eq{"Id": user.ID}).
-		ToSql()
+		Where(sq.Eq{"Id": user.ID}))
 	if err != nil {
-		return fmt.Errorf("failed to build user update query: %w", err)
+		return err
 	}
 	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -169,11 +165,10 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 
 // Delete deletes a user
 func (r *UserRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query, args, err := qb.Delete("Users").
-		Where(sq.Eq{"Id": id}).
-		ToSql()
+	query, args, err := buildQuery(qb.Delete("Users").
+		Where(sq.Eq{"Id": id}))
 	if err != nil {
-		return fmt.Errorf("failed to build user delete query: %w", err)
+		return err
 	}
 	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
