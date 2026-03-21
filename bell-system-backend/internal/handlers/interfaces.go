@@ -36,7 +36,7 @@ type SessionRepository interface {
 type ScheduleItemRepository interface {
 	Create(ctx context.Context, item *models.ScheduleItem) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.ScheduleItem, error)
-	List(ctx context.Context, filterSessionID string, filterDay int, sortSQL string) ([]*models.ScheduleItem, error)
+	List(ctx context.Context, filterSessionID string, filterDay int, sorts []jsonapi.SortField) ([]*models.ScheduleItem, error)
 	GetCurrentSessionSchedules(ctx context.Context, sessionID uuid.UUID) ([]*models.ScheduleItem, error)
 	Update(ctx context.Context, item *models.ScheduleItem) error
 	Delete(ctx context.Context, id uuid.UUID) error

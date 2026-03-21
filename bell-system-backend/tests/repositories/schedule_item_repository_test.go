@@ -522,7 +522,7 @@ func TestScheduleItemRepository_List_Success(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
 		WillReturnRows(sessionRows)
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 
@@ -548,7 +548,7 @@ func TestScheduleItemRepository_List_Empty(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM ScheduleItems ORDER BY Time").
 		WillReturnRows(rows)
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.NoError(t, err)
 	assert.Empty(t, items)
 }
@@ -560,7 +560,7 @@ func TestScheduleItemRepository_List_QueryError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM ScheduleItems ORDER BY Time").
 		WillReturnError(errors.New("connection lost"))
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.Error(t, err)
 	assert.Nil(t, items)
 	assert.Contains(t, err.Error(), "failed to list schedule items")
@@ -576,7 +576,7 @@ func TestScheduleItemRepository_List_ScanError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM ScheduleItems ORDER BY Time").
 		WillReturnRows(rows)
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.Error(t, err)
 	assert.Nil(t, items)
 	assert.Contains(t, err.Error(), "failed to scan schedule item")
@@ -597,7 +597,7 @@ func TestScheduleItemRepository_List_DaysQueryError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM ScheduleDays WHERE ScheduleItemId IN").
 		WillReturnError(errors.New("days query failed"))
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.Error(t, err)
 	assert.Nil(t, items)
 }
@@ -623,7 +623,7 @@ func TestScheduleItemRepository_List_SoundsQueryError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM SystemAudioFiles WHERE Id IN").
 		WillReturnError(errors.New("sounds query failed"))
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.Error(t, err)
 	assert.Nil(t, items)
 }
@@ -655,7 +655,7 @@ func TestScheduleItemRepository_List_SessionsQueryError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM Sessions WHERE Id IN").
 		WillReturnError(errors.New("sessions query failed"))
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.Error(t, err)
 	assert.Nil(t, items)
 }
@@ -670,7 +670,7 @@ func TestScheduleItemRepository_List_RowsError(t *testing.T) {
 	mock.ExpectQuery("SELECT .+ FROM ScheduleItems ORDER BY Time").
 		WillReturnRows(rows)
 
-	items, err := repo.List(ctx, "", 0, "ORDER BY Time")
+	items, err := repo.List(ctx, "", 0, nil)
 	require.Error(t, err)
 	assert.Nil(t, items)
 	assert.Contains(t, err.Error(), "error iterating schedule item rows")

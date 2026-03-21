@@ -92,15 +92,9 @@ func validateDays(days []int) bool {
 	return true
 }
 
-var scheduleSortColumns = map[string]string{
-	"name": "Name",
-	"time": "Time",
-}
-
 // List handles GET /.
 func (h *ScheduleHandler) List(w http.ResponseWriter, r *http.Request) {
 	filters := jsonapi.ParseFilter(r, []string{"sessionId", "day"})
-	sortSQL := jsonapi.SortToSQL(jsonapi.ParseSort(r), scheduleSortColumns, "ORDER BY Time")
 
 	filterDay := 0
 	if d := filters["day"]; d != "" {
@@ -109,7 +103,7 @@ func (h *ScheduleHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items, err := h.Items.List(r.Context(), filters["sessionId"], filterDay, sortSQL)
+	items, err := h.Items.List(r.Context(), filters["sessionId"], filterDay, jsonapi.ParseSort(r))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "internal_error", "failed to list schedule items")
 		return

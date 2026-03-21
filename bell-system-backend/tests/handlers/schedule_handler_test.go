@@ -94,7 +94,7 @@ func TestScheduleHandler_List_Success(t *testing.T) {
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return items, nil
 		},
 	}
@@ -118,14 +118,14 @@ func TestScheduleHandler_List_Success(t *testing.T) {
 }
 
 func TestScheduleHandler_List_WithSort(t *testing.T) {
-	var capturedSort string
+	var capturedSorts []jsonapi.SortField
 	items := []*models.ScheduleItem{
 		{ID: uuid.New(), Name: "Bell", Days: []int{2}},
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, sortSQL string) ([]*models.ScheduleItem, error) {
-			capturedSort = sortSQL
+		ListFunc: func(_ context.Context, _ string, _ int, sorts []jsonapi.SortField) ([]*models.ScheduleItem, error) {
+			capturedSorts = sorts
 			return items, nil
 		},
 	}
@@ -138,7 +138,9 @@ func TestScheduleHandler_List_WithSort(t *testing.T) {
 	r.ServeHTTP(rr, req)
 
 	require.Equal(t, http.StatusOK, rr.Code)
-	assert.Equal(t, "ORDER BY Name DESC", capturedSort)
+	require.Len(t, capturedSorts, 1)
+	assert.Equal(t, "name", capturedSorts[0].Field)
+	assert.True(t, capturedSorts[0].Desc)
 }
 
 func TestScheduleHandler_List_IncludeSession(t *testing.T) {
@@ -150,7 +152,7 @@ func TestScheduleHandler_List_IncludeSession(t *testing.T) {
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return items, nil
 		},
 	}
@@ -180,7 +182,7 @@ func TestScheduleHandler_List_IncludeSound(t *testing.T) {
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return items, nil
 		},
 	}
@@ -211,7 +213,7 @@ func TestScheduleHandler_List_IncludeBoth(t *testing.T) {
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return items, nil
 		},
 	}
@@ -237,7 +239,7 @@ func TestScheduleHandler_List_NoInclude(t *testing.T) {
 	}
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return items, nil
 		},
 	}
@@ -292,7 +294,7 @@ func TestScheduleHandler_List_WithFilter(t *testing.T) {
 	var capturedDay int
 
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, filterSessionID string, filterDay int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, filterSessionID string, filterDay int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			capturedSessionID = filterSessionID
 			capturedDay = filterDay
 			return []*models.ScheduleItem{}, nil
@@ -314,7 +316,7 @@ func TestScheduleHandler_List_WithFilter(t *testing.T) {
 
 func TestScheduleHandler_List_Empty(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return []*models.ScheduleItem{}, nil
 		},
 	}
@@ -331,7 +333,7 @@ func TestScheduleHandler_List_Empty(t *testing.T) {
 
 func TestScheduleHandler_List_DBError(t *testing.T) {
 	itemRepo := &mocks.MockScheduleItemRepo{
-		ListFunc: func(_ context.Context, _ string, _ int, _ string) ([]*models.ScheduleItem, error) {
+		ListFunc: func(_ context.Context, _ string, _ int, _ []jsonapi.SortField) ([]*models.ScheduleItem, error) {
 			return nil, errors.New("database error")
 		},
 	}
