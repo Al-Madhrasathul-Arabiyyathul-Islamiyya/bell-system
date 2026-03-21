@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"arabiyya.edu.mv/bell-system-backend/pkg/logger"
+
+	sq "github.com/Masterminds/squirrel"
 )
 
 // SystemStateRepository handles database operations for system state.
@@ -23,11 +25,17 @@ func NewSystemStateRepository(db *sql.DB, logger *logger.Logger) *SystemStateRep
 
 // GetState returns the current system state value and its last update time.
 func (r *SystemStateRepository) GetState(ctx context.Context) (string, time.Time, error) {
-	query := `SELECT Value, UpdatedAt FROM SystemState WHERE [Key] = 'system_state'`
+	query, args, err := sq.Select("Value", "UpdatedAt").
+		From("SystemState").
+		Where(sq.Eq{"[Key]": "system_state"}).
+		ToSql()
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to build get state query: %w", err)
+	}
 
 	var value string
 	var updatedAt time.Time
-	err := r.DB.QueryRowContext(ctx, query).Scan(&value, &updatedAt)
+	err = r.DB.QueryRowContext(ctx, query, args...).Scan(&value, &updatedAt)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("failed to get system state: %w", err)
 	}
@@ -37,9 +45,16 @@ func (r *SystemStateRepository) GetState(ctx context.Context) (string, time.Time
 
 // SetState updates the system state value.
 func (r *SystemStateRepository) SetState(ctx context.Context, state string) error {
-	query := `UPDATE SystemState SET Value = @p1, UpdatedAt = GETDATE() WHERE [Key] = 'system_state'`
+	query, args, err := sq.Update("SystemState").
+		Set("Value", state).
+		Set("UpdatedAt", sq.Expr("GETDATE()")).
+		Where(sq.Eq{"[Key]": "system_state"}).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("failed to build set state query: %w", err)
+	}
 
-	_, err := r.DB.ExecContext(ctx, query, state)
+	_, err = r.DB.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to set system state: %w", err)
 	}
