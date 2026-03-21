@@ -275,10 +275,9 @@ Admin frontend should use `client_type=admin`.
 These should be documented in the frontend code as assumptions or follow-up tasks.
 
 1. Product docs describe role-scoped schedule and audio permissions for session users, but the current backend only enforces admin-only access on `/users`. Other authenticated routes currently accept any authenticated role.
-2. `docs/api/websocket-client-guide.md` still mentions downloading audio from `GET /audio/{id}` in one section, but the current OpenAPI and backend implementation use `GET /audio/{id}/content` for the binary.
-3. `GET /schedule/current` is documented in OpenAPI as possibly `404`, but the current handler returns `200` with `{ session: null, items: [] }` when no session is active.
-4. WebSocket pre-upgrade errors use a legacy `{ "error": ... }` envelope, not JSON:API `errors`.
-5. `POST /system/cancel-next-bell` is behind auth and JSON:API middleware, but has no request body and should be called with an empty body.
+2. `GET /schedule/current` is documented in OpenAPI as possibly `404`, but the current handler returns `200` with `{ session: null, items: [] }` when no session is active.
+3. WebSocket pre-upgrade errors use a legacy `{ "error": ... }` envelope, not JSON:API `errors`.
+4. `POST /system/cancel-next-bell` is behind auth and JSON:API middleware, but has no request body and should be called with an empty body.
 
 ## Frontend Guardrails
 
