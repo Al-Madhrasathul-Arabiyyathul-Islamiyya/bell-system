@@ -905,7 +905,8 @@ func TestAudioHandler_List_WithPagination(t *testing.T) {
 	err := json.NewDecoder(rr.Body).Decode(&resp)
 	require.NoError(t, err)
 	assert.Equal(t, float64(11), resp.Meta["total"])
-	assert.Equal(t, float64(2), resp.Meta["page"])
+	page := resp.Meta["page"].(map[string]any)
+	assert.Equal(t, float64(2), page["number"])
 }
 
 func TestAudioHandler_List_WithFilter(t *testing.T) {

@@ -110,7 +110,7 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.Passwords.Compare(user.PasswordHash, req.OldPassword); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "incorrect old password")
+		writeError(w, http.StatusUnprocessableEntity, "unprocessable_entity", "incorrect old password")
 		return
 	}
 

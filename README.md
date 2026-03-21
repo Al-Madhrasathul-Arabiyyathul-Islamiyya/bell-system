@@ -57,7 +57,7 @@ bell-system/
 ├── .github/workflows/    # CI/CD pipelines
 ├── scripts/hooks/        # Git hooks (repo-wide)
 ├── bell-system-backend/  # Go REST API + scheduler
-├── admin-client/         # React admin dashboard
+├── admin-client/         # Vue admin dashboard
 ├── desktop-client/       # .NET WPF desktop app
 └── docs/                 # Shared documentation
     ├── api/              # OpenAPI specs

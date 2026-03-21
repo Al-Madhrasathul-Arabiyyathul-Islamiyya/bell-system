@@ -4,8 +4,13 @@
 
 ```
 docs/
+├── admin-client/           # Admin frontend implementation docs and theme tokens
+│   ├── README.md           # Admin-client document index
+│   ├── implementation-spec.md # Frontend architecture, package, and routing spec
+│   ├── api-integration-spec.md # REST/WebSocket integration guide and backend caveats
+│   └── theme.css          # DaisyUI theme definitions for light/dark modes
 ├── api/                    # API specifications
-│   ├── openapi/            # Modular OpenAPI 3.0 spec (JSON:API v1.1)
+│   ├── openapi/            # Modular OpenAPI 3.2 spec (JSON:API v1.1)
 │   │   ├── openapi.yaml    # Root spec with path references
 │   │   ├── parameters.yaml # Reusable query parameters
 │   │   ├── responses.yaml  # Reusable error responses

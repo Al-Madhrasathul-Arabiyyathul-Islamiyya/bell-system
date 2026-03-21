@@ -88,7 +88,6 @@ func MarshalScheduleItem(item *models.ScheduleItem) Resource {
 
 type audioFileAttributes struct {
 	Name      string    `json:"name"`
-	FilePath  string    `json:"filePath"`
 	FileType  string    `json:"fileType"`
 	Checksum  string    `json:"checksum"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -101,7 +100,6 @@ func MarshalAudioFile(f *models.SystemAudioFile) Resource {
 		ID:   f.ID.String(),
 		Attributes: audioFileAttributes{
 			Name:      f.Name,
-			FilePath:  f.FilePath,
 			FileType:  string(f.FileType),
 			Checksum:  f.Checksum,
 			CreatedAt: f.CreatedAt,
@@ -147,6 +145,5 @@ func MarshalSystemState(state string, lastUpdated time.Time) Resource {
 			State:       state,
 			LastUpdated: lastUpdated,
 		},
-		Links: &ResourceLinks{Self: "/api/v1/system/state"},
 	}
 }

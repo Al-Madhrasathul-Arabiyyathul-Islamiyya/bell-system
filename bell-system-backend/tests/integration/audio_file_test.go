@@ -173,5 +173,6 @@ func TestAudioFileList_Pagination(t *testing.T) {
 	col := readCollection(t, resp)
 	assert.Len(t, col.Data, 2)
 	assert.GreaterOrEqual(t, col.Meta["total"].(float64), float64(3))
-	assert.Equal(t, float64(2), col.Meta["pageSize"])
+	page := col.Meta["page"].(map[string]any)
+	assert.Equal(t, float64(2), page["size"])
 }

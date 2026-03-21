@@ -80,7 +80,6 @@ func TestAudioHandler_Upload_WithFileStorage(t *testing.T) {
 	attrs, ok := resp.Data.Attributes.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "abc123checksum", attrs["checksum"])
-	assert.Contains(t, attrs["filePath"], ".wav")
 }
 
 func TestAudioHandler_Upload_FileStorageSaveError(t *testing.T) {
