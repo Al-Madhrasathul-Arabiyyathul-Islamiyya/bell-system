@@ -45,6 +45,15 @@ func TestScheduleCurrent_WithItems(t *testing.T) {
 	cleanAndSeed(t)
 	token := adminToken(t)
 
+	// Delete all seed sessions so only our test session is active
+	resp := doRequest(t, http.MethodGet, "/api/v1/sessions", nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	col := readCollection(t, resp)
+	for _, s := range col.Data {
+		resp = doRequest(t, http.MethodDelete, "/api/v1/sessions/"+s.ID, nil, token)
+		resp.Body.Close()
+	}
+
 	// Create a session that covers the current time (so GetCurrentSession finds it)
 	now := time.Now()
 	startTime := fmt.Sprintf("%02d:%02d", now.Hour(), 0)
@@ -55,7 +64,7 @@ func TestScheduleCurrent_WithItems(t *testing.T) {
 	endTime := fmt.Sprintf("%02d:%02d", endHour, 59)
 
 	sessionBody := fmt.Sprintf(`{"data":{"type":"sessions","attributes":{"name":"Test Now Session","startTime":"%s","endTime":"%s"}}}`, startTime, endTime)
-	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/sessions", bytes.NewBufferString(sessionBody), token)
+	resp = doJSONAPIRequest(t, http.MethodPost, "/api/v1/sessions", bytes.NewBufferString(sessionBody), token)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
 	sessionDoc := readDocument(t, resp)
