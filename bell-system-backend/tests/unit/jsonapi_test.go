@@ -322,6 +322,14 @@ func TestParseSort_Multiple(t *testing.T) {
 	assert.True(t, fields[1].Desc)
 }
 
+func TestParseSort_SkipsEmptySegments(t *testing.T) {
+	r := httptest.NewRequest(http.MethodGet, "/?sort=name,,startTime", nil)
+	fields := jsonapi.ParseSort(r)
+	require.Len(t, fields, 2)
+	assert.Equal(t, "name", fields[0].Field)
+	assert.Equal(t, "startTime", fields[1].Field)
+}
+
 func TestParseFilter(t *testing.T) {
 	r := httptest.NewRequest(http.MethodGet, "/?filter[role]=admin&filter[status]=active&filter[bad]=evil", nil)
 	filters := jsonapi.ParseFilter(r, []string{"role", "status"})
