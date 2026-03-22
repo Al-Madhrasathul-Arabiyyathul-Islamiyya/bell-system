@@ -6,14 +6,37 @@ on:
   pull_request:
     branches: [develop, master]
 
-defaults:
-  run:
-    working-directory: bell-system-backend
-
 jobs:
-  lint:
-    name: Lint
+  changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      admin-client: ${{ steps.filter.outputs.admin-client }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'bell-system-backend/**'
+            admin-client:
+              - 'admin-client/**'
+
+  backend-lint:
+    name: Backend Lint
+    needs: changes
+    runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
+    defaults:
+      run:
+        working-directory: bell-system-backend
     steps:
       - uses: actions/checkout@v6
 
@@ -50,9 +73,14 @@ jobs:
             exit 1
           fi
 
-  test:
-    name: Test
+  backend-test:
+    name: Backend Test
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
+    defaults:
+      run:
+        working-directory: bell-system-backend
     steps:
       - uses: actions/checkout@v6
 
@@ -78,9 +106,14 @@ jobs:
           fail_ci_if_error: true
           verbose: true
 
-  build:
-    name: Build
+  backend-build:
+    name: Backend Build
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
+    defaults:
+      run:
+        working-directory: bell-system-backend
     steps:
       - uses: actions/checkout@v6
 
@@ -92,9 +125,14 @@ jobs:
       - name: Build server
         run: go build ./cmd/server
 
-  integration:
-    name: Integration Tests
+  backend-integration:
+    name: Backend Integration Tests
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
+    defaults:
+      run:
+        working-directory: bell-system-backend
     steps:
       - uses: actions/checkout@v6
 
@@ -121,3 +159,60 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           verbose: true
+
+  admin-client-lint:
+    name: Admin Client Lint
+    needs: changes
+    runs-on: ubuntu-latest
+    if: needs.changes.outputs.admin-client == 'true'
+    defaults:
+      run:
+        working-directory: admin-client
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: admin-client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  admin-client-build:
+    name: Admin Client Build
+    needs: changes
+    runs-on: ubuntu-latest
+    if: needs.changes.outputs.admin-client == 'true'
+    defaults:
+      run:
+        working-directory: admin-client
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: admin-client/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Run build
+        run: pnpm build

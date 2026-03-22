@@ -13,7 +13,7 @@ This folder defines the target implementation for the `admin-client` frontend.
 
 ## Current Project State
 
-- `admin-client/` is currently a minimal Vue + Vite starter.
+- `admin-client/` now has the initial app shell, routing, persisted theme/auth placeholders, and the base Tailwind + DaisyUI pipeline.
 - Backend API contracts live in `docs/api/openapi/` and are partially aligned with the Go implementation.
 - The frontend should be implemented as a Vue 3 SPA using VueUse helpers and DaisyUI theming.
 
@@ -24,6 +24,7 @@ This folder defines the target implementation for the `admin-client` frontend.
 - Use Pinia for auth and small client-only state.
 - Use TanStack Vue Query for API cache, loading, invalidation, and optimistic refresh.
 - Use VueUse for storage, color mode, media queries, debouncing, intervals, document title, and WebSocket handling.
+- Use Regle with Zod schemas for form validation instead of `vee-validate`.
 - Use Tailwind CSS v4 + DaisyUI, and import the theme tokens from this folder.
 - Treat the backend as JSON:API-first, but explicitly handle the exception endpoints:
   - `POST /auth/login`
