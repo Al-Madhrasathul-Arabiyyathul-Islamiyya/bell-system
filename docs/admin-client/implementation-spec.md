@@ -25,8 +25,9 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 - `@vueuse/router`
 - `ofetch`
 - `zod`
-- `vee-validate`
-- `@vee-validate/zod`
+- `@regle/core`
+- `@regle/rules`
+- `@regle/schemas`
 - `@iconify/vue`
 
 ### Build and Styling
@@ -56,7 +57,7 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 - `@tanstack/vue-query`: server state should not be stored in Pinia.
 - `@vueuse/core`: use `useStorage`, `useColorMode`, `useBreakpoints`, `useDocumentTitle`, `useDebounceFn`, `watchDebounced`, `useIntervalFn`, `useWebSocket`, and `useTimeAgo`.
 - `ofetch`: lighter than Axios and sufficient for JSON:API, login JSON, and multipart upload.
-- `zod` + `vee-validate`: runtime-safe forms without duplicating validation logic.
+- `zod` + `Regle`: schema-driven forms and validation without coupling page components to hand-rolled field state.
 - `openapi-typescript`: generate API-facing types from `docs/api/openapi/openapi.yaml`, then wrap them with JSON:API adapters.
 
 ## Explicit Frontend Decisions
@@ -76,7 +77,7 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 
 ```bash
 cd admin-client
-pnpm add vue-router pinia @tanstack/vue-query @vueuse/core @vueuse/router ofetch zod vee-validate @vee-validate/zod @iconify/vue
+pnpm add vue-router pinia @tanstack/vue-query @vueuse/core @vueuse/router ofetch zod @regle/core @regle/rules @regle/schemas @iconify/vue
 pnpm add -D tailwindcss @tailwindcss/vite daisyui vitest @vue/test-utils happy-dom playwright openapi-typescript eslint eslint-plugin-vue @typescript-eslint/parser @typescript-eslint/eslint-plugin prettier
 ```
 
@@ -203,7 +204,7 @@ admin-client/
 
 - server-side pagination
 - role filter
-- create/update forms with Zod schemas
+- create/update forms with Zod schemas wired through Regle
 
 ### Sessions
 
@@ -259,6 +260,7 @@ VueUse helpers to use directly:
 - Import `docs/admin-client/theme.css` into the Tailwind/DaisyUI pipeline and keep the theme names `light` and `dark`.
 - Default to the light theme.
 - Use the existing green/red/gold palette as the product identity.
+- Use `Philosopher` for display headings and `Mulish` for body/interface copy.
 - Avoid Vite starter styling entirely.
 - Add a small set of local CSS utilities only for app-shell layout and branded surfaces.
 

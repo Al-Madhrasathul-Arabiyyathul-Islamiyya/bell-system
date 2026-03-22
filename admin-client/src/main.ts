@@ -1,5 +1,10 @@
 import { createApp } from "vue";
-import "./style.css";
 import App from "./App.vue";
+import { installAppProviders } from "./app/providers";
+import "./style.css";
 
-createApp(App).mount("#app");
+const app = createApp(App);
+
+installAppProviders(app);
+
+app.mount("#app");
