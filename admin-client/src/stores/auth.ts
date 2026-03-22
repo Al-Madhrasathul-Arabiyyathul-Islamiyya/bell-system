@@ -12,6 +12,7 @@ export const useAuthStore = defineStore("auth", () => {
   });
 
   const isAuthenticated = computed(() => Boolean(token.value));
+  const isAdmin = computed(() => user.value.role === "admin");
   const username = computed(() => user.value.username);
 
   function loginPlaceholder(nextUsername: string) {
@@ -44,6 +45,7 @@ export const useAuthStore = defineStore("auth", () => {
   return {
     clearAuth,
     isAuthenticated,
+    isAdmin,
     loginPlaceholder,
     logout: clearAuth,
     setAuth,

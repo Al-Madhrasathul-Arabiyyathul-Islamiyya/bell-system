@@ -1,5 +1,5 @@
 import { apiJson } from "./client";
-import type { AuthUser } from "./types";
+import type { AuthUser, JsonApiResource } from "./types";
 
 export type LoginPayload = {
   password: string;
@@ -8,16 +8,16 @@ export type LoginPayload = {
 
 export type LoginResponse = {
   token: string;
-  user: {
-    id?: string;
+  user: JsonApiResource<{
+    createdAt?: string;
     role?: AuthUser["role"];
     username?: string;
-  };
+  }>;
 };
 
 export type ChangePasswordPayload = {
-  currentPassword: string;
   newPassword: string;
+  oldPassword: string;
 };
 
 export async function login(payload: LoginPayload) {
