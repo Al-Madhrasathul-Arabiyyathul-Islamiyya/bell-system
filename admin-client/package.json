@@ -10,12 +10,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.25"
+    "@tanstack/vue-query": "^5.94.5",
+    "@vueuse/core": "^14.2.1",
+    "@vueuse/router": "^14.2.1",
+    "ofetch": "^1.5.1",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.25",
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
     "@types/node": "^24.10.1",
     "@vitejs/plugin-vue": "^6.0.2",
     "@vue/tsconfig": "^0.8.1",
+    "daisyui": "^5.5.19",
+    "tailwindcss": "^4.2.2",
     "typescript": "~5.9.3",
     "vite": "^8.0.0-beta.13",
     "vue-tsc": "^3.1.5"
@@ -23,6 +32,9 @@
   "pnpm": {
     "overrides": {
       "vite": "^8.0.0-beta.13"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "vue-demi"
+    ]
   }
 }
