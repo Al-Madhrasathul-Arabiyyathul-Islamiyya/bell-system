@@ -76,8 +76,8 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 
 ```bash
 cd admin-client
-yarn add vue-router pinia @tanstack/vue-query @vueuse/core @vueuse/router ofetch zod vee-validate @vee-validate/zod @iconify/vue
-yarn add -D tailwindcss @tailwindcss/vite daisyui vitest @vue/test-utils happy-dom playwright openapi-typescript eslint eslint-plugin-vue @typescript-eslint/parser @typescript-eslint/eslint-plugin prettier
+pnpm add vue-router pinia @tanstack/vue-query @vueuse/core @vueuse/router ofetch zod vee-validate @vee-validate/zod @iconify/vue
+pnpm add -D tailwindcss @tailwindcss/vite daisyui vitest @vue/test-utils happy-dom playwright openapi-typescript eslint eslint-plugin-vue @typescript-eslint/parser @typescript-eslint/eslint-plugin prettier
 ```
 
 ## App Structure

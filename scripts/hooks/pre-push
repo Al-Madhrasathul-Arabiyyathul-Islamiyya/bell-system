@@ -19,10 +19,10 @@ if echo "$CHANGED" | grep -q "^bell-system-backend/"; then
     cd "$REPO_ROOT"
 fi
 
-# --- Admin Client (React/TypeScript) ---
+# --- Admin Client (Vue/TypeScript) ---
 if echo "$CHANGED" | grep -q "^admin-client/"; then
     echo "==> [admin-client] Checks not yet configured."
-    # Future: yarn test, yarn build
+    # Future: pnpm test, pnpm build
 fi
 
 # --- Desktop Client (.NET) ---
