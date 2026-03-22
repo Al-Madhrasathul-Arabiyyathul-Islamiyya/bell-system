@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { Icon } from "@iconify/vue";
 import {
   breakpointsTailwind,
@@ -10,21 +10,25 @@ import {
   useTitle,
 } from "@vueuse/core";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { useBellSystemSocket } from "../features/realtime/composables/use-bell-system-socket";
 import { appEnv } from "../lib/env";
+import { useAppShellStore } from "../stores/app-shell";
 import { useAuthStore } from "../stores/auth";
 import { usePreferencesStore } from "../stores/preferences";
+import { useRealtimeStore } from "../stores/realtime";
 
 const route = useRoute();
 const router = useRouter();
+const appShellStore = useAppShellStore();
 const authStore = useAuthStore();
 const preferencesStore = usePreferencesStore();
+const realtimeStore = useRealtimeStore();
 
 const online = useOnline();
 const now = useNow({ interval: 1_000 });
 const formattedTime = useDateFormat(now, "HH:mm:ss");
 const breakpoints = useBreakpoints(breakpointsTailwind);
 const isDesktop = breakpoints.greaterOrEqual("lg");
-const mobileMenuOpen = ref(false);
 
 const navigationItems = [
   {
@@ -66,33 +70,36 @@ const pageTitle = computed(() => {
   return `${routeTitle} • ${appEnv.appName}`;
 });
 
-const drawerOpen = computed(() => isDesktop.value || mobileMenuOpen.value);
+const drawerOpen = computed(
+  () => isDesktop.value || appShellStore.mobileMenuOpen,
+);
 
+useBellSystemSocket();
 useTitle(pageTitle);
 
 watch(
   () => route.fullPath,
   () => {
     if (!isDesktop.value) {
-      mobileMenuOpen.value = false;
+      appShellStore.closeMobileMenu();
     }
   },
 );
 
 watch(isDesktop, (desktop) => {
   if (desktop) {
-    mobileMenuOpen.value = false;
+    appShellStore.closeMobileMenu();
   }
 });
 
 function openMobileMenu() {
   if (!isDesktop.value) {
-    mobileMenuOpen.value = true;
+    appShellStore.openMobileMenu();
   }
 }
 
 function closeMobileMenu() {
-  mobileMenuOpen.value = false;
+  appShellStore.closeMobileMenu();
 }
 
 function handleLogout() {
@@ -145,6 +152,21 @@ function handleLogout() {
                 :class="online ? 'status-success' : 'status-error'"
               />
               {{ online ? "Online" : "Offline" }}
+            </span>
+            <span
+              class="badge badge-outline gap-2 border-base-300 px-3 py-3 text-xs font-medium"
+            >
+              <span
+                class="status"
+                :class="
+                  realtimeStore.socketStatus === 'OPEN'
+                    ? 'status-success'
+                    : realtimeStore.socketStatus === 'CONNECTING'
+                      ? 'status-warning'
+                      : 'status-error'
+                "
+              />
+              Socket {{ realtimeStore.socketStatus.toLowerCase() }}
             </span>
             <span
               class="badge badge-outline hidden border-base-300 px-3 py-3 text-xs font-medium md:inline-flex"
@@ -202,13 +224,15 @@ function handleLogout() {
         <div
           class="rounded-box border border-primary/15 bg-primary/8 px-4 py-3 text-sm leading-6 text-base-content/80"
         >
-          Setup foundation only for now. API transport, auth, JSON:API adapters,
-          and live socket state are still pending. Base URLs are preconfigured
-          as
+          API transport, query composables, persisted auth state, and realtime
+          socket foundations are now in place. Base URLs are preconfigured as
           <span class="font-semibold">{{ appEnv.apiBaseUrl }}</span>
           and
           <span class="font-semibold">{{ appEnv.wsBaseUrl }}</span
-          >.
+          >. Connected clients:
+          <span class="font-semibold">{{
+            realtimeStore.connectedClients.length
+          }}</span>
         </div>
         <RouterView />
       </main>
@@ -269,8 +293,8 @@ function handleLogout() {
             Next implementation blocks
           </p>
           <p class="mt-2 leading-6">
-            Auth API, JSON:API adapter layer, dashboard queries, and WebSocket
-            synchronization.
+            Replace placeholder auth with live endpoints, wire dashboard
+            queries, and connect Regle forms to the CRUD feature flows.
           </p>
         </div>
       </aside>
