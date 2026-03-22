@@ -21,8 +21,11 @@ fi
 
 # --- Admin Client (Vue/TypeScript) ---
 if echo "$CHANGED" | grep -q "^admin-client/"; then
-    echo "==> [admin-client] Checks not yet configured."
-    # Future: pnpm test, pnpm build
+    echo "==> [admin-client] Running validation..."
+    cd "$REPO_ROOT/admin-client"
+    pnpm check
+
+    cd "$REPO_ROOT"
 fi
 
 # --- Desktop Client (.NET) ---

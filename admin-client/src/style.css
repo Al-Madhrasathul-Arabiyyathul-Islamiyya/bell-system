@@ -1,7 +1,11 @@
 :root {
   color: #14352b;
-  background:
-    radial-gradient(circle at top, #f2fff7 0%, #e4f5ea 42%, #d8ebe0 100%);
+  background: radial-gradient(
+    circle at top,
+    #f2fff7 0%,
+    #e4f5ea 42%,
+    #d8ebe0 100%
+  );
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   line-height: 1.5;
   font-weight: 400;
