@@ -7,9 +7,33 @@ on:
     branches: [develop, master]
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      admin-client: ${{ steps.filter.outputs.admin-client }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'bell-system-backend/**'
+            admin-client:
+              - 'admin-client/**'
+
   backend-lint:
     name: Backend Lint
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
     defaults:
       run:
         working-directory: bell-system-backend
@@ -51,7 +75,9 @@ jobs:
 
   backend-test:
     name: Backend Test
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
     defaults:
       run:
         working-directory: bell-system-backend
@@ -82,7 +108,9 @@ jobs:
 
   backend-build:
     name: Backend Build
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
     defaults:
       run:
         working-directory: bell-system-backend
@@ -99,7 +127,9 @@ jobs:
 
   backend-integration:
     name: Backend Integration Tests
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.backend == 'true'
     defaults:
       run:
         working-directory: bell-system-backend
@@ -132,21 +162,24 @@ jobs:
 
   admin-client-lint:
     name: Admin Client Lint
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.admin-client == 'true'
     defaults:
       run:
         working-directory: admin-client
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: admin-client/pnpm-lock.yaml
-
-      - name: Enable pnpm
-        run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
@@ -159,21 +192,24 @@ jobs:
 
   admin-client-build:
     name: Admin Client Build
+    needs: changes
     runs-on: ubuntu-latest
+    if: needs.changes.outputs.admin-client == 'true'
     defaults:
       run:
         working-directory: admin-client
     steps:
       - uses: actions/checkout@v6
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.8.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: admin-client/pnpm-lock.yaml
-
-      - name: Enable pnpm
-        run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
