@@ -57,7 +57,7 @@ func (r *ScheduleItemRepository) Create(ctx context.Context, item *models.Schedu
 
 		query, args, err := buildQuery(qb.Insert("ScheduleItems").
 			Columns("Id", "SessionId", "Name", "Time", "SoundId", "CreatedAt", "UpdatedAt").
-			Values(item.ID, item.SessionID, item.Name, item.Time, item.SoundID, item.CreatedAt, item.UpdatedAt))
+			Values(item.ID, item.SessionID, item.Name, item.Time.Format("15:04"), item.SoundID, item.CreatedAt, item.UpdatedAt))
 		if err != nil {
 			return err
 		}
@@ -390,7 +390,7 @@ func (r *ScheduleItemRepository) Update(ctx context.Context, item *models.Schedu
 		query, args, err := buildQuery(qb.Update("ScheduleItems").
 			Set("SessionId", item.SessionID).
 			Set("Name", item.Name).
-			Set("Time", item.Time).
+			Set("Time", item.Time.Format("15:04")).
 			Set("SoundId", item.SoundID).
 			Set("UpdatedAt", item.UpdatedAt).
 			Where(sq.Eq{"Id": item.ID}))

@@ -33,6 +33,15 @@ func TestScheduleItemRepository_Create_Success(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec("INSERT INTO ScheduleItems").
+		WithArgs(
+			sqlmock.AnyArg(),
+			sessionID,
+			"First Period Bell",
+			"07:45",
+			item.SoundID,
+			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
+		).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 	for range item.Days {
 		mock.ExpectExec("INSERT INTO ScheduleDays").
@@ -62,7 +71,17 @@ func TestScheduleItemRepository_Create_WithPresetID(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec("INSERT INTO ScheduleItems").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO ScheduleItems").
+		WithArgs(
+			presetID,
+			nil,
+			"Custom ID Bell",
+			"08:00",
+			item.SoundID,
+			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("INSERT INTO ScheduleDays").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
@@ -83,7 +102,17 @@ func TestScheduleItemRepository_Create_NoDays(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec("INSERT INTO ScheduleItems").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO ScheduleItems").
+		WithArgs(
+			sqlmock.AnyArg(),
+			nil,
+			"No Days Bell",
+			"09:00",
+			item.SoundID,
+			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	err := repo.Create(ctx, item)
@@ -370,7 +399,16 @@ func TestScheduleItemRepository_Update_Success(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec("UPDATE ScheduleItems").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("UPDATE ScheduleItems").
+		WithArgs(
+			sessionID,
+			"Updated Bell",
+			"10:00",
+			item.SoundID,
+			sqlmock.AnyArg(),
+			item.ID,
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectExec("DELETE FROM ScheduleDays WHERE").WillReturnResult(sqlmock.NewResult(0, 5))
 	for range item.Days {
 		mock.ExpectExec("INSERT INTO ScheduleDays").WillReturnResult(sqlmock.NewResult(0, 1))
@@ -445,7 +483,17 @@ func TestScheduleItemRepository_Create_WithoutSession(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec("INSERT INTO ScheduleItems").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO ScheduleItems").
+		WithArgs(
+			sqlmock.AnyArg(),
+			nil,
+			"School Opening",
+			"06:45",
+			item.SoundID,
+			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	for range item.Days {
 		mock.ExpectExec("INSERT INTO ScheduleDays").WillReturnResult(sqlmock.NewResult(0, 1))
 	}
@@ -469,7 +517,17 @@ func TestScheduleItemRepository_Create_WithSession(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectExec("INSERT INTO ScheduleItems").WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectExec("INSERT INTO ScheduleItems").
+		WithArgs(
+			sqlmock.AnyArg(),
+			sessionID,
+			"Morning First Period",
+			"07:45",
+			item.SoundID,
+			sqlmock.AnyArg(),
+			sqlmock.AnyArg(),
+		).
+		WillReturnResult(sqlmock.NewResult(0, 1))
 	for range item.Days {
 		mock.ExpectExec("INSERT INTO ScheduleDays").WillReturnResult(sqlmock.NewResult(0, 1))
 	}
