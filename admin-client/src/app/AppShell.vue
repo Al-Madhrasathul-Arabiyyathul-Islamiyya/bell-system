@@ -143,9 +143,9 @@ async function handleLogout() {
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-base-200">
+  <div class="flex h-dvh flex-col overflow-hidden bg-base-200">
     <header
-      class="relative z-40 overflow-visible border-b border-base-300 bg-base-100/90 backdrop-blur"
+      class="relative z-40 shrink-0 overflow-visible border-b border-base-300 bg-base-100/90 backdrop-blur"
     >
       <div
         class="navbar grid min-h-16 grid-cols-[auto_1fr_auto] items-center gap-3 overflow-visible px-4 sm:px-6"
@@ -250,7 +250,7 @@ async function handleLogout() {
     </header>
 
     <div
-      class="drawer min-h-0 flex-1 lg:drawer-open"
+      class="drawer h-0 min-h-0 flex-1 lg:drawer-open"
       :class="{ 'drawer-open': drawerOpen }"
     >
       <input
@@ -260,9 +260,9 @@ async function handleLogout() {
         aria-label="Navigation"
       />
 
-      <div class="drawer-content min-h-0 bg-base-200">
+      <div class="drawer-content min-h-0 overflow-y-auto bg-base-200">
         <main
-          class="flex h-full w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
+          class="flex min-h-full w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
         >
           <RouterView />
         </main>
@@ -276,7 +276,7 @@ async function handleLogout() {
         />
 
         <aside
-          class="flex min-h-full w-72 flex-col border-r border-base-300 bg-base-100 text-base-content transition-[width] duration-200 ease-out"
+          class="flex h-full w-72 flex-col border-r border-base-300 bg-base-100 text-base-content transition-[width] duration-200 ease-out"
           :class="{
             'lg:w-24': sidebarCollapsed,
             'lg:w-72': !sidebarCollapsed,
