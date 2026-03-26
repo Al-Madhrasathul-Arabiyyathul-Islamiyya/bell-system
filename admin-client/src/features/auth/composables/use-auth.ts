@@ -18,8 +18,8 @@ export function useLoginMutation() {
     onSuccess(response) {
       authStore.setAuth(response.token, {
         id: response.user.id ?? null,
-        role: response.user.role ?? null,
-        username: response.user.username ?? null,
+        role: response.user.attributes.role ?? null,
+        username: response.user.attributes.username ?? null,
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.authUser() });
     },

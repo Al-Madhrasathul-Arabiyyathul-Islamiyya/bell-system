@@ -2,12 +2,15 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useTitle } from "@vueuse/core";
+import { getPrimaryError } from "../lib/api/errors";
 import { appEnv } from "../lib/env";
+import { useLoginMutation } from "../features/auth/composables/use-auth";
 import { useAuthStore } from "../stores/auth";
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const loginMutation = useLoginMutation();
 
 const username = ref("");
 const password = ref("");
@@ -20,9 +23,34 @@ const redirectTarget = computed(() => {
     : "/dashboard";
 });
 
-function handlePlaceholderLogin() {
-  authStore.loginPlaceholder(username.value);
-  router.push(redirectTarget.value);
+const routeError = computed(() => {
+  if (route.query.error === "admin-only") {
+    return "This admin client only allows administrator accounts.";
+  }
+
+  return null;
+});
+
+const loginError = computed(() => {
+  if (!loginMutation.error.value) {
+    return null;
+  }
+
+  return getPrimaryError(loginMutation.error.value).detail;
+});
+
+async function handleLogin() {
+  await loginMutation.mutateAsync({
+    password: password.value,
+    username: username.value,
+  });
+
+  if (!authStore.isAdmin) {
+    authStore.clearAuth();
+    return;
+  }
+
+  await router.push(redirectTarget.value);
 }
 </script>
 
@@ -43,9 +71,9 @@ function handlePlaceholderLogin() {
         <p
           class="max-w-2xl text-sm leading-7 text-base-content/70 md:text-base"
         >
-          This page is still on a placeholder session flow so the app shell can
-          be exercised before the auth API and JSON:API transport layer are
-          implemented.
+          Sign in with a live backend account. Auth state is persisted locally,
+          so valid sessions survive hard refreshes until logout or a `401`
+          response clears them.
         </p>
       </div>
 
@@ -74,12 +102,20 @@ function handlePlaceholderLogin() {
 
         <article class="card border border-base-300 bg-base-100 shadow-sm">
           <div class="card-body gap-4">
-            <h2 class="card-title">Temporary Access</h2>
+            <h2 class="card-title">Admin Sign In</h2>
+            <div
+              v-if="routeError || loginError"
+              class="alert alert-error text-sm"
+              role="alert"
+            >
+              {{ routeError || loginError }}
+            </div>
             <label class="form-control gap-2">
               <span class="label-text font-medium">Username</span>
               <input
                 v-model="username"
                 class="input input-bordered w-full"
+                :disabled="loginMutation.isPending.value"
                 placeholder="admin"
                 type="text"
               />
@@ -89,20 +125,23 @@ function handlePlaceholderLogin() {
               <input
                 v-model="password"
                 class="input input-bordered w-full"
-                placeholder="Pending API integration"
+                :disabled="loginMutation.isPending.value"
+                placeholder="Password"
                 type="password"
+                @keydown.enter="handleLogin"
               />
             </label>
             <button
               class="btn btn-primary mt-2"
               type="button"
-              @click="handlePlaceholderLogin"
+              :class="{ 'btn-disabled': loginMutation.isPending.value }"
+              :disabled="loginMutation.isPending.value"
+              @click="handleLogin"
             >
-              Enter Placeholder Session
+              {{ loginMutation.isPending.value ? "Signing In..." : "Sign In" }}
             </button>
             <p class="text-xs leading-6 text-base-content/60">
-              This only persists a local placeholder token for shell
-              development. Real login will replace it.
+              Only administrator accounts should continue into this client.
             </p>
           </div>
         </article>

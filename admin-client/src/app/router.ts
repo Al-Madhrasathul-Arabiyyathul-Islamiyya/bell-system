@@ -21,6 +21,7 @@ const routes: RouteRecordRaw[] = [
     path: "/",
     component: () => import("./AppShell.vue"),
     meta: {
+      requiresAdmin: true,
       requiresAuth: true,
     },
     children: [
@@ -95,6 +96,10 @@ function requiresAuth(route: RouteLocationNormalized) {
   return route.matched.some((record) => record.meta.requiresAuth);
 }
 
+function requiresAdmin(route: RouteLocationNormalized) {
+  return route.matched.some((record) => record.meta.requiresAdmin);
+}
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
@@ -108,6 +113,17 @@ router.beforeEach((to) => {
       name: "login",
       query: {
         redirect: to.fullPath,
+      },
+    };
+  }
+
+  if (requiresAdmin(to) && authStore.isAuthenticated && !authStore.isAdmin) {
+    authStore.clearAuth();
+
+    return {
+      name: "login",
+      query: {
+        error: "admin-only",
       },
     };
   }
