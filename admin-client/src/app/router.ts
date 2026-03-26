@@ -22,7 +22,6 @@ const routes: RouteRecordRaw[] = [
     path: "/",
     component: () => import("./AppShell.vue"),
     meta: {
-      requiresAdmin: true,
       requiresAuth: true,
     },
     children: [
@@ -69,6 +68,7 @@ const routes: RouteRecordRaw[] = [
         name: "users",
         component: () => import("../pages/UsersPage.vue"),
         meta: {
+          requiresAdmin: true,
           title: "Users",
         },
       },
@@ -120,15 +120,14 @@ router.beforeEach((to) => {
   }
 
   if (requiresAdmin(to) && authStore.isAuthenticated && !authStore.isAdmin) {
-    authStore.clearAuth();
     toastStore.enqueue({
-      detail: "This admin client only allows administrator accounts.",
+      detail: "Only administrator accounts can access user management.",
       title: "Access Denied",
       tone: "error",
     });
 
     return {
-      name: "login",
+      name: "dashboard",
     };
   }
 

@@ -1,4 +1,5 @@
-import { apiJson, apiJsonApiWrite } from "./client";
+import { adaptJsonApiResource } from "../jsonapi/adapters";
+import { apiJsonApiDocument, apiJsonApiWrite } from "./client";
 
 export type SystemStateVm = {
   lastUpdated: string;
@@ -15,7 +16,15 @@ export type UpdateSystemStatePayload = {
 };
 
 export async function getSystemState() {
-  return apiJson<SystemStateVm>("/system/state");
+  const document = await apiJsonApiDocument<{
+    state: SystemStateVm["state"];
+    updatedAt: string;
+  }>("/system/state");
+
+  return adaptJsonApiResource(document, (resource) => ({
+    lastUpdated: resource.attributes.updatedAt,
+    state: resource.attributes.state,
+  }));
 }
 
 export async function updateSystemState(payload: UpdateSystemStatePayload) {
@@ -26,8 +35,7 @@ export async function updateSystemState(payload: UpdateSystemStatePayload) {
 }
 
 export async function cancelNextBell() {
-  return apiJson<void>("/system/cancel-next-bell", {
+  return apiJsonApiWrite<void>("/system/cancel-next-bell", {
     method: "POST" as const,
-    requestType: "json",
   });
 }

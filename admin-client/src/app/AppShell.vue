@@ -58,6 +58,7 @@ const navigationItems = [
   {
     icon: "solar:users-group-rounded-bold-duotone",
     label: "Users",
+    requiresAdmin: true,
     to: { name: "users" },
   },
   {
@@ -66,6 +67,14 @@ const navigationItems = [
     to: { name: "system" },
   },
 ] as const;
+
+const visibleNavigationItems = computed(() => {
+  return navigationItems.filter((item) => {
+    return (
+      !("requiresAdmin" in item) || !item.requiresAdmin || authStore.isAdmin
+    );
+  });
+});
 
 const pageTitle = computed(() => {
   const routeTitle =
@@ -255,17 +264,6 @@ async function handleLogout() {
         <main
           class="flex h-full w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
         >
-          <div class="alert alert-info shadow-sm text-sm leading-6">
-            API transport, query composables, persisted auth state, and realtime
-            socket foundations are now in place. Base URLs are preconfigured as
-            <span class="font-semibold">{{ appEnv.apiBaseUrl }}</span>
-            and
-            <span class="font-semibold">{{ appEnv.wsBaseUrl }}</span
-            >. Connected clients:
-            <span class="font-semibold">{{
-              realtimeStore.connectedClients.length
-            }}</span>
-          </div>
           <RouterView />
         </main>
       </div>
@@ -286,7 +284,7 @@ async function handleLogout() {
         >
           <nav class="flex-1 px-4 py-5">
             <ul class="menu w-full gap-2">
-              <li v-for="item in navigationItems" :key="item.label">
+              <li v-for="item in visibleNavigationItems" :key="item.label">
                 <RouterLink
                   v-slot="{ href, isActive, navigate }"
                   custom
