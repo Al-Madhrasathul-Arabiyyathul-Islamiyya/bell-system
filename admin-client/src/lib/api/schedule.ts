@@ -11,6 +11,12 @@ type ScheduleItemAttributes = {
   updatedAt: string;
 };
 
+type ScheduleWriteAttributes = {
+  days: number[];
+  name: string;
+  time: string;
+};
+
 type SessionAttributes = {
   endTime: string;
   name: string;
@@ -48,7 +54,12 @@ export type CurrentScheduleResponse = {
   items: Array<{
     id: string;
     name: string;
-    sound: string;
+    sound: {
+      checksum: string;
+      fileType: "anthem" | "bell" | "other" | "school_song";
+      id: string;
+      name: string;
+    } | null;
     status?: string;
     time: string;
   }>;
@@ -62,7 +73,7 @@ export type CurrentScheduleResponse = {
 
 export type ScheduleWritePayload = {
   data: {
-    attributes: ScheduleItemAttributes;
+    attributes: ScheduleWriteAttributes;
     relationships: {
       session: {
         data: null | {
@@ -77,7 +88,7 @@ export type ScheduleWritePayload = {
         };
       };
     };
-    type: "schedule";
+    type: "schedule-items";
   };
 };
 
