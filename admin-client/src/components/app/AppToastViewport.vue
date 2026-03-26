@@ -67,7 +67,7 @@ function toneIcon(tone: ToastTone) {
             aria-label="Dismiss notification"
             @click="toastStore.dismiss(item.id)"
           >
-            <Icon icon="solar:close-line-duotone" class="text-xl" />
+            <Icon icon="solar:close-circle-line-duotone" class="text-xl" />
           </button>
         </div>
       </div>
