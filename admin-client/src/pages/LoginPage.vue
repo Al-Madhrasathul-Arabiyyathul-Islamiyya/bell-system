@@ -74,7 +74,7 @@ async function handleLogin() {
           />
         </button>
         <ul
-          class="menu dropdown-content z-10 mt-3 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl"
+          class="menu dropdown-content z-10 mt-3 w-40 rounded-box bg-base-100 p-2 shadow"
         >
           <li>
             <button
@@ -105,16 +105,14 @@ async function handleLogin() {
     </div>
 
     <section class="login-panel pt-4">
-      <article
-        class="card mx-auto w-full max-w-md border border-base-300 bg-base-100 shadow-xl"
-      >
-        <div class="card-body gap-5 p-8">
+      <article class="card mx-auto w-full max-w-md bg-base-100 shadow-2xl">
+        <div class="card-body gap-6">
           <div class="flex flex-col items-center gap-4 text-center">
-            <img
-              class="size-20 rounded-box bg-primary/10 p-3"
-              src="/logo.svg"
-              alt="Arabiyya Bell System logo"
-            />
+            <figure class="avatar">
+              <div class="w-20 rounded-box bg-primary/10 p-3">
+                <img src="/logo.svg" alt="Arabiyya Bell System logo" />
+              </div>
+            </figure>
             <h1
               class="font-display text-4xl font-semibold tracking-tight text-base-content"
             >
@@ -122,7 +120,7 @@ async function handleLogin() {
             </h1>
           </div>
 
-          <div class="space-y-4">
+          <div class="space-y-5">
             <div
               v-if="routeError || loginError"
               class="alert alert-error text-sm"
@@ -131,31 +129,28 @@ async function handleLogin() {
               {{ routeError || loginError }}
             </div>
 
-            <label class="form-control gap-2">
-              <span class="label-text font-medium">Email</span>
+            <fieldset class="fieldset">
+              <legend class="fieldset-legend">Email</legend>
               <input
                 v-model="email"
-                class="input input-bordered w-full"
+                class="input w-full"
                 :disabled="loginMutation.isPending.value"
                 placeholder="admin@example.com"
                 type="email"
               />
-            </label>
-            <label class="form-control gap-2">
-              <span class="label-text font-medium">Password</span>
+              <legend class="fieldset-legend">Password</legend>
               <input
                 v-model="password"
-                class="input input-bordered w-full"
+                class="input w-full"
                 :disabled="loginMutation.isPending.value"
                 placeholder="Password"
                 type="password"
                 @keydown.enter="handleLogin"
               />
-            </label>
+            </fieldset>
             <button
-              class="btn btn-primary mt-2"
+              class="btn btn-primary w-full"
               type="button"
-              :class="{ 'btn-disabled': loginMutation.isPending.value }"
               :disabled="loginMutation.isPending.value"
               @click="handleLogin"
             >
