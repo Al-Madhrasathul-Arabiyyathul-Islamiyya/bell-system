@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useTemplateRef } from "vue";
 import { Icon } from "@iconify/vue";
 import { usePreferencesStore } from "../../stores/preferences";
+import type { ThemePreference } from "../../stores/preferences";
 
 withDefaults(
   defineProps<{
@@ -13,6 +14,7 @@ withDefaults(
 );
 
 const preferencesStore = usePreferencesStore();
+const trigger = useTemplateRef<HTMLDivElement>("trigger");
 
 const themeLabel = computed(() => {
   if (preferencesStore.themePreference === "system") {
@@ -31,11 +33,17 @@ const themeIcon = computed(() => {
     ? "solar:moon-stars-bold-duotone"
     : "solar:sun-bold-duotone";
 });
+
+function setTheme(theme: ThemePreference) {
+  preferencesStore.themePreference = theme;
+  trigger.value?.blur();
+}
 </script>
 
 <template>
   <div class="dropdown dropdown-end">
     <div
+      ref="trigger"
       tabindex="0"
       role="button"
       class="btn btn-ghost"
@@ -52,28 +60,13 @@ const themeIcon = computed(() => {
       tabindex="-1"
     >
       <li>
-        <button
-          type="button"
-          @click="preferencesStore.themePreference = 'system'"
-        >
-          System
-        </button>
+        <button type="button" @click="setTheme('system')">System</button>
       </li>
       <li>
-        <button
-          type="button"
-          @click="preferencesStore.themePreference = 'light'"
-        >
-          Light
-        </button>
+        <button type="button" @click="setTheme('light')">Light</button>
       </li>
       <li>
-        <button
-          type="button"
-          @click="preferencesStore.themePreference = 'dark'"
-        >
-          Dark
-        </button>
+        <button type="button" @click="setTheme('dark')">Dark</button>
       </li>
     </ul>
   </div>

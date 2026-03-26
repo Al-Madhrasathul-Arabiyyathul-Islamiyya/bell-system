@@ -2,7 +2,7 @@ import { computed, watch } from "vue";
 import { defineStore } from "pinia";
 import { usePreferredDark, useStorage } from "@vueuse/core";
 
-type ThemePreference = "system" | "light" | "dark";
+export type ThemePreference = "system" | "light" | "dark";
 type ResolvedTheme = "light" | "dark";
 
 export const usePreferencesStore = defineStore("preferences", () => {
