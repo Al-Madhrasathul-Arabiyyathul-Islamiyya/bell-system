@@ -148,7 +148,7 @@ async function handleLogout() {
 
     <div class="drawer-content min-h-screen bg-base-200">
       <header class="border-b border-base-300 bg-base-100/90 backdrop-blur">
-        <div class="navbar mx-auto max-w-7xl px-4 sm:px-6">
+        <div class="navbar w-full px-4 sm:px-6">
           <div class="navbar-start gap-3">
             <button
               class="btn btn-ghost btn-square"
@@ -311,7 +311,7 @@ async function handleLogout() {
       </header>
 
       <main
-        class="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
+        class="flex min-h-[calc(100vh-4rem)] w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
       >
         <div class="alert alert-info shadow-sm text-sm leading-6">
           API transport, query composables, persisted auth state, and realtime
@@ -336,45 +336,32 @@ async function handleLogout() {
       />
 
       <aside
-        class="flex min-h-full w-80 flex-col bg-neutral text-neutral-content transition-[width] duration-200 ease-out"
+        class="flex min-h-full w-80 flex-col border-r border-base-300 bg-base-100 text-base-content transition-[width] duration-200 ease-out"
         :class="{
           'lg:w-24': sidebarCollapsed,
           'lg:w-80': !sidebarCollapsed,
         }"
       >
-        <div class="border-b border-white/10 px-6 py-6">
+        <div class="border-b border-base-300 px-6 py-6">
           <div
             class="flex items-center gap-4"
             :class="{ 'justify-center': sidebarCollapsed }"
           >
             <img
-              class="size-14 rounded-box bg-white/10 p-2"
+              class="size-14 rounded-box bg-primary/10 p-2"
               src="/logo.svg"
               alt="Bell System logo"
             />
-            <div v-if="!sidebarCollapsed" class="space-y-1">
-              <p
-                class="text-xs font-semibold uppercase tracking-[0.24em] text-primary-content/70"
-              >
-                Workspace
-              </p>
-              <h2 class="font-display text-xl font-semibold">
-                Admin Control Surface
-              </h2>
-              <p class="text-sm text-neutral-content/70">
-                Vue, Pinia, Vue Query, DaisyUI
-              </p>
-            </div>
           </div>
         </div>
 
         <nav class="flex-1 px-4 py-5">
-          <ul class="menu gap-2">
+          <ul class="menu w-full gap-2">
             <li v-for="item in navigationItems" :key="item.label">
               <RouterLink
-                class="flex items-center gap-3 rounded-box px-4 py-3 text-sm font-medium"
+                class="flex w-full items-center gap-3 rounded-box px-4 py-3 text-sm font-medium"
                 :class="{ 'justify-center px-3': sidebarCollapsed }"
-                active-class="active bg-white/10 text-white"
+                active-class="active"
                 :to="item.to"
                 :title="sidebarCollapsed ? item.label : undefined"
               >
@@ -384,19 +371,6 @@ async function handleLogout() {
             </li>
           </ul>
         </nav>
-
-        <div
-          v-if="!sidebarCollapsed"
-          class="border-t border-white/10 px-6 py-5 text-sm text-neutral-content/70"
-        >
-          <p class="font-medium text-neutral-content">
-            Next implementation blocks
-          </p>
-          <p class="mt-2 leading-6">
-            Replace placeholder auth with live endpoints, wire dashboard
-            queries, and connect Regle forms to the CRUD feature flows.
-          </p>
-        </div>
       </aside>
     </div>
   </div>
