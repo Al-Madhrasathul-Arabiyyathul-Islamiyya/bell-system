@@ -319,7 +319,7 @@ async function handleLogout() {
           <span class="font-semibold">{{ appEnv.apiBaseUrl }}</span>
           and
           <span class="font-semibold">{{ appEnv.wsBaseUrl }}</span
-          >. Connected clients:
+          >Connected clients:
           <span class="font-semibold">{{
             realtimeStore.connectedClients.length
           }}</span>
