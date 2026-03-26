@@ -1,7 +1,7 @@
 import { adaptJsonApiCollection } from "../jsonapi/adapters";
+import { appEnv } from "../env";
 import {
   apiBinary,
-  apiJson,
   apiJsonApiCollection,
   apiJsonApiDocument,
   apiJsonApiWrite,
@@ -47,6 +47,12 @@ export type AudioUpdatePayload = {
   };
 };
 
+export type AudioChecksumVm = {
+  checksum: string;
+  fileType: AudioFileType;
+  id: string;
+};
+
 export async function listAudioFiles(params: AudioListParams = {}) {
   const document = await apiJsonApiCollection<AudioAttributes>("/audio", {
     query: {
@@ -60,7 +66,7 @@ export async function listAudioFiles(params: AudioListParams = {}) {
 
   return adaptJsonApiCollection(document, (resource) => ({
     checksum: resource.attributes.checksum,
-    contentUrl: `/api/v1/audio/${resource.id}/content`,
+    contentUrl: toAudioContentUrl(resource.id),
     createdAt: resource.attributes.createdAt,
     fileType: resource.attributes.fileType,
     id: resource.id,
@@ -74,7 +80,7 @@ export async function getAudioFile(id: string) {
 
   return {
     checksum: document.data.attributes.checksum,
-    contentUrl: `/api/v1/audio/${id}/content`,
+    contentUrl: toAudioContentUrl(id),
     createdAt: document.data.attributes.createdAt,
     fileType: document.data.attributes.fileType,
     id: document.data.id,
@@ -84,7 +90,16 @@ export async function getAudioFile(id: string) {
 }
 
 export async function getAudioChecksums() {
-  return apiJson<Record<string, string>>("/audio/checksums");
+  const document = await apiJsonApiCollection<{
+    checksum: string;
+    fileType: AudioFileType;
+  }>("/audio/checksums");
+
+  return adaptJsonApiCollection(document, (resource) => ({
+    checksum: resource.attributes.checksum,
+    fileType: resource.attributes.fileType,
+    id: resource.id,
+  }));
 }
 
 export async function uploadAudio(payload: FormData) {
@@ -109,4 +124,8 @@ export async function deleteAudio(id: string) {
 
 export async function getAudioContent(id: string) {
   return apiBinary(`/audio/${id}/content`);
+}
+
+function toAudioContentUrl(id: string) {
+  return `${appEnv.apiBaseUrl}/audio/${id}/content`;
 }
