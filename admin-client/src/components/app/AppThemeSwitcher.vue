@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, useTemplateRef } from "vue";
+import { computed } from "vue";
 import { Icon } from "@iconify/vue";
 import { usePreferencesStore } from "../../stores/preferences";
 import type { ThemePreference } from "../../stores/preferences";
+import { useDropdown } from "../../composables/useDropdown";
 
 withDefaults(
   defineProps<{
@@ -14,13 +15,10 @@ withDefaults(
 );
 
 const preferencesStore = usePreferencesStore();
-const trigger = useTemplateRef<HTMLDivElement>("trigger");
+const { open, toggle, close } = useDropdown();
 
 const themeLabel = computed(() => {
-  if (preferencesStore.themePreference === "system") {
-    return "System";
-  }
-
+  if (preferencesStore.themePreference === "system") return "System";
   return preferencesStore.themePreference === "dark" ? "Dark" : "Light";
 });
 
@@ -36,28 +34,32 @@ const themeIcon = computed(() => {
 
 function setTheme(theme: ThemePreference) {
   preferencesStore.themePreference = theme;
-  trigger.value?.blur();
+  close();
 }
 </script>
 
 <template>
-  <div class="dropdown dropdown-end">
+  <div class="dropdown dropdown-end" :class="{ 'dropdown-open': open }">
     <div
-      ref="trigger"
+      ref="triggerRef"
       tabindex="0"
       role="button"
       class="btn btn-ghost"
       :class="iconOnly ? 'btn-circle' : 'gap-2 px-3'"
       aria-label="Theme switcher"
+      @click="toggle"
     >
       <Icon :icon="themeIcon" class="text-xl" />
       <span v-if="!iconOnly" class="hidden text-sm font-medium sm:inline">
         {{ themeLabel }}
       </span>
     </div>
+
     <ul
-      class="menu dropdown-content z-[70] mt-3 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl"
-      tabindex="-1"
+      v-show="open"
+      ref="dropdownRef"
+      class="menu absolute right-0 z-70 mt-3 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl"
+      @click.stop
     >
       <li>
         <button type="button" @click="setTheme('system')">System</button>
