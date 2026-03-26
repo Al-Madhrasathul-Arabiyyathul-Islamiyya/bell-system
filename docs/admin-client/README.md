@@ -13,7 +13,9 @@ This folder defines the target implementation for the `admin-client` frontend.
 
 ## Current Project State
 
-- `admin-client/` now has the initial app shell, routing, persisted theme/auth placeholders, and the base Tailwind + DaisyUI pipeline.
+- `admin-client/` now has the app shell, routing, persisted theme/auth state, centralized toasts, and the base Tailwind + DaisyUI pipeline.
+- Users management and System controls are now wired to the live backend APIs.
+- `/users` is gated to the `admin` role, while the shared shell route stays aligned with the backend's authenticated-route behavior.
 - Backend API contracts live in `docs/api/openapi/` and are partially aligned with the Go implementation.
 - The frontend should be implemented as a Vue 3 SPA using VueUse helpers and DaisyUI theming.
 
@@ -45,3 +47,9 @@ This folder defines the target implementation for the `admin-client` frontend.
 - System controls
 - WebSocket-driven live refresh
 - Production-ready container build for `admin-client/`
+
+## Implemented So Far
+
+- App shell, auth flow, route guards, theme switching, and toast notifications
+- Users page with paginated CRUD UI and admin-role route gating
+- System page with state controls, cancel-next-bell confirmation, and change-password flow

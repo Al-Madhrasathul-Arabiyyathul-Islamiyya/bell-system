@@ -1,19 +1,25 @@
 <script setup lang="ts">
+import { Icon } from "@iconify/vue";
+
 defineProps<{
   description: string;
+  icon?: string;
   title: string;
   value: string;
 }>();
 </script>
 
 <template>
-  <article class="card bg-base-100 shadow-sm">
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
     <div class="card-body gap-2">
-      <p
-        class="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50"
-      >
-        {{ title }}
-      </p>
+      <div class="flex items-start justify-between gap-3">
+        <p
+          class="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50"
+        >
+          {{ title }}
+        </p>
+        <Icon v-if="icon" :icon="icon" class="text-2xl text-primary/80" />
+      </div>
       <p class="text-3xl font-semibold text-base-content">
         {{ value }}
       </p>

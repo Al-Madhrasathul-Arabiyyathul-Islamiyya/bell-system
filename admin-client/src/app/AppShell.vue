@@ -58,6 +58,7 @@ const navigationItems = [
   {
     icon: "solar:users-group-rounded-bold-duotone",
     label: "Users",
+    requiresAdmin: true,
     to: { name: "users" },
   },
   {
@@ -66,6 +67,14 @@ const navigationItems = [
     to: { name: "system" },
   },
 ] as const;
+
+const visibleNavigationItems = computed(() => {
+  return navigationItems.filter((item) => {
+    return (
+      !("requiresAdmin" in item) || !item.requiresAdmin || authStore.isAdmin
+    );
+  });
+});
 
 const pageTitle = computed(() => {
   const routeTitle =
@@ -286,7 +295,7 @@ async function handleLogout() {
         >
           <nav class="flex-1 px-4 py-5">
             <ul class="menu w-full gap-2">
-              <li v-for="item in navigationItems" :key="item.label">
+              <li v-for="item in visibleNavigationItems" :key="item.label">
                 <RouterLink
                   v-slot="{ href, isActive, navigate }"
                   custom
