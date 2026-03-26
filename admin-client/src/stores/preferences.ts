@@ -1,33 +1,35 @@
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { defineStore } from "pinia";
-import { useColorMode } from "@vueuse/core";
+import { usePreferredDark, useStorage } from "@vueuse/core";
 
-type AppTheme = "light" | "dark";
+type ThemePreference = "system" | "light" | "dark";
+type ResolvedTheme = "light" | "dark";
 
 export const usePreferencesStore = defineStore("preferences", () => {
-  const colorMode = useColorMode<AppTheme>({
-    attribute: "data-theme",
-    emitAuto: false,
-    initialValue: "light",
-    modes: {
-      dark: "dark",
-      light: "light",
-    },
+  const preferredDark = usePreferredDark();
+  const themePreference = useStorage<ThemePreference>(
+    "bell-system-theme",
+    "system",
+  );
+
+  const resolvedTheme = computed<ResolvedTheme>(() => {
+    if (themePreference.value === "system") {
+      return preferredDark.value ? "dark" : "light";
+    }
+
+    return themePreference.value;
   });
 
-  const theme = computed<AppTheme>({
-    get: () => (colorMode.value === "dark" ? "dark" : "light"),
-    set: (value) => {
-      colorMode.value = value;
+  watch(
+    resolvedTheme,
+    (theme) => {
+      document.documentElement.setAttribute("data-theme", theme);
     },
-  });
-
-  function toggleTheme() {
-    theme.value = theme.value === "light" ? "dark" : "light";
-  }
+    { immediate: true },
+  );
 
   return {
-    theme,
-    toggleTheme,
+    resolvedTheme,
+    themePreference,
   };
 });

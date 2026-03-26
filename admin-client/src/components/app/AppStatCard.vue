@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <article class="card border border-base-300 bg-base-100 shadow-sm">
+  <article class="card bg-base-100 shadow-sm">
     <div class="card-body gap-2">
       <p
         class="text-xs font-semibold uppercase tracking-[0.2em] text-base-content/50"

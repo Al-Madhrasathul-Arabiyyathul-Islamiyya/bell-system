@@ -22,17 +22,21 @@ import { AppFeatureCard, AppPageHeader } from "./page-exports";
         ]"
       />
 
-      <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <article class="card bg-base-100 shadow-sm">
         <div class="card-body gap-3">
           <h2 class="card-title">Configured endpoints</h2>
-          <p class="text-sm text-base-content/70">REST base</p>
-          <code class="rounded-box bg-base-200 px-3 py-2 text-xs">{{
-            appEnv.apiBaseUrl
-          }}</code>
-          <p class="mt-2 text-sm text-base-content/70">WebSocket base</p>
-          <code class="rounded-box bg-base-200 px-3 py-2 text-xs">{{
-            appEnv.wsBaseUrl
-          }}</code>
+          <div class="space-y-2">
+            <p class="text-sm text-base-content/70">REST base</p>
+            <div class="mockup-code text-xs">
+              <pre><code>{{ appEnv.apiBaseUrl }}</code></pre>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <p class="text-sm text-base-content/70">WebSocket base</p>
+            <div class="mockup-code text-xs">
+              <pre><code>{{ appEnv.wsBaseUrl }}</code></pre>
+            </div>
+          </div>
         </div>
       </article>
     </div>

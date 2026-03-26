@@ -173,20 +173,57 @@ function handleLogout() {
             >
               {{ formattedTime }}
             </span>
-            <button
-              class="btn btn-ghost btn-square"
-              type="button"
-              @click="preferencesStore.toggleTheme"
-            >
-              <Icon
-                :icon="
-                  preferencesStore.theme === 'light'
-                    ? 'solar:moon-stars-bold-duotone'
-                    : 'solar:sun-bold-duotone'
-                "
-                class="text-xl"
-              />
-            </button>
+            <div class="dropdown dropdown-end">
+              <button class="btn btn-ghost gap-2 px-3" type="button">
+                <Icon
+                  :icon="
+                    preferencesStore.themePreference === 'system'
+                      ? 'solar:monitor-bold-duotone'
+                      : preferencesStore.resolvedTheme === 'dark'
+                        ? 'solar:moon-stars-bold-duotone'
+                        : 'solar:sun-bold-duotone'
+                  "
+                  class="text-xl"
+                />
+                <span class="hidden text-sm font-medium sm:inline">
+                  {{
+                    preferencesStore.themePreference === "system"
+                      ? "System"
+                      : preferencesStore.themePreference === "dark"
+                        ? "Dark"
+                        : "Light"
+                  }}
+                </span>
+              </button>
+              <ul
+                class="menu dropdown-content z-10 mt-3 w-40 rounded-box bg-base-100 p-2 shadow"
+              >
+                <li>
+                  <button
+                    type="button"
+                    @click="preferencesStore.themePreference = 'system'"
+                  >
+                    System
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    @click="preferencesStore.themePreference = 'light'"
+                  >
+                    Light
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    @click="preferencesStore.themePreference = 'dark'"
+                  >
+                    Dark
+                  </button>
+                </li>
+              </ul>
+            </div>
             <div class="dropdown dropdown-end">
               <button class="btn btn-ghost gap-2 px-3" type="button">
                 <span class="hidden text-sm font-medium sm:inline">
@@ -195,7 +232,7 @@ function handleLogout() {
                 <Icon icon="solar:user-circle-bold-duotone" class="text-2xl" />
               </button>
               <ul
-                class="menu dropdown-content z-10 mt-3 w-56 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl"
+                class="menu dropdown-content z-10 mt-3 w-56 rounded-box bg-base-100 p-2 shadow"
               >
                 <li
                   class="menu-title text-xs uppercase tracking-[0.2em] text-base-content/50"
@@ -221,15 +258,13 @@ function handleLogout() {
       <main
         class="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
       >
-        <div
-          class="rounded-box border border-primary/15 bg-primary/8 px-4 py-3 text-sm leading-6 text-base-content/80"
-        >
+        <div class="alert alert-info shadow-sm text-sm leading-6">
           API transport, query composables, persisted auth state, and realtime
           socket foundations are now in place. Base URLs are preconfigured as
           <span class="font-semibold">{{ appEnv.apiBaseUrl }}</span>
           and
           <span class="font-semibold">{{ appEnv.wsBaseUrl }}</span
-          >. Connected clients:
+          >Connected clients:
           <span class="font-semibold">{{
             realtimeStore.connectedClients.length
           }}</span>

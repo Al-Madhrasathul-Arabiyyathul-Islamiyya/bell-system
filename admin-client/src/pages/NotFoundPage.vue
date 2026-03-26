@@ -8,9 +8,7 @@ useTitle(`Not Found • ${appEnv.appName}`);
 
 <template>
   <main class="flex min-h-screen items-center justify-center bg-base-200 px-4">
-    <article
-      class="card w-full max-w-xl border border-base-300 bg-base-100 shadow-xl"
-    >
+    <article class="card w-full max-w-xl bg-base-100 shadow-2xl">
       <div class="card-body gap-4">
         <p
           class="text-xs font-semibold uppercase tracking-[0.24em] text-primary"
