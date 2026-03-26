@@ -1,3 +1,4 @@
+import { toValue, type MaybeRefOrGetter } from "vue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   deleteAudio,
@@ -12,10 +13,12 @@ import {
 } from "../../../lib/api/audio";
 import { queryKeys } from "../../../lib/api/query-keys";
 
-export function useAudioFilesQuery(params: AudioListParams = {}) {
+export function useAudioFilesQuery(
+  params: MaybeRefOrGetter<AudioListParams> = {},
+) {
   return useQuery({
-    queryFn: () => listAudioFiles(params),
-    queryKey: queryKeys.audio(params),
+    queryFn: () => listAudioFiles(toValue(params)),
+    queryKey: queryKeys.audio(toValue(params)),
   });
 }
 
@@ -40,7 +43,7 @@ export function useUploadAudioMutation() {
   return useMutation({
     mutationFn: (payload: FormData) => uploadAudio(payload),
     onSuccess() {
-      queryClient.invalidateQueries({ queryKey: queryKeys.audio() });
+      queryClient.invalidateQueries({ queryKey: ["audio"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.audioChecksums() });
     },
   });
@@ -58,7 +61,7 @@ export function useUpdateAudioMutation() {
       payload: AudioUpdatePayload;
     }) => updateAudio(id, payload),
     onSuccess(_, variables) {
-      queryClient.invalidateQueries({ queryKey: queryKeys.audio() });
+      queryClient.invalidateQueries({ queryKey: ["audio"] });
       queryClient.invalidateQueries({
         queryKey: [...queryKeys.audio(), "detail", variables.id] as const,
       });
@@ -72,7 +75,7 @@ export function useDeleteAudioMutation() {
   return useMutation({
     mutationFn: (id: string) => deleteAudio(id),
     onSuccess() {
-      queryClient.invalidateQueries({ queryKey: queryKeys.audio() });
+      queryClient.invalidateQueries({ queryKey: ["audio"] });
       queryClient.invalidateQueries({ queryKey: queryKeys.audioChecksums() });
     },
   });

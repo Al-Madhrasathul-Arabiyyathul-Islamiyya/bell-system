@@ -260,15 +260,15 @@ async function handleLogout() {
         aria-label="Navigation"
       />
 
-      <div class="drawer-content min-h-0 overflow-y-auto bg-base-200">
+      <div class="drawer-content h-full min-h-0 overflow-y-auto bg-base-200">
         <main
-          class="flex min-h-full w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
+          class="flex min-h-0 w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
         >
           <RouterView />
         </main>
       </div>
 
-      <div class="drawer-side z-30">
+      <div class="drawer-side z-30 h-full min-h-0">
         <label
           class="drawer-overlay"
           aria-label="Close navigation"
