@@ -12,7 +12,9 @@ import {
 
 type SocketMessage =
   | {
-      clients?: ConnectedClient[];
+      payload?: {
+        clients?: ConnectedClient[];
+      };
       type: "connected_clients";
     }
   | {
@@ -49,11 +51,14 @@ export function useBellSystemSocket() {
   const authStore = useAuthStore();
   const realtimeStore = useRealtimeStore();
   const queryClient = useQueryClient();
+  const clientType = computed(() => {
+    return authStore.isAdmin ? "admin" : "client";
+  });
 
   const socketUrl = computed(() => {
     const url = new URL(appEnv.wsBaseUrl);
     url.searchParams.set("client_name", "admin-client");
-    url.searchParams.set("client_type", "admin");
+    url.searchParams.set("client_type", clientType.value);
 
     if (authStore.token) {
       url.searchParams.set("token", authStore.token);
@@ -88,9 +93,7 @@ export function useBellSystemSocket() {
       realtimeStore.setLastEvent(message.type);
 
       if (message.type === "connected_clients") {
-        realtimeStore.setConnectedClients(
-          Array.isArray(message.clients) ? message.clients : [],
-        );
+        realtimeStore.setConnectedClients(readConnectedClients(message));
         return;
       }
 
@@ -135,4 +138,11 @@ function parseSocketMessage(data: string): null | SocketMessage {
   } catch {
     return null;
   }
+}
+
+function readConnectedClients(message: SocketMessage) {
+  const payload = (message as { payload?: { clients?: ConnectedClient[] } })
+    .payload;
+
+  return Array.isArray(payload?.clients) ? payload.clients : [];
 }
