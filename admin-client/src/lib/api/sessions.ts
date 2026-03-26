@@ -1,5 +1,12 @@
-import { apiJson, apiJsonApiCollection, apiJsonApiWrite } from "./client";
-import { adaptJsonApiCollection } from "../jsonapi/adapters";
+import {
+  apiJsonApiCollection,
+  apiJsonApiDocument,
+  apiJsonApiWrite,
+} from "./client";
+import {
+  adaptJsonApiCollection,
+  adaptJsonApiResource,
+} from "../jsonapi/adapters";
 import type { JsonApiCollectionDocument, JsonApiDocument } from "./types";
 
 export type SessionAttributes = {
@@ -13,13 +20,6 @@ export type SessionVm = {
   id: string;
   name: string;
   startTime: string;
-};
-
-export type CurrentSessionResponse = {
-  endTime: string | null;
-  id: string | null;
-  name: string | null;
-  startTime: string | null;
 };
 
 export type SessionWritePayload = {
@@ -36,7 +36,10 @@ export async function listSessions() {
 }
 
 export async function getCurrentSession() {
-  return apiJson<CurrentSessionResponse>("/sessions/current");
+  const document =
+    await apiJsonApiDocument<SessionAttributes>("/sessions/current");
+
+  return adaptJsonApiResource(document, mapSessionResource);
 }
 
 export async function createSession(payload: SessionWritePayload) {
