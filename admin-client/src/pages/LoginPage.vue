@@ -15,7 +15,7 @@ const authStore = useAuthStore();
 const toastStore = useToastStore();
 const loginMutation = useLoginMutation();
 
-const email = ref("");
+const username = ref("");
 const password = ref("");
 
 useTitle(`Login • ${appEnv.appName}`);
@@ -37,7 +37,7 @@ const loginError = computed(() => {
 async function handleLogin() {
   await loginMutation.mutateAsync({
     password: password.value,
-    username: email.value,
+    username: username.value,
   });
 
   if (!authStore.isAdmin) {
@@ -86,13 +86,13 @@ async function handleLogin() {
             </div>
 
             <fieldset class="fieldset">
-              <legend class="fieldset-legend">Email</legend>
+              <legend class="fieldset-legend">Username</legend>
               <input
-                v-model="email"
+                v-model="username"
                 class="input w-full"
                 :disabled="loginMutation.isPending.value"
-                placeholder="admin@example.com"
-                type="email"
+                placeholder="admin"
+                type="text"
               />
               <legend class="fieldset-legend">Password</legend>
               <input
