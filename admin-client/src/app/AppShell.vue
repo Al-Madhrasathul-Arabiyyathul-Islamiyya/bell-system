@@ -264,17 +264,6 @@ async function handleLogout() {
         <main
           class="flex h-full w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:py-8"
         >
-          <div class="alert alert-info shadow-sm text-sm leading-6">
-            API transport, query composables, persisted auth state, and realtime
-            socket foundations are now in place. Base URLs are preconfigured as
-            <span class="font-semibold">{{ appEnv.apiBaseUrl }}</span>
-            and
-            <span class="font-semibold">{{ appEnv.wsBaseUrl }}</span
-            >. Connected clients:
-            <span class="font-semibold">{{
-              realtimeStore.connectedClients.length
-            }}</span>
-          </div>
           <RouterView />
         </main>
       </div>
