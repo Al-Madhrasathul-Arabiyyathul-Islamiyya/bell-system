@@ -6,13 +6,9 @@ import AppThemeSwitcher from "../components/app/AppThemeSwitcher.vue";
 import { getUserFacingError } from "../lib/api/errors";
 import { appEnv } from "../lib/env";
 import { useLoginMutation } from "../features/auth/composables/use-auth";
-import { useAuthStore } from "../stores/auth";
-import { useToastStore } from "../stores/toast";
 
 const route = useRoute();
 const router = useRouter();
-const authStore = useAuthStore();
-const toastStore = useToastStore();
 const loginMutation = useLoginMutation();
 
 const username = ref("");
@@ -39,16 +35,6 @@ async function handleLogin() {
     password: password.value,
     username: username.value,
   });
-
-  if (!authStore.isAdmin) {
-    authStore.clearAuth();
-    toastStore.enqueue({
-      detail: "This admin client only allows administrator accounts.",
-      title: "Access Denied",
-      tone: "error",
-    });
-    return;
-  }
 
   await router.push(redirectTarget.value);
 }

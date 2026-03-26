@@ -1,3 +1,4 @@
+import { toValue, type MaybeRefOrGetter } from "vue";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/vue-query";
 import {
   createScheduleItem,
@@ -10,10 +11,12 @@ import {
 } from "../../../lib/api/schedule";
 import { queryKeys } from "../../../lib/api/query-keys";
 
-export function useScheduleItemsQuery(params: ScheduleListParams = {}) {
+export function useScheduleItemsQuery(
+  params: MaybeRefOrGetter<ScheduleListParams> = {},
+) {
   return useQuery({
-    queryFn: () => listScheduleItems(params),
-    queryKey: queryKeys.schedule(params),
+    queryFn: () => listScheduleItems(toValue(params)),
+    queryKey: queryKeys.schedule(toValue(params)),
   });
 }
 
