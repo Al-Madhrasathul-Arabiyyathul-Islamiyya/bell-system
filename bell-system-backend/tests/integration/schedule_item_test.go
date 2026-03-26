@@ -82,6 +82,7 @@ func TestScheduleItemCRUD(t *testing.T) {
 	require.NotEmpty(t, itemID)
 	attrs := doc.Data.Attributes.(map[string]any)
 	assert.Equal(t, "First Bell", attrs["name"])
+	assert.Equal(t, "07:00", attrs["time"])
 
 	// Get by ID — should include relations
 	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, token)
@@ -95,6 +96,7 @@ func TestScheduleItemCRUD(t *testing.T) {
 	doc = readDocument(t, resp)
 	attrs = doc.Data.Attributes.(map[string]any)
 	assert.Equal(t, "First Bell", attrs["name"])
+	assert.Equal(t, "07:00", attrs["time"])
 
 	// Verify days are present
 	days, ok := attrs["days"].([]any)
@@ -107,15 +109,28 @@ func TestScheduleItemCRUD(t *testing.T) {
 
 	col := readCollection(t, resp)
 	assert.GreaterOrEqual(t, col.Meta["total"].(float64), float64(1))
+	foundCreatedItem := false
+	for _, item := range col.Data {
+		if item.ID != itemID {
+			continue
+		}
+
+		foundCreatedItem = true
+		listAttrs := item.Attributes.(map[string]any)
+		assert.Equal(t, "07:00", listAttrs["time"])
+		break
+	}
+	assert.True(t, foundCreatedItem, "expected created schedule item in collection")
 
 	// Update
-	updateBody := `{"data":{"type":"schedule-items","attributes":{"name":"Updated Bell"}}}`
+	updateBody := `{"data":{"type":"schedule-items","attributes":{"name":"Updated Bell","time":"07:15"}}}`
 	resp = doJSONAPIRequest(t, http.MethodPut, "/api/v1/schedule/"+itemID, bytes.NewBufferString(updateBody), token)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	doc = readDocument(t, resp)
 	attrs = doc.Data.Attributes.(map[string]any)
 	assert.Equal(t, "Updated Bell", attrs["name"])
+	assert.Equal(t, "07:15", attrs["time"])
 
 	// Delete
 	resp = doRequest(t, http.MethodDelete, "/api/v1/schedule/"+itemID, nil, token)
@@ -126,6 +141,65 @@ func TestScheduleItemCRUD(t *testing.T) {
 	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, token)
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 	resp.Body.Close()
+}
+
+func TestScheduleItem_TimePersistenceRoundTrip(t *testing.T) {
+	cleanAndSeed(t)
+	token := adminToken(t)
+
+	soundID := createTestAudioFile(t, token)
+	sessionID := getSessionID(t, token)
+
+	createBody := fmt.Sprintf(
+		`{"data":{"type":"schedule-items","attributes":{"name":"Time Persistence Bell","time":"13:25","days":[2,3,4]},"relationships":{"sound":{"data":{"type":"audio-files","id":"%s"}},"session":{"data":{"type":"sessions","id":"%s"}}}}}`,
+		soundID, sessionID,
+	)
+	resp := doJSONAPIRequest(t, http.MethodPost, "/api/v1/schedule", bytes.NewBufferString(createBody), token)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	doc := readDocument(t, resp)
+	itemID := doc.Data.ID
+	attrs := doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "13:25", attrs["time"])
+
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "13:25", attrs["time"])
+
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule?filter[sessionId]="+sessionID, nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	col := readCollection(t, resp)
+	found := false
+	for _, item := range col.Data {
+		if item.ID != itemID {
+			continue
+		}
+
+		found = true
+		listAttrs := item.Attributes.(map[string]any)
+		assert.Equal(t, "13:25", listAttrs["time"])
+		break
+	}
+	assert.True(t, found, "expected time persistence item in filtered schedule list")
+
+	updateBody := `{"data":{"type":"schedule-items","attributes":{"time":"13:40"}}}`
+	resp = doJSONAPIRequest(t, http.MethodPut, "/api/v1/schedule/"+itemID, bytes.NewBufferString(updateBody), token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "13:40", attrs["time"])
+
+	resp = doRequest(t, http.MethodGet, "/api/v1/schedule/"+itemID, nil, token)
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	doc = readDocument(t, resp)
+	attrs = doc.Data.Attributes.(map[string]any)
+	assert.Equal(t, "13:40", attrs["time"])
 }
 
 func TestScheduleItem_InvalidDays(t *testing.T) {
