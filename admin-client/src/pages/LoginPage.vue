@@ -2,17 +2,17 @@
 import { computed, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useTitle } from "@vueuse/core";
-import { Icon } from "@iconify/vue";
-import { getPrimaryError } from "../lib/api/errors";
+import AppThemeSwitcher from "../components/app/AppThemeSwitcher.vue";
+import { getUserFacingError } from "../lib/api/errors";
 import { appEnv } from "../lib/env";
 import { useLoginMutation } from "../features/auth/composables/use-auth";
 import { useAuthStore } from "../stores/auth";
-import { usePreferencesStore } from "../stores/preferences";
+import { useToastStore } from "../stores/toast";
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
-const preferencesStore = usePreferencesStore();
+const toastStore = useToastStore();
 const loginMutation = useLoginMutation();
 
 const email = ref("");
@@ -26,20 +26,12 @@ const redirectTarget = computed(() => {
     : "/dashboard";
 });
 
-const routeError = computed(() => {
-  if (route.query.error === "admin-only") {
-    return "This admin client only allows administrator accounts.";
-  }
-
-  return null;
-});
-
 const loginError = computed(() => {
   if (!loginMutation.error.value) {
     return null;
   }
 
-  return getPrimaryError(loginMutation.error.value).detail;
+  return getUserFacingError(loginMutation.error.value).detail;
 });
 
 async function handleLogin() {
@@ -50,6 +42,11 @@ async function handleLogin() {
 
   if (!authStore.isAdmin) {
     authStore.clearAuth();
+    toastStore.enqueue({
+      detail: "This admin client only allows administrator accounts.",
+      title: "Access Denied",
+      tone: "error",
+    });
     return;
   }
 
@@ -60,48 +57,7 @@ async function handleLogin() {
 <template>
   <main class="login-shell">
     <div class="mx-auto flex w-full max-w-6xl justify-end px-2">
-      <div class="dropdown dropdown-end">
-        <button class="btn btn-ghost btn-circle" type="button">
-          <Icon
-            :icon="
-              preferencesStore.themePreference === 'system'
-                ? 'solar:monitor-bold-duotone'
-                : preferencesStore.resolvedTheme === 'dark'
-                  ? 'solar:moon-stars-bold-duotone'
-                  : 'solar:sun-bold-duotone'
-            "
-            class="text-xl"
-          />
-        </button>
-        <ul
-          class="menu dropdown-content z-10 mt-3 w-40 rounded-box bg-base-100 p-2 shadow"
-        >
-          <li>
-            <button
-              type="button"
-              @click="preferencesStore.themePreference = 'system'"
-            >
-              System
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              @click="preferencesStore.themePreference = 'light'"
-            >
-              Light
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              @click="preferencesStore.themePreference = 'dark'"
-            >
-              Dark
-            </button>
-          </li>
-        </ul>
-      </div>
+      <AppThemeSwitcher icon-only />
     </div>
 
     <section class="login-panel pt-4">
@@ -122,11 +78,11 @@ async function handleLogin() {
 
           <div class="space-y-5">
             <div
-              v-if="routeError || loginError"
+              v-if="loginError"
               class="alert alert-error text-sm"
               role="alert"
             >
-              {{ routeError || loginError }}
+              {{ loginError }}
             </div>
 
             <fieldset class="fieldset">

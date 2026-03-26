@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { useStorage } from "@vueuse/core";
 
 export const useAppShellStore = defineStore("app-shell", () => {
-  const sidebarPinned = useStorage("bell-admin-sidebar-pinned", true);
+  const sidebarCollapsed = useStorage("bell-admin-sidebar-collapsed", false);
   const mobileMenuOpen = useStorage("bell-admin-mobile-menu-open", false);
 
   function closeMobileMenu() {
@@ -13,20 +13,20 @@ export const useAppShellStore = defineStore("app-shell", () => {
     mobileMenuOpen.value = true;
   }
 
-  function setSidebarPinned(value: boolean) {
-    sidebarPinned.value = value;
+  function setSidebarCollapsed(value: boolean) {
+    sidebarCollapsed.value = value;
   }
 
-  function toggleSidebarPinned() {
-    sidebarPinned.value = !sidebarPinned.value;
+  function toggleSidebarCollapsed() {
+    sidebarCollapsed.value = !sidebarCollapsed.value;
   }
 
   return {
     closeMobileMenu,
     mobileMenuOpen,
     openMobileMenu,
-    setSidebarPinned,
-    sidebarPinned,
-    toggleSidebarPinned,
+    setSidebarCollapsed,
+    sidebarCollapsed,
+    toggleSidebarCollapsed,
   };
 });
