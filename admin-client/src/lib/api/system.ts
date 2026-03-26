@@ -17,12 +17,12 @@ export type UpdateSystemStatePayload = {
 
 export async function getSystemState() {
   const document = await apiJsonApiDocument<{
+    lastUpdated: string;
     state: SystemStateVm["state"];
-    updatedAt: string;
   }>("/system/state");
 
   return adaptJsonApiResource(document, (resource) => ({
-    lastUpdated: resource.attributes.updatedAt,
+    lastUpdated: resource.attributes.lastUpdated,
     state: resource.attributes.state,
   }));
 }

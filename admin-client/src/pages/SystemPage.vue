@@ -12,9 +12,11 @@ import {
 } from "../features/system/composables/use-system";
 import { getUserFacingError } from "../lib/api/errors";
 import type { SystemStateVm } from "../lib/api/system";
+import { useAuthStore } from "../stores/auth";
 import { useRealtimeStore } from "../stores/realtime";
 import { useToastStore } from "../stores/toast";
 
+const authStore = useAuthStore();
 const toastStore = useToastStore();
 const realtimeStore = useRealtimeStore();
 
@@ -31,6 +33,7 @@ const cancelNextBellMutation = useCancelNextBellMutation();
 const changePasswordMutation = useChangePasswordMutation();
 
 const systemState = computed(() => systemStateQuery.data.value ?? null);
+const showConnectedClients = computed(() => authStore.isAdmin);
 const systemError = computed(() => {
   if (!systemStateQuery.error.value) {
     return null;
@@ -127,7 +130,10 @@ async function handleChangePassword(payload: {
       description="Control bell playback, review current connection health, and manage the password for the current signed-in account."
     />
 
-    <div class="grid gap-4 xl:grid-cols-3">
+    <div
+      class="grid gap-4"
+      :class="showConnectedClients ? 'xl:grid-cols-3' : 'xl:grid-cols-2'"
+    >
       <AppStatCard
         title="System State"
         icon="solar:settings-bold-duotone"
@@ -147,6 +153,7 @@ async function handleChangePassword(payload: {
         description="Realtime admin websocket connection health."
       />
       <AppStatCard
+        v-if="showConnectedClients"
         title="Connected Clients"
         icon="solar:devices-bold-duotone"
         :value="String(realtimeStore.connectedClients.length)"
@@ -162,6 +169,7 @@ async function handleChangePassword(payload: {
       <SystemStateCard
         :state="systemState"
         :status="realtimeStore.socketStatus"
+        :show-connected-clients="showConnectedClients"
         :connected-clients="realtimeStore.connectedClients.length"
         :state-pending="updateSystemStateMutation.isPending.value"
         :cancel-pending="cancelNextBellMutation.isPending.value"

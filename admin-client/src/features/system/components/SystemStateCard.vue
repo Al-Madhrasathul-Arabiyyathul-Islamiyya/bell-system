@@ -8,6 +8,7 @@ const props = withDefaults(
   defineProps<{
     cancelPending?: boolean;
     connectedClients: number;
+    showConnectedClients?: boolean;
     state: null | SystemStateVm;
     statePending?: boolean;
     status: SocketStatus;
@@ -80,14 +81,17 @@ const socketBadgeClass = computed(() => {
         </div>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-3">
+      <div
+        class="grid gap-4"
+        :class="showConnectedClients ? 'md:grid-cols-3' : 'md:grid-cols-2'"
+      >
         <div class="rounded-box bg-base-200 p-4">
           <p class="text-sm text-base-content/65">Current state</p>
           <p class="mt-2 text-2xl font-semibold capitalize text-base-content">
             {{ state?.state ?? "Loading" }}
           </p>
         </div>
-        <div class="rounded-box bg-base-200 p-4">
+        <div v-if="showConnectedClients" class="rounded-box bg-base-200 p-4">
           <p class="text-sm text-base-content/65">Connected clients</p>
           <p class="mt-2 text-2xl font-semibold text-base-content">
             {{ connectedClients }}
