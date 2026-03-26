@@ -173,20 +173,57 @@ function handleLogout() {
             >
               {{ formattedTime }}
             </span>
-            <button
-              class="btn btn-ghost btn-square"
-              type="button"
-              @click="preferencesStore.toggleTheme"
-            >
-              <Icon
-                :icon="
-                  preferencesStore.theme === 'light'
-                    ? 'solar:moon-stars-bold-duotone'
-                    : 'solar:sun-bold-duotone'
-                "
-                class="text-xl"
-              />
-            </button>
+            <div class="dropdown dropdown-end">
+              <button class="btn btn-ghost gap-2 px-3" type="button">
+                <Icon
+                  :icon="
+                    preferencesStore.themePreference === 'system'
+                      ? 'solar:monitor-bold-duotone'
+                      : preferencesStore.resolvedTheme === 'dark'
+                        ? 'solar:moon-stars-bold-duotone'
+                        : 'solar:sun-bold-duotone'
+                  "
+                  class="text-xl"
+                />
+                <span class="hidden text-sm font-medium sm:inline">
+                  {{
+                    preferencesStore.themePreference === "system"
+                      ? "System"
+                      : preferencesStore.themePreference === "dark"
+                        ? "Dark"
+                        : "Light"
+                  }}
+                </span>
+              </button>
+              <ul
+                class="menu dropdown-content z-10 mt-3 w-40 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl"
+              >
+                <li>
+                  <button
+                    type="button"
+                    @click="preferencesStore.themePreference = 'system'"
+                  >
+                    System
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    @click="preferencesStore.themePreference = 'light'"
+                  >
+                    Light
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    @click="preferencesStore.themePreference = 'dark'"
+                  >
+                    Dark
+                  </button>
+                </li>
+              </ul>
+            </div>
             <div class="dropdown dropdown-end">
               <button class="btn btn-ghost gap-2 px-3" type="button">
                 <span class="hidden text-sm font-medium sm:inline">
