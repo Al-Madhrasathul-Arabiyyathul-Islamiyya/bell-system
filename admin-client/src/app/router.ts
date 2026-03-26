@@ -6,6 +6,7 @@ import {
 } from "vue-router";
 import { pinia } from "./pinia";
 import { useAuthStore } from "../stores/auth";
+import { useToastStore } from "../stores/toast";
 
 const routes: RouteRecordRaw[] = [
   {
@@ -107,6 +108,7 @@ export const router = createRouter({
 
 router.beforeEach((to) => {
   const authStore = useAuthStore(pinia);
+  const toastStore = useToastStore(pinia);
 
   if (requiresAuth(to) && !authStore.isAuthenticated) {
     return {
@@ -119,12 +121,14 @@ router.beforeEach((to) => {
 
   if (requiresAdmin(to) && authStore.isAuthenticated && !authStore.isAdmin) {
     authStore.clearAuth();
+    toastStore.enqueue({
+      detail: "This admin client only allows administrator accounts.",
+      title: "Access Denied",
+      tone: "error",
+    });
 
     return {
       name: "login",
-      query: {
-        error: "admin-only",
-      },
     };
   }
 

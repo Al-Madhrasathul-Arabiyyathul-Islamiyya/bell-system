@@ -10,22 +10,27 @@ import {
   useTitle,
 } from "@vueuse/core";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import { useLogoutMutation } from "../features/auth/composables/use-auth";
 import { useBellSystemSocket } from "../features/realtime/composables/use-bell-system-socket";
 import { appEnv } from "../lib/env";
 import { useAppShellStore } from "../stores/app-shell";
 import { useAuthStore } from "../stores/auth";
 import { usePreferencesStore } from "../stores/preferences";
 import { useRealtimeStore } from "../stores/realtime";
+import { useToastStore } from "../stores/toast";
 
 const route = useRoute();
 const router = useRouter();
 const appShellStore = useAppShellStore();
 const authStore = useAuthStore();
+const toastStore = useToastStore();
 const preferencesStore = usePreferencesStore();
 const realtimeStore = useRealtimeStore();
+const logoutMutation = useLogoutMutation();
 
 const online = useOnline();
 const now = useNow({ interval: 1_000 });
+const formattedDate = useDateFormat(now, "ddd, DD MMM YYYY");
 const formattedTime = useDateFormat(now, "HH:mm:ss");
 const breakpoints = useBreakpoints(breakpointsTailwind);
 const isDesktop = breakpoints.greaterOrEqual("lg");
@@ -73,6 +78,9 @@ const pageTitle = computed(() => {
 const drawerOpen = computed(
   () => isDesktop.value || appShellStore.mobileMenuOpen,
 );
+const sidebarCollapsed = computed(
+  () => isDesktop.value && appShellStore.sidebarCollapsed,
+);
 
 useBellSystemSocket();
 useTitle(pageTitle);
@@ -92,19 +100,37 @@ watch(isDesktop, (desktop) => {
   }
 });
 
-function openMobileMenu() {
-  if (!isDesktop.value) {
-    appShellStore.openMobileMenu();
+function toggleSidebar() {
+  if (isDesktop.value) {
+    appShellStore.toggleSidebarCollapsed();
+    return;
   }
+
+  if (appShellStore.mobileMenuOpen) {
+    appShellStore.closeMobileMenu();
+    return;
+  }
+
+  appShellStore.openMobileMenu();
 }
 
 function closeMobileMenu() {
   appShellStore.closeMobileMenu();
 }
 
-function handleLogout() {
-  authStore.logout();
-  router.push({ name: "login" });
+async function handleLogout() {
+  try {
+    await logoutMutation.mutateAsync();
+  } catch {
+    // Clear local auth and return to login even if the server logout call fails.
+  }
+
+  toastStore.enqueue({
+    detail: "You have been signed out of the admin client.",
+    title: "Signed Out",
+    tone: "success",
+  });
+  await router.push({ name: "login" });
 }
 </script>
 
@@ -125,21 +151,55 @@ function handleLogout() {
         <div class="navbar mx-auto max-w-7xl px-4 sm:px-6">
           <div class="navbar-start gap-3">
             <button
-              class="btn btn-ghost btn-square lg:hidden"
+              class="btn btn-ghost btn-square"
               type="button"
-              @click="openMobileMenu"
+              @click="toggleSidebar"
             >
-              <Icon icon="solar:hamburger-menu-outline" class="text-xl" />
+              <Icon
+                :icon="
+                  isDesktop
+                    ? sidebarCollapsed
+                      ? 'solar:alt-arrow-right-bold-duotone'
+                      : 'solar:alt-arrow-left-bold-duotone'
+                    : 'solar:hamburger-menu-outline'
+                "
+                class="text-xl"
+              />
             </button>
-            <div>
-              <p
-                class="text-xs font-semibold uppercase tracking-[0.24em] text-primary"
-              >
-                Bell System
+            <div class="flex items-center gap-3">
+              <img
+                class="size-11 rounded-box bg-primary/10 p-2"
+                src="/logo.svg"
+                alt="Bell System logo"
+              />
+              <div class="min-w-0">
+                <h1
+                  class="font-display text-lg font-semibold text-base-content"
+                >
+                  Arabiyya Bell System
+                </h1>
+                <p class="truncate text-sm text-base-content/60">
+                  Admin Client
+                </p>
+              </div>
+            </div>
+            <div class="hidden flex-col leading-tight md:flex">
+              <p class="text-sm font-semibold text-base-content/70">
+                {{ formattedDate }}
+                <span
+                  class="ml-2 text-xs font-medium uppercase tracking-[0.18em]"
+                >
+                  Local Time
+                </span>
               </p>
-              <h1 class="font-display text-lg font-semibold text-base-content">
-                Admin Client
-              </h1>
+              <p class="font-display text-2xl font-semibold text-base-content">
+                {{ formattedTime }}
+                <span
+                  class="ml-2 font-sans text-sm font-medium text-base-content/60"
+                >
+                  Local Time
+                </span>
+              </p>
             </div>
           </div>
 
@@ -167,11 +227,6 @@ function handleLogout() {
                 "
               />
               Socket {{ realtimeStore.socketStatus.toLowerCase() }}
-            </span>
-            <span
-              class="badge badge-outline hidden border-base-300 px-3 py-3 text-xs font-medium md:inline-flex"
-            >
-              {{ formattedTime }}
             </span>
             <div class="dropdown dropdown-end">
               <button class="btn btn-ghost gap-2 px-3" type="button">
@@ -264,7 +319,7 @@ function handleLogout() {
           <span class="font-semibold">{{ appEnv.apiBaseUrl }}</span>
           and
           <span class="font-semibold">{{ appEnv.wsBaseUrl }}</span
-          >Connected clients:
+          >. Connected clients:
           <span class="font-semibold">{{
             realtimeStore.connectedClients.length
           }}</span>
@@ -281,16 +336,23 @@ function handleLogout() {
       />
 
       <aside
-        class="flex min-h-full w-80 flex-col bg-neutral text-neutral-content"
+        class="flex min-h-full w-80 flex-col bg-neutral text-neutral-content transition-[width] duration-200 ease-out"
+        :class="{
+          'lg:w-24': sidebarCollapsed,
+          'lg:w-80': !sidebarCollapsed,
+        }"
       >
         <div class="border-b border-white/10 px-6 py-6">
-          <div class="flex items-center gap-4">
+          <div
+            class="flex items-center gap-4"
+            :class="{ 'justify-center': sidebarCollapsed }"
+          >
             <img
               class="size-14 rounded-box bg-white/10 p-2"
               src="/logo.svg"
               alt="Bell System logo"
             />
-            <div class="space-y-1">
+            <div v-if="!sidebarCollapsed" class="space-y-1">
               <p
                 class="text-xs font-semibold uppercase tracking-[0.24em] text-primary-content/70"
               >
@@ -311,17 +373,20 @@ function handleLogout() {
             <li v-for="item in navigationItems" :key="item.label">
               <RouterLink
                 class="flex items-center gap-3 rounded-box px-4 py-3 text-sm font-medium"
+                :class="{ 'justify-center px-3': sidebarCollapsed }"
                 active-class="active bg-white/10 text-white"
                 :to="item.to"
+                :title="sidebarCollapsed ? item.label : undefined"
               >
                 <Icon :icon="item.icon" class="text-xl" />
-                <span>{{ item.label }}</span>
+                <span v-if="!sidebarCollapsed">{{ item.label }}</span>
               </RouterLink>
             </li>
           </ul>
         </nav>
 
         <div
+          v-if="!sidebarCollapsed"
           class="border-t border-white/10 px-6 py-5 text-sm text-neutral-content/70"
         >
           <p class="font-medium text-neutral-content">
