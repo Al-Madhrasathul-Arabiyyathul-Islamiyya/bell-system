@@ -107,11 +107,11 @@ The workflow extracts the version directly from the pushed tag and uses it for:
 Examples:
 
 - pushing `backend/v1.0.0` creates a backend release and publishes:
-  - `ghcr.io/<repo>/backend:v1.0.0`
-  - `ghcr.io/<repo>/backend:latest`
+  - `ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/backend:v1.0.0`
+  - `ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/backend:latest`
 - pushing `admin/v1.0.0` creates an admin-client release and publishes:
-  - `ghcr.io/<repo>/admin:v1.0.0`
-  - `ghcr.io/<repo>/admin:latest`
+  - `ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/admin:v1.0.0`
+  - `ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/admin:latest`
 - pushing `desktop/v1.0.0` creates a desktop-client release with the packaged MSIX artifact
 
 Important:
