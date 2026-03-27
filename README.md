@@ -84,3 +84,37 @@ bell-system/
 ```
 
 Hooks are repo-wide and detect which components changed. Only runs checks relevant to the modified files (e.g. Go checks for backend changes, future ESLint for admin-client).
+
+## Release Versioning
+
+Releases are tag-driven through [release.yml](.github/workflows/release.yml).
+
+Tag formats:
+
+- backend:
+  - `backend/v1.0.0`
+- admin-client:
+  - `admin/v1.0.0`
+- desktop-client:
+  - `desktop/v1.0.0`
+
+The workflow extracts the version directly from the pushed tag and uses it for:
+
+- the GitHub Release name
+- published artifact naming
+- container image tags where applicable
+
+Examples:
+
+- pushing `backend/v1.0.0` creates a backend release and publishes:
+  - `ghcr.io/<repo>/backend:v1.0.0`
+  - `ghcr.io/<repo>/backend:latest`
+- pushing `admin/v1.0.0` creates an admin-client release and publishes:
+  - `ghcr.io/<repo>/admin:v1.0.0`
+  - `ghcr.io/<repo>/admin:latest`
+- pushing `desktop/v1.0.0` creates a desktop-client release with the packaged MSIX artifact
+
+Important:
+
+- the release version does not currently come from component-local manifest files such as `admin-client/package.json`
+- the git tag is the source of truth for release versioning
