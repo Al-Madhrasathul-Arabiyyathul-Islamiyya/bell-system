@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { Icon } from "@iconify/vue";
+import AppSystemStateToggle from "../../../components/app/AppSystemStateToggle.vue";
 import type { SystemStateVm } from "../../../lib/api/system";
 import type { SocketStatus } from "../../../stores/realtime";
 
@@ -106,32 +107,13 @@ const socketBadgeClass = computed(() => {
       </div>
 
       <div class="flex flex-wrap gap-3">
-        <button
-          class="btn btn-primary"
-          type="button"
-          :disabled="statePending || state?.state === 'active'"
-          @click="emit('setState', 'active')"
-        >
-          <Icon icon="solar:play-bold-duotone" class="text-lg" />
-          {{
-            statePending && state?.state !== "active"
-              ? "Updating..."
-              : "Resume System"
-          }}
-        </button>
-        <button
-          class="btn btn-warning"
-          type="button"
-          :disabled="statePending || state?.state === 'paused'"
-          @click="emit('setState', 'paused')"
-        >
-          <Icon icon="solar:pause-bold-duotone" class="text-lg" />
-          {{
-            statePending && state?.state !== "paused"
-              ? "Updating..."
-              : "Pause System"
-          }}
-        </button>
+        <AppSystemStateToggle
+          :state="state?.state"
+          :pending="statePending"
+          @toggle="
+            emit('setState', state?.state === 'paused' ? 'active' : 'paused')
+          "
+        />
         <button
           class="btn btn-error btn-soft"
           type="button"
