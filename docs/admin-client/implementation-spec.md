@@ -43,12 +43,8 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 - `@vue/test-utils`
 - `happy-dom`
 - `playwright`
-- `openapi-typescript`
-- `eslint`
-- `eslint-plugin-vue`
-- `@typescript-eslint/parser`
-- `@typescript-eslint/eslint-plugin`
-- `prettier`
+- `oxlint`
+- `oxfmt`
 
 ## Why These Packages
 
@@ -58,7 +54,6 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 - `@vueuse/core`: use `useStorage`, `useColorMode`, `useBreakpoints`, `useDocumentTitle`, `useDebounceFn`, `watchDebounced`, `useIntervalFn`, `useWebSocket`, and `useTimeAgo`.
 - `ofetch`: lighter than Axios and sufficient for JSON:API, login JSON, and multipart upload.
 - `zod` + `Regle`: schema-driven forms and validation without coupling page components to hand-rolled field state.
-- `openapi-typescript`: generate API-facing types from `docs/api/openapi/openapi.yaml`, then wrap them with JSON:API adapters.
 
 ## Explicit Frontend Decisions
 
@@ -78,7 +73,7 @@ Build `admin-client/` as a Vue 3 admin SPA for the Bell Schedule System backend.
 ```bash
 cd admin-client
 pnpm add vue-router pinia @tanstack/vue-query @vueuse/core @vueuse/router ofetch zod @regle/core @regle/rules @regle/schemas @iconify/vue
-pnpm add -D tailwindcss @tailwindcss/vite daisyui vitest @vue/test-utils happy-dom playwright openapi-typescript eslint eslint-plugin-vue @typescript-eslint/parser @typescript-eslint/eslint-plugin prettier
+pnpm add -D tailwindcss @tailwindcss/vite daisyui vitest @vue/test-utils happy-dom playwright oxlint oxfmt
 ```
 
 ## App Structure

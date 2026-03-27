@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": true,
+  "trailingComma": "all",
+  "endOfLine": "lf",
+  "printWidth": 80,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    ".pnpm-store",
+    "coverage",
+    "*.tsbuildinfo"
+  ]
+}
