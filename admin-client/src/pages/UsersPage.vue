@@ -5,7 +5,6 @@ import { useStorage } from "@vueuse/core";
 import AppConfirmDialog from "../components/app/AppConfirmDialog.vue";
 import { AppPageHeader, AppStatCard } from "./page-exports";
 import UserFormDialog from "../features/users/components/UserFormDialog.vue";
-import UserRoleBadge from "../features/users/components/UserRoleBadge.vue";
 import UsersTable from "../features/users/components/UsersTable.vue";
 import {
   useCreateUserMutation,
@@ -229,28 +228,6 @@ function readMetaPages(meta: Record<string, unknown> | undefined) {
         :value="String(adminUsersOnPage)"
         description="Visible administrator accounts in the current result set."
       />
-      <article class="card border border-base-300 bg-base-100 shadow-sm">
-        <div class="card-body gap-3">
-          <p
-            class="text-xs font-semibold uppercase tracking-[0.24em] text-primary"
-          >
-            Active Filter
-          </p>
-          <div class="flex items-center gap-3">
-            <UserRoleBadge v-if="roleFilter !== 'all'" :role="roleFilter" />
-            <span v-else class="badge badge-outline font-medium"
-              >All Roles</span
-            >
-            <p class="text-sm text-base-content/70">
-              Page {{ currentPage }} of {{ totalPages }}
-            </p>
-          </div>
-          <p class="text-sm leading-7 text-base-content/70">
-            Adjust the role filter or page size to narrow the result set before
-            editing.
-          </p>
-        </div>
-      </article>
     </div>
 
     <article class="card border border-base-300 bg-base-100 shadow-sm">

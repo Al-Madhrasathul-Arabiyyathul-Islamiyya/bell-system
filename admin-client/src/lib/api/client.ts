@@ -17,8 +17,11 @@ const apiFetch = createFetch({
       applyAuthHeader(options);
     },
     onResponseError({ response }: FetchContext) {
-      if (response?.status === 401) {
-        useAuthStore(pinia).clearAuth();
+      const authStore = useAuthStore(pinia);
+
+      if (response?.status === 401 && authStore.isAuthenticated) {
+        authStore.clearAuth();
+        redirectToLoginIfNeeded();
       }
     },
     retry: 0,
@@ -128,4 +131,22 @@ function withMode(options: ApiRequestOptions, mode: RequestMode) {
     ...options,
     headers,
   };
+}
+
+function redirectToLoginIfNeeded() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (window.location.pathname === "/login") {
+    return;
+  }
+
+  const redirectTarget = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  const nextUrl = new URL("/login", window.location.origin);
+
+  nextUrl.searchParams.set("reason", "session-expired");
+  nextUrl.searchParams.set("redirect", redirectTarget);
+
+  window.location.replace(nextUrl.toString());
 }
