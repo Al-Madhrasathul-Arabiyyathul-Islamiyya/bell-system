@@ -5,7 +5,6 @@ import { useStorage } from "@vueuse/core";
 import AppConfirmDialog from "../components/app/AppConfirmDialog.vue";
 import { AppPageHeader, AppStatCard } from "./page-exports";
 import AudioFilesTable from "../features/audio/components/AudioFilesTable.vue";
-import AudioFileTypeBadge from "../features/audio/components/AudioFileTypeBadge.vue";
 import AudioMetadataDialog from "../features/audio/components/AudioMetadataDialog.vue";
 import AudioPreviewPlayer from "../features/audio/components/AudioPreviewPlayer.vue";
 import AudioUploadDialog from "../features/audio/components/AudioUploadDialog.vue";
@@ -428,33 +427,6 @@ function toAudioUpdatePayload(
 
       <div class="space-y-6">
         <AudioPreviewPlayer :file="previewTarget" />
-
-        <article class="card border border-base-300 bg-base-100 shadow-sm">
-          <div class="card-body gap-4">
-            <p
-              class="text-xs font-semibold uppercase tracking-[0.24em] text-primary"
-            >
-              Selected Type
-            </p>
-            <div class="flex items-center gap-2">
-              <AudioFileTypeBadge
-                v-if="fileTypeFilter !== 'all'"
-                :file-type="fileTypeFilter"
-              />
-              <span v-else class="badge badge-outline font-medium"
-                >All Types</span
-              >
-              <p class="text-sm text-base-content/70">
-                Page {{ currentPage }} of {{ totalPages }}
-              </p>
-            </div>
-            <p class="text-sm leading-7 text-base-content/70">
-              Upload uses multipart form data, while metadata edits use JSON:API
-              updates. Preview and direct download both use the public binary
-              content route.
-            </p>
-          </div>
-        </article>
       </div>
     </div>
 

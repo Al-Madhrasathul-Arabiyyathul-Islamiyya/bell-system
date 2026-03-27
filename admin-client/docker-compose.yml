@@ -1,0 +1,9 @@
+services:
+  admin-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bell-system-admin-client
+    ports:
+      - "8081:80"
+    restart: unless-stopped

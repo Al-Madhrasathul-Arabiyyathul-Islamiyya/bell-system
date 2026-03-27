@@ -1,35 +1,44 @@
 [server]
-port = 8080
 environment = "development"
+port = 8080
 readTimeout = 15
 writeTimeout = 15
 
 [database]
 driver = "sqlserver"
 host = "localhost"
-port = 1433
-user = "bell_schedule_user"
-password = "YourStrongPassword123!"
 name = "BellScheduleDB"
+password = "YourStrongPassword123!"
+port = 1433
 sslmode = "disable"
+user = "bell_schedule_user"
 
 [jwt]
-secret = "your-secret-key-change-in-production"
 expiresIn = 180 # minutes
+secret = "your-secret-key-change-in-production" 
 
 [storage]
 audioDir = "./data/audio"
 
 [cors]
-allowedOrigins = ["http://localhost:3000", "http://localhost:5173"]
+allowedOrigins = [
+  "http://localhost:3000",
+  "https://localhost:3000",
+  "http://localhost:5173",
+  "https://localhost:5173",
+  "http://localhost:80",
+  "http://localhost:8081",
+  "https://localhost:80",
+  "https://localhost:8081",
+]
 maxAge = 300
 
 [websocket]
-pingInterval = 30   # seconds
-pongTimeout = 10    # seconds
 maxMessageSize = 512 # bytes
+pingInterval = 30 # seconds
+pongTimeout = 10 # seconds
 
 [scheduler]
-checkInterval = 30  # seconds
-enabled = true
-timezone = "Indian/Maldives"  # IANA timezone for schedule comparisons
+checkInterval = 30 # seconds
+enabled = true 
+timezone = "Indian/Maldives" # IANA timezone for schedule comparisons

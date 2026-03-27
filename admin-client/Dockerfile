@@ -1,5 +1,5 @@
 # Build stage
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /src
 RUN corepack enable
@@ -18,4 +18,4 @@ COPY --from=builder /src/dist /usr/share/nginx/html
 EXPOSE 80
 
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-  CMD wget -qO- http://localhost/health || exit 1
+  CMD wget --spider -q http://127.0.0.1/health || exit 1

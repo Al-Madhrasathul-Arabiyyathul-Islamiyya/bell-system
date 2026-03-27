@@ -17,7 +17,7 @@ const realtimeStore = useRealtimeStore();
 const showCancelDialog = ref(false);
 
 const currentScheduleQuery = useCurrentScheduleQuery();
-const { currentItem, nextItem, upcomingItems } = useCurrentScheduleSummary(
+const { nextItem, upcomingItems } = useCurrentScheduleSummary(
   computed(() => currentScheduleQuery.data.value ?? null),
 );
 const {
@@ -59,7 +59,7 @@ async function handleCancelNextBell() {
       description="Monitor the live bell state, the current schedule snapshot, upcoming bells, and realtime connectivity from one operational surface."
     />
 
-    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <AppStatCard
         title="System State"
         :value="
@@ -80,15 +80,6 @@ async function handleCancelNextBell() {
           currentScheduleQuery.data.value?.session
             ? `${currentScheduleQuery.data.value.session.startTime?.slice(0, 5)} - ${currentScheduleQuery.data.value.session.endTime?.slice(0, 5)}`
             : 'No session is active at the current time.'
-        "
-      />
-      <AppStatCard
-        title="Current Bell"
-        :value="currentItem?.name ?? 'None Active'"
-        :description="
-          currentItem
-            ? `${currentItem.time} • ${currentItem.sound?.name ?? 'No audio linked'}`
-            : 'Nothing is currently ringing.'
         "
       />
       <AppStatCard

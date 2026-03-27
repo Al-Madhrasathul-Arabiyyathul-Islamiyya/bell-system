@@ -21,6 +21,7 @@ const redirectTarget = computed(() => {
     ? route.query.redirect
     : "/dashboard";
 });
+const sessionExpired = computed(() => route.query.reason === "session-expired");
 
 const loginError = computed(() => {
   if (!loginMutation.error.value) {
@@ -63,6 +64,14 @@ async function handleLogin() {
           </div>
 
           <div class="space-y-5">
+            <div
+              v-if="sessionExpired && !loginError"
+              class="alert alert-warning text-sm"
+              role="alert"
+            >
+              Your session expired. Please sign in again.
+            </div>
+
             <div
               v-if="loginError"
               class="alert alert-error text-sm"
