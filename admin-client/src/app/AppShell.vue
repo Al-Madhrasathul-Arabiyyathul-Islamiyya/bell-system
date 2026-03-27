@@ -10,8 +10,12 @@ import {
   useTitle,
 } from "@vueuse/core";
 import { RouterLink, RouterView, useRoute, useRouter } from "vue-router";
+import AppSystemStateToggle from "../components/app/AppSystemStateToggle.vue";
 import { useLogoutMutation } from "../features/auth/composables/use-auth";
+import { useCurrentScheduleSummary } from "../features/dashboard/composables/use-current-schedule-summary";
 import { useBellSystemSocket } from "../features/realtime/composables/use-bell-system-socket";
+import { useCurrentScheduleQuery } from "../features/schedule/composables/use-schedule";
+import { useSystemControls } from "../features/system/composables/use-system-controls";
 import AppThemeSwitcher from "../components/app/AppThemeSwitcher.vue";
 import { appEnv } from "../lib/env";
 import { useAppShellStore } from "../stores/app-shell";
@@ -26,6 +30,12 @@ const authStore = useAuthStore();
 const toastStore = useToastStore();
 const realtimeStore = useRealtimeStore();
 const logoutMutation = useLogoutMutation();
+const currentScheduleQuery = useCurrentScheduleQuery();
+const { nextItem } = useCurrentScheduleSummary(
+  computed(() => currentScheduleQuery.data.value ?? null),
+);
+const { systemState, toggleSystemState, updateSystemStateMutation } =
+  useSystemControls();
 
 const online = useOnline();
 const now = useNow({ interval: 1_000 });
@@ -182,15 +192,34 @@ async function handleLogout() {
           </div>
         </div>
 
-        <div
-          class="hidden flex-col items-center justify-center leading-tight md:flex"
-        >
-          <p class="text-sm font-semibold text-base-content/70">
-            {{ formattedDate }}
-          </p>
-          <p class="font-display text-2xl font-semibold text-base-content">
-            {{ formattedTime }}
-          </p>
+        <div class="hidden items-center justify-center gap-6 md:flex">
+          <div class="flex flex-col items-center justify-center leading-tight">
+            <p class="text-sm font-semibold text-base-content/70">
+              {{ formattedDate }}
+            </p>
+            <p class="font-display text-2xl font-semibold text-base-content">
+              {{ formattedTime }}
+            </p>
+          </div>
+          <div
+            class="max-w-xs rounded-box border border-base-300 bg-base-200/80 px-4 py-2 text-center"
+          >
+            <p
+              class="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-primary"
+            >
+              Next Bell
+            </p>
+            <p class="truncate text-sm font-semibold text-base-content">
+              {{ nextItem?.name ?? "No upcoming bell" }}
+            </p>
+            <p class="truncate text-xs text-base-content/65">
+              {{
+                nextItem
+                  ? `${nextItem.time} • ${nextItem.sound?.name ?? "No audio linked"}`
+                  : "The live schedule has no pending bells right now."
+              }}
+            </p>
+          </div>
         </div>
 
         <div class="flex items-center justify-end gap-2">
@@ -218,6 +247,12 @@ async function handleLogout() {
             />
             Socket {{ realtimeStore.socketStatus.toLowerCase() }}
           </span>
+          <AppSystemStateToggle
+            icon-only
+            :state="systemState?.state"
+            :pending="updateSystemStateMutation.isPending.value"
+            @toggle="toggleSystemState"
+          />
           <AppThemeSwitcher />
           <div class="dropdown dropdown-end">
             <div tabindex="0" role="button" class="btn btn-ghost gap-2 px-3">

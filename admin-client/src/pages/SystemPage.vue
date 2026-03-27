@@ -5,13 +5,9 @@ import AppConfirmDialog from "../components/app/AppConfirmDialog.vue";
 import ChangePasswordCard from "../features/system/components/ChangePasswordCard.vue";
 import SystemStateCard from "../features/system/components/SystemStateCard.vue";
 import { useChangePasswordMutation } from "../features/auth/composables/use-auth";
-import {
-  useCancelNextBellMutation,
-  useSystemStateQuery,
-  useUpdateSystemStateMutation,
-} from "../features/system/composables/use-system";
 import { getUserFacingError } from "../lib/api/errors";
 import type { SystemStateVm } from "../lib/api/system";
+import { useSystemControls } from "../features/system/composables/use-system-controls";
 import { useAuthStore } from "../stores/auth";
 import { useRealtimeStore } from "../stores/realtime";
 import { useToastStore } from "../stores/toast";
@@ -27,47 +23,19 @@ const changePasswordCard = useTemplateRef<InstanceType<
 const passwordError = ref<null | string>(null);
 const showCancelDialog = ref(false);
 
-const systemStateQuery = useSystemStateQuery();
-const updateSystemStateMutation = useUpdateSystemStateMutation();
-const cancelNextBellMutation = useCancelNextBellMutation();
 const changePasswordMutation = useChangePasswordMutation();
-
-const systemState = computed(() => systemStateQuery.data.value ?? null);
+const {
+  cancelNextBell,
+  cancelNextBellMutation,
+  setSystemState,
+  systemError,
+  systemState,
+  updateSystemStateMutation,
+} = useSystemControls();
 const showConnectedClients = computed(() => authStore.isAdmin);
-const systemError = computed(() => {
-  if (!systemStateQuery.error.value) {
-    return null;
-  }
-
-  return getUserFacingError(systemStateQuery.error.value).detail;
-});
 
 async function handleSetState(state: SystemStateVm["state"]) {
-  try {
-    await updateSystemStateMutation.mutateAsync({
-      data: {
-        attributes: {
-          state,
-        },
-        type: "system-state",
-      },
-    });
-
-    toastStore.enqueue({
-      detail:
-        state === "paused"
-          ? "Bell playback has been paused."
-          : "Bell playback has been resumed.",
-      title: state === "paused" ? "System Paused" : "System Resumed",
-      tone: "success",
-    });
-  } catch (error) {
-    toastStore.enqueue({
-      detail: getUserFacingError(error).detail,
-      title: "State Update Failed",
-      tone: "error",
-    });
-  }
+  await setSystemState(state);
 }
 
 function requestCancelNextBell() {
@@ -80,23 +48,9 @@ function closeCancelDialog() {
 
 async function handleCancelNextBell() {
   try {
-    await cancelNextBellMutation.mutateAsync();
-    toastStore.enqueue({
-      detail: "The next pending bell was cancelled successfully.",
-      title: "Bell Cancelled",
-      tone: "success",
-    });
-  } catch (error) {
-    const userError = getUserFacingError(error);
-
-    toastStore.enqueue({
-      detail:
-        userError.status === 404
-          ? "No pending bell is available to cancel right now."
-          : userError.detail,
-      title: userError.status === 404 ? "Nothing to Cancel" : "Action Failed",
-      tone: userError.status === 404 ? "info" : "error",
-    });
+    await cancelNextBell();
+  } catch {
+    // Toast feedback is already handled inside the shared system controls composable.
   } finally {
     showCancelDialog.value = false;
   }

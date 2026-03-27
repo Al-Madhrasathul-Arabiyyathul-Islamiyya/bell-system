@@ -14,6 +14,8 @@ type ScheduleFormPayload = {
   time: string;
 };
 
+type DayPreset = "all" | "custom" | "weekdays";
+
 const props = withDefaults(
   defineProps<{
     audioFiles: AudioFileVm[];
@@ -46,12 +48,19 @@ const dayOptions = [
   { label: "Sat", value: 7 },
 ] as const;
 
+const allDayValues = dayOptions.map((day) => day.value);
+const weekdayValues = [1, 2, 3, 4, 5] as const;
+
 const form = reactive({
   days: [] as number[],
   name: "",
   sessionId: "",
   soundId: "",
   time: "",
+});
+
+const presetForm = reactive({
+  dayPreset: "custom" as DayPreset,
 });
 
 const schema = z.object({
@@ -100,9 +109,17 @@ watch(
     form.sessionId = props.item?.sessionId ?? props.sessions[0]?.id ?? "";
     form.soundId = props.item?.soundId ?? "";
     form.days = props.item?.days ? [...props.item.days] : [];
+    presetForm.dayPreset = resolveDayPreset(form.days);
     r$.$reset();
   },
   { immediate: true },
+);
+
+watch(
+  () => [...form.days].sort((left, right) => left - right).join(","),
+  () => {
+    presetForm.dayPreset = resolveDayPreset(form.days);
+  },
 );
 
 async function handleSubmit() {
@@ -130,6 +147,40 @@ function updateDay(day: number, checked: boolean) {
   if (!checked) {
     form.days = form.days.filter((value) => value !== day);
   }
+}
+
+function applyDayPreset(preset: DayPreset) {
+  presetForm.dayPreset = preset;
+
+  if (preset === "all") {
+    form.days = [...allDayValues];
+    return;
+  }
+
+  if (preset === "weekdays") {
+    form.days = [...weekdayValues];
+  }
+}
+
+function resolveDayPreset(days: number[]): DayPreset {
+  const sortedDays = [...days].sort((left, right) => left - right);
+
+  if (matchesDays(sortedDays, allDayValues)) {
+    return "all";
+  }
+
+  if (matchesDays(sortedDays, weekdayValues)) {
+    return "weekdays";
+  }
+
+  return "custom";
+}
+
+function matchesDays(days: number[], expectedDays: readonly number[]) {
+  return (
+    days.length === expectedDays.length &&
+    days.every((day, index) => day === expectedDays[index])
+  );
 }
 </script>
 
@@ -228,6 +279,53 @@ function updateDay(day: number, checked: boolean) {
 
         <fieldset class="fieldset md:col-span-2">
           <legend class="fieldset-legend">Days</legend>
+          <div class="mb-3 grid gap-2 md:grid-cols-3">
+            <label
+              class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 px-3 py-3"
+            >
+              <input
+                class="radio radio-sm"
+                type="radio"
+                name="day-preset"
+                :checked="presetForm.dayPreset === 'all'"
+                :disabled="pending"
+                @change="applyDayPreset('all')"
+              />
+              <span class="label-text font-medium text-base-content"
+                >All days</span
+              >
+            </label>
+            <label
+              class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 px-3 py-3"
+            >
+              <input
+                class="radio radio-sm"
+                type="radio"
+                name="day-preset"
+                :checked="presetForm.dayPreset === 'weekdays'"
+                :disabled="pending"
+                @change="applyDayPreset('weekdays')"
+              />
+              <span class="label-text font-medium text-base-content"
+                >Weekdays</span
+              >
+            </label>
+            <label
+              class="label cursor-pointer justify-start gap-3 rounded-box border border-base-300 px-3 py-3"
+            >
+              <input
+                class="radio radio-sm"
+                type="radio"
+                name="day-preset"
+                :checked="presetForm.dayPreset === 'custom'"
+                :disabled="pending"
+                @change="applyDayPreset('custom')"
+              />
+              <span class="label-text font-medium text-base-content"
+                >Custom</span
+              >
+            </label>
+          </div>
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-7">
             <label
               v-for="day in dayOptions"
@@ -246,7 +344,7 @@ function updateDay(day: number, checked: boolean) {
                   )
                 "
               />
-              <span class="label-text">{{ day.label }}</span>
+              <span class="label-text text-base-content">{{ day.label }}</span>
             </label>
           </div>
           <p v-if="r$.days.$error" class="fieldset-label text-error">
