@@ -9,6 +9,10 @@ docs/
 │   ├── implementation-spec.md # Frontend architecture, package, and routing spec
 │   ├── api-integration-spec.md # REST/WebSocket integration guide and backend caveats
 │   └── theme.css          # DaisyUI theme definitions for light/dark modes
+├── post-v1/                # Follow-up initiatives after the v1 baseline
+│   ├── README.md           # Post-v1 document index
+│   ├── logging-and-audit-roadmap.md # Loki-friendly logging, audit trails, and health logs
+│   └── sessionless-schedule-items.md # Sessionless bell items and scheduler changes
 ├── api/                    # API specifications
 │   ├── openapi/            # Modular OpenAPI 3.2 spec (JSON:API v1.1)
 │   │   ├── openapi.yaml    # Root spec with path references
