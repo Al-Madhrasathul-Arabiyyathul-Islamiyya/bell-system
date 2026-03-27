@@ -13,7 +13,7 @@ This is a monorepo containing three components:
 | Component | Tech | Description |
 |-----------|------|-------------|
 | [bell-system-backend](bell-system-backend/) | Go, Chi, SQL Server | REST API, scheduler, WebSocket server |
-| [admin-client](admin-client/) | React, TypeScript, Vite | Admin web interface for schedule management |
+| [admin-client](admin-client/) | Vue 3, TypeScript, Vite, pnpm | Admin web interface for schedule management |
 | [desktop-client](desktop-client/) | .NET (WPF) | Desktop app for audio playback and display |
 
 ## Tech Stack
@@ -21,7 +21,7 @@ This is a monorepo containing three components:
 - **Backend**: Go 1.26+, go-chi/chi v5, spf13/viper (TOML config), go.uber.org/zap
 - **Database**: SQL Server (microsoft/go-mssqldb)
 - **Auth**: JWT (180min expiry)
-- **Admin Client**: React 18, TypeScript, Vite
+- **Admin Client**: Vue 3, TypeScript, Vite, pnpm
 - **Desktop Client**: .NET, WPF
 
 ## Getting Started
@@ -30,7 +30,7 @@ This is a monorepo containing three components:
 
 - Go 1.26+
 - SQL Server
-- Node.js 18+ and Yarn (for admin client)
+- Node.js 22+ and pnpm (for admin client)
 - .NET 9+ SDK (for desktop client)
 
 ### Clone
