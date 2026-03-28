@@ -28,6 +28,27 @@ make build
 ./bin/bell-schedule-system
 ```
 
+## Container Deployment
+
+Run the published backend image locally with Compose:
+
+```bash
+docker compose up -d
+```
+
+This uses:
+
+- [docker-compose.yml](/D:/Stuff/projects/bell-system/bell-system-backend/docker-compose.yml)
+- [config.docker.toml](/D:/Stuff/projects/bell-system/bell-system-backend/config.docker.toml)
+
+It expects SQL Server to be reachable from the container via `host.docker.internal:1433`.
+
+For hosted deployment with the admin client behind Traefik, use the repo root deploy file:
+
+```bash
+docker compose -f ../docker-compose.deploy.yml up -d
+```
+
 ## Project Structure
 
 ```

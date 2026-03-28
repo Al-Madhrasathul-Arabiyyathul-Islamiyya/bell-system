@@ -9,6 +9,7 @@ docs/
 │   ├── implementation-spec.md # Frontend architecture, package, and routing spec
 │   ├── api-integration-spec.md # REST/WebSocket integration guide and backend caveats
 │   └── theme.css          # DaisyUI theme definitions for light/dark modes
+├── docker-compose.deploy.yml # Root hosted deployment compose file for backend + admin-client
 ├── post-v1/                # Follow-up initiatives after the v1 baseline
 │   ├── README.md           # Post-v1 document index
 │   ├── logging-and-audit-roadmap.md # Loki-friendly logging, audit trails, and health logs
