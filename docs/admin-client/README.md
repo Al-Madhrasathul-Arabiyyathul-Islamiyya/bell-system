@@ -1,6 +1,6 @@
 # Admin Client Documentation
 
-This folder defines the target implementation for the `admin-client` frontend.
+This folder describes the implemented `admin-client` frontend and the supporting decisions behind it.
 
 ## Recommended Document Order
 
@@ -13,11 +13,21 @@ This folder defines the target implementation for the `admin-client` frontend.
 
 ## Current Project State
 
-- `admin-client/` now has the app shell, routing, persisted theme/auth state, centralized toasts, and the base Tailwind + DaisyUI pipeline.
-- Users management and System controls are now wired to the live backend APIs.
-- `/users` is gated to the `admin` role, while the shared shell route stays aligned with the backend's authenticated-route behavior.
-- Backend API contracts live in `docs/api/openapi/` and are partially aligned with the Go implementation.
-- The frontend should be implemented as a Vue 3 SPA using VueUse helpers and DaisyUI theming.
+- `admin-client/` is feature-complete for the current v1 scope.
+- The app includes:
+  - login/auth persistence
+  - dashboard
+  - sessions CRUD
+  - schedule CRUD
+  - audio management with preview
+  - users CRUD
+  - system controls
+  - WebSocket-driven live status updates
+- `/users` is gated to the `admin` role.
+- Schedule visibility is role-aware for `admin`, `morning_user`, and `afternoon_user`.
+- The frontend uses Vue 3, VueUse, Pinia, TanStack Vue Query, DaisyUI, Regle, Zod, `oxlint`, and `oxfmt`.
+- The published container image is released to GHCR under:
+  - `ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/admin:<tag>`
 
 ## High-Level Decisions
 
@@ -36,20 +46,9 @@ This folder defines the target implementation for the `admin-client` frontend.
   - `GET /audio/{id}/content`
   - WebSocket `/ws`
 
-## Expected Deliverables
+## Deployment Notes
 
-- Authentication flow
-- Dashboard
-- Users CRUD
-- Sessions CRUD
-- Schedule CRUD
-- Audio library management
-- System controls
-- WebSocket-driven live refresh
-- Production-ready container build for `admin-client/`
-
-## Implemented So Far
-
-- App shell, auth flow, route guards, theme switching, and toast notifications
-- Users page with paginated CRUD UI and admin-role route gating
-- System page with state controls, cancel-next-bell confirmation, and change-password flow
+- Local image build uses [Dockerfile](/D:/Stuff/projects/bell-system/admin-client/Dockerfile).
+- Local Compose usage uses [docker-compose.yml](/D:/Stuff/projects/bell-system/admin-client/docker-compose.yml) and defaults to the GHCR `latest` image.
+- Hosted multi-service deployment uses [docker-compose.deploy.yml](/D:/Stuff/projects/bell-system/docker-compose.deploy.yml).
+- Versioned releases are driven by git tags in the form `admin/v*`.

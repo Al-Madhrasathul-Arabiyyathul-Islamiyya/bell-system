@@ -1,0 +1,38 @@
+services:
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/backend:latest}
+    pull_policy: always
+    container_name: bell-system-backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    volumes:
+      - ./bell-system-backend/config.docker.toml:/app/config/config.toml:ro
+      - ./bell-system-backend/api:/app/api:ro
+      - ./bell-system-backend/data/audio:/app/data/audio
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bellsystem.rule=Host(`bellsystem.arabiyyaschool.edu.mv`)"
+      - "traefik.http.routers.bellsystem.entrypoints=websecure"
+      - "traefik.http.routers.bellsystem.tls=true"
+      - "traefik.http.services.bellsystem.loadbalancer.server.port=8080"
+    networks:
+      - traefik
+
+  admin-client:
+    image: ${ADMIN_CLIENT_IMAGE:-ghcr.io/al-madhrasathul-arabiyyathul-islamiyya/bell-system/admin:latest}
+    pull_policy: always
+    container_name: bell-system-admin-client
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.bellsystem-admin.rule=Host(`bellsystem-admin.arabiyyaschool.edu.mv`)"
+      - "traefik.http.routers.bellsystem-admin.entrypoints=websecure"
+      - "traefik.http.routers.bellsystem-admin.tls=true"
+      - "traefik.http.services.bellsystem-admin.loadbalancer.server.port=80"
+    networks:
+      - traefik
+
+networks:
+  traefik:
+    external: true

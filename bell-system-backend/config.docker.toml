@@ -1,0 +1,46 @@
+[server]
+environment = "development"
+port = 8080
+readTimeout = 15
+writeTimeout = 15
+
+[database]
+driver = "sqlserver"
+host = "host.docker.internal"
+name = "BellScheduleDB"
+password = "YourStrongPassword123!"
+port = 1433
+sslmode = "disable"
+user = "bell_schedule_user"
+
+[jwt]
+expiresIn = 180
+secret = "your-secret-key-change-in-production"
+
+[storage]
+audioDir = "./data/audio"
+
+[cors]
+allowedOrigins = [
+  "http://localhost:3000",
+  "https://localhost:3000",
+  "http://localhost:5173",
+  "https://localhost:5173",
+  "http://localhost:80",
+  "http://localhost:8080",
+  "https://localhost:80",
+  "https://localhost:8080",
+  "http://localhost:8081",
+  "https://localhost:8081",
+]
+maxAge = 300
+
+[websocket]
+maxMessageSize = 512
+pingInterval = 30
+pongTimeout = 10
+
+[scheduler]
+checkInterval = 30
+enabled = true
+timezone = "Indian/Maldives"
